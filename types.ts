@@ -20,6 +20,13 @@ export enum SizeTier {
   AncientKing = 'Cổ Vương' // 80-100%
 }
 
+export enum MutationTier {
+  Common = 'Common',
+  Rare = 'Rare',
+  Epic = 'Epic',
+  Legendary = 'Legendary',
+}
+
 export interface Vector2 {
   x: number;
   y: number;
@@ -53,7 +60,7 @@ export interface LavaZone {
 
 export interface DelayedAction {
   id: string;
-  type: 'metal_dash' | 'water_shot' | 'fire_land';
+  type: 'metal_dash' | 'water_shot' | 'fire_land' | 'double_cast';
   timer: number;
   ownerId: string;
   data?: any;
@@ -82,16 +89,67 @@ export interface Player extends Entity {
   // RPG Stats (Phase 1 Update)
   defense: number;
   damageMultiplier: number;
+
+  // Mutation Stats
+  mutations: string[];
+  critChance: number;
+  critMultiplier: number;
+  lifesteal: number;
+  armorPen: number;
+  reflectDamage: number;
+  visionMultiplier: number;
+  sizePenaltyMultiplier: number;
+  skillCooldownMultiplier: number;
+  skillPowerMultiplier: number;
+  skillDashMultiplier: number;
+  killGrowthMultiplier: number;
+  poisonOnHit: boolean;
+  doubleCast: boolean;
+  reviveAvailable: boolean;
+  magneticFieldRadius: number;
+  mutationCooldowns: {
+    speedSurge: number;
+    invulnerable: number;
+    rewind: number;
+    lightning: number;
+    chaos: number;
+    kingForm: number;
+  };
+  rewindHistory: { position: Vector2; health: number; time: number }[];
+  stationaryTime: number;
+  teleportCooldown: number;
+  landmarkCharge: number;
+  landmarkId: string | null;
+  landmarkCooldown: number;
   
   // Status Effects
   statusEffects: {
     speedBoost: number; // Multiplier, 1 is normal
     shielded: boolean;
     burning: boolean;
+    burnTimer: number;
     slowed: boolean;
+    slowTimer: number;
+    slowMultiplier: number;
     poisoned: boolean; // New: Earth Tier 5 / Wood Drain
+    poisonTimer: number;
     regen: number; // New: HP per second
     airborne: boolean; // New: For Fire Jump
+    stealthed: boolean;
+    stealthCharge: number;
+    invulnerable: number;
+    rooted: number;
+    speedSurge: number;
+    kingForm: number;
+    damageBoost: number;
+    defenseBoost: number;
+    damageBoostTimer: number;
+    defenseBoostTimer: number;
+    shieldTimer: number;
+    speedBoostTimer: number;
+    critCharges: number;
+    visionBoost: number;
+    visionBoostTimer: number;
   };
 }
 
@@ -99,12 +157,75 @@ export interface Bot extends Player {
   aiState: 'wander' | 'chase' | 'flee';
   targetEntityId: string | null;
   aiReactionTimer: number; // Delay reaction slightly for realism
+  isCreep?: boolean;
+  creepType?: string;
+  isElite?: boolean;
+  isBoss?: boolean;
+  bossAttackTimer?: number;
+  bossAttackCharge?: number;
 }
 
 export interface Food extends Entity {
   value: number;
   isEjected?: boolean; // Created by player W key
   kind?: 'normal' | 'ejected' | 'relic';
+}
+
+export type PowerUpType =
+  | 'fire_orb'
+  | 'healing'
+  | 'ice_heart'
+  | 'sword_aura'
+  | 'diamond_shield'
+  | 'healing_fruit'
+  | 'legendary_orb';
+
+export interface PowerUp extends Entity {
+  type: PowerUpType;
+  duration: number;
+}
+
+export type HazardType =
+  | 'lightning'
+  | 'geyser'
+  | 'icicle'
+  | 'spear'
+  | 'vines'
+  | 'thin_ice'
+  | 'wind'
+  | 'mushroom';
+
+export interface Hazard {
+  id: string;
+  type: HazardType;
+  position: Vector2;
+  radius: number;
+  timer: number;
+  duration: number;
+  direction?: Vector2;
+  active: boolean;
+}
+
+export type LandmarkType =
+  | 'fire_furnace'
+  | 'wood_tree'
+  | 'water_statue'
+  | 'metal_altar'
+  | 'earth_pyramid';
+
+export interface Landmark {
+  id: string;
+  type: LandmarkType;
+  position: Vector2;
+  radius: number;
+  timer: number;
+}
+
+export interface MutationChoice {
+  id: string;
+  name: string;
+  tier: MutationTier;
+  description: string;
 }
 
 export interface Particle extends Entity {
@@ -125,7 +246,12 @@ export interface FloatingText {
 export interface GameState {
   player: Player;
   bots: Bot[];
+  creeps: Bot[];
+  boss: Bot | null;
   food: Food[];
+  powerUps: PowerUp[];
+  hazards: Hazard[];
+  landmarks: Landmark[];
   particles: Particle[];
   projectiles: Projectile[];
   floatingTexts: FloatingText[];
@@ -141,6 +267,22 @@ export interface GameState {
   kingId: string | null; 
   relicId: string | null;
   relicTimer: number;
+  mutationChoices: MutationChoice[] | null;
+  isPaused: boolean;
+  hazardTimers: {
+    lightning: number;
+    geyser: number;
+    icicle: number;
+    powerUpFire: number;
+    powerUpWood: number;
+    powerUpWater: number;
+    powerUpMetal: number;
+    powerUpEarth: number;
+    bossRespawn: number;
+    creepRespawn: number;
+    dustStorm: number;
+    dustStormActive: boolean;
+  };
   
   // Input State
   inputs: {

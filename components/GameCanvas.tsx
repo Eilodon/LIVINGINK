@@ -2,6 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { GameState, Faction, Player, Bot, SizeTier } from '../types';
 import { COLOR_PALETTE, WORLD_WIDTH, WORLD_HEIGHT, MAP_RADIUS, EAT_THRESHOLD_RATIO, DANGER_THRESHOLD_RATIO, ELEMENTAL_ADVANTAGE, FACTION_CONFIG, CENTER_RADIUS } from '../constants';
 
+const distSq = (v1: { x: number; y: number }, v2: { x: number; y: number }) => {
+  const dx = v1.x - v2.x;
+  const dy = v1.y - v2.y;
+  return dx * dx + dy * dy;
+};
+
 interface GameCanvasProps {
   gameState: GameState;
   onMouseMove: (x: number, y: number) => void;
@@ -57,7 +63,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       const { width, height, dpr } = sizeRef.current;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const { camera, player, food, bots, particles, projectiles, zoneRadius, floatingTexts, kingId, lavaZones } = gameState;
+      const { camera, player, food, bots, creeps, boss, powerUps, hazards, landmarks, particles, projectiles, zoneRadius, floatingTexts, kingId, lavaZones, hazardTimers } = gameState;
+      const playerZone = getZoneFromPosition(player.position);
+      let visionRadius = Infinity;
+      const visionFactor = player.visionMultiplier * player.statusEffects.visionBoost;
+      if (playerZone === Faction.Wood && player.faction !== Faction.Wood) visionRadius = 380 * visionFactor;
+      if (playerZone === Faction.Earth && hazardTimers?.dustStormActive && player.faction !== Faction.Water) {
+        visionRadius = 320 * visionFactor;
+      }
+      const visionRadiusSq = visionRadius === Infinity ? Infinity : visionRadius * visionRadius;
+      const inVision = (pos: { x: number; y: number }) => {
+        if (visionRadiusSq === Infinity) return true;
+        return distSq(pos, player.position) <= visionRadiusSq;
+      };
 
       // Clear
       ctx.fillStyle = COLOR_PALETTE.background;
@@ -103,6 +121,89 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
 
           drawZone(ctx, zoneRadius);
 
+          if (landmarks) {
+            landmarks.forEach(landmark => {
+              ctx.save();
+              ctx.globalAlpha = 0.6;
+              ctx.strokeStyle = '#facc15';
+              ctx.lineWidth = 3;
+              ctx.beginPath();
+              ctx.arc(landmark.position.x, landmark.position.y, landmark.radius, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.globalAlpha = 0.8;
+              ctx.fillStyle = '#e2e8f0';
+              ctx.font = 'bold 16px "Cinzel", serif';
+              ctx.textAlign = 'center';
+              const label = landmark.type === 'fire_furnace' ? 'LÒ LỬA' :
+                landmark.type === 'wood_tree' ? 'CÂY MẸ' :
+                landmark.type === 'water_statue' ? 'TƯỢNG BĂNG' :
+                landmark.type === 'metal_altar' ? 'ĐÀI KIẾM' : 'KIM TỰ THÁP';
+              ctx.fillText(label, landmark.position.x, landmark.position.y - landmark.radius - 10);
+              ctx.restore();
+            });
+          }
+
+          if (hazards) {
+            hazards.forEach(hazard => {
+              if (!hazard.active && hazard.duration <= 0 && (hazard.type === 'lightning' || hazard.type === 'geyser' || hazard.type === 'icicle')) return;
+              if (!inVision(hazard.position)) return;
+              ctx.save();
+              if (hazard.type === 'lightning') {
+                ctx.strokeStyle = hazard.active ? 'rgba(239,68,68,0.8)' : 'rgba(250,204,21,0.9)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash(hazard.active ? [10, 8] : []);
+              }
+              if (hazard.type === 'geyser') {
+                ctx.strokeStyle = 'rgba(249,115,22,0.8)';
+                ctx.lineWidth = 3;
+              }
+              if (hazard.type === 'icicle') {
+                ctx.strokeStyle = 'rgba(56,189,248,0.8)';
+                ctx.lineWidth = 3;
+              }
+              if (hazard.type === 'vines') {
+                ctx.fillStyle = 'rgba(34,197,94,0.2)';
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              if (hazard.type === 'thin_ice') {
+                ctx.fillStyle = 'rgba(125,211,252,0.2)';
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              if (hazard.type === 'wind') {
+                ctx.strokeStyle = 'rgba(148,163,184,0.6)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.stroke();
+              }
+              if (hazard.type === 'mushroom') {
+                ctx.strokeStyle = 'rgba(168,85,247,0.6)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.stroke();
+              }
+              if (hazard.type === 'spear') {
+                ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.stroke();
+              }
+              if (hazard.type === 'lightning' || hazard.type === 'geyser' || hazard.type === 'icicle') {
+                ctx.beginPath();
+                ctx.arc(hazard.position.x, hazard.position.y, hazard.radius, 0, Math.PI * 2);
+                ctx.stroke();
+              }
+              ctx.setLineDash([]);
+              ctx.restore();
+            });
+          }
+
           ctx.restore();
       }
 
@@ -115,6 +216,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       food.forEach(f => {
          if (f.position.x < camera.x - width/2 - viewBuffer || f.position.x > camera.x + width/2 + viewBuffer ||
              f.position.y < camera.y - height/2 - viewBuffer || f.position.y > camera.y + height/2 + viewBuffer) return;
+         if (!inVision(f.position)) return;
 
          const isRelic = f.kind === 'relic';
          if (isRelic) {
@@ -144,9 +246,29 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
          }
       });
 
+      // 1.5 Power-ups
+      powerUps.forEach(p => {
+         if (p.position.x < camera.x - width/2 - viewBuffer || p.position.x > camera.x + width/2 + viewBuffer ||
+             p.position.y < camera.y - height/2 - viewBuffer || p.position.y > camera.y + height/2 + viewBuffer) return;
+         if (!inVision(p.position)) return;
+
+         ctx.save();
+         ctx.shadowColor = p.color;
+         ctx.shadowBlur = 15;
+         ctx.fillStyle = p.color;
+         ctx.beginPath();
+         ctx.arc(p.position.x, p.position.y, p.radius, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.shadowBlur = 0;
+         ctx.restore();
+      });
+
+      const renderEntities = [player, ...bots, ...creeps, ...(boss ? [boss] : [])];
+
       // 2. Trails
-      [player, ...bots].forEach(entity => {
+      renderEntities.forEach(entity => {
           if (entity.isDead || !entity.trail.length) return;
+          if (!inVision(entity.position)) return;
           const config = FACTION_CONFIG[entity.faction];
           ctx.beginPath();
           ctx.strokeStyle = config.color;
@@ -178,11 +300,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       });
 
       // 4. Entities
-      const entities = [player, ...bots].sort((a, b) => a.radius - b.radius);
+      const entities = renderEntities.sort((a, b) => a.radius - b.radius);
       entities.forEach(entity => {
           if (entity.isDead) return;
           if (entity.position.x < camera.x - width/2 - entity.radius*3 || entity.position.x > camera.x + width/2 + entity.radius*3 ||
               entity.position.y < camera.y - height/2 - entity.radius*3 || entity.position.y > camera.y + height/2 + entity.radius*3) return;
+          if (!inVision(entity.position)) return;
 
           drawEntity(
             ctx, 
@@ -224,6 +347,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       ctx.globalAlpha = 1.0;
 
       ctx.restore(); 
+
+      if (playerZone === Faction.Earth && hazardTimers?.dustStormActive && player.faction !== Faction.Water) {
+          ctx.fillStyle = 'rgba(120, 80, 50, 0.18)';
+          ctx.fillRect(0, 0, width, height);
+      }
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -358,6 +486,25 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       ctx.stroke();
 
       ctx.restore(); 
+  };
+
+  const getZoneFromPosition = (pos: { x: number; y: number }): Faction | 'Center' => {
+      const cx = WORLD_WIDTH / 2;
+      const cy = WORLD_HEIGHT / 2;
+      const dx = pos.x - cx;
+      const dy = pos.y - cy;
+      const dSq = dx*dx + dy*dy;
+
+      if (dSq < CENTER_RADIUS * CENTER_RADIUS) return 'Center';
+
+      let angle = Math.atan2(dy, dx); 
+      if (angle < 0) angle += 2 * Math.PI;
+
+      const sector = (Math.PI * 2) / 5;
+      const adjustedAngle = (angle + (Math.PI / 2) + (sector / 2)) % (Math.PI * 2);
+      const index = Math.floor(adjustedAngle / sector);
+      const zones = [Faction.Wood, Faction.Water, Faction.Earth, Faction.Metal, Faction.Fire];
+      return zones[index] || Faction.Fire;
   };
 
   const drawAbyss = (ctx: CanvasRenderingContext2D, frameCount: number) => {
@@ -623,6 +770,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       const r = entity.radius;
       const x = entity.position.x;
       const y = entity.position.y;
+      const stealthAlpha = entity.statusEffects.stealthed && !isPlayer ? 0.2 : 1;
 
       // --- 1. DETERMINE VISUAL TIER ---
       let visualMultiplier = 1.0;
@@ -671,10 +819,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
         ctx.shadowBlur = glowBlur;
         ctx.shadowColor = glowColor;
         ctx.fillStyle = glowColor;
+        ctx.globalAlpha = stealthAlpha;
         ctx.beginPath();
         ctx.arc(x, y, r * visualMultiplier * 1.1, 0, Math.PI*2);
         ctx.fill();
         ctx.shadowBlur = 0; // Reset
+        ctx.globalAlpha = 1.0;
+      }
+
+      if (entity.statusEffects.kingForm > 0) {
+        ctx.save();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 4;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       }
 
       // --- SETUP LOCAL COORDINATE SYSTEM ---
@@ -682,6 +843,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       const angle = Math.atan2(entity.velocity.y, entity.velocity.x);
       ctx.save();
       ctx.translate(x, y);
+      ctx.globalAlpha = stealthAlpha;
       
       // FIRE JUMP VISUAL (Scaling)
       if (entity.statusEffects.airborne) {
@@ -778,6 +940,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
 
       // Restore coordinate system for Text/UI elements
       ctx.restore(); 
+      ctx.globalAlpha = 1.0;
 
       // --- 6. INDICATOR RING (World Space) ---
       if (!isPlayer && !entity.isDead) {

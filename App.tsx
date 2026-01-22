@@ -1,23 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GamePhase, GameState, Faction, Player } from './types';
-import { createPlayer, createBot, createFood, updateGameState } from './services/engine';
+import { GamePhase, GameState, Faction, Player, MutationChoice } from './types';
+import { createPlayer, createBot, createFood, createCreeps, createLandmarks, createZoneHazards, updateGameState } from './services/engine';
 import { audioManager } from './services/audioManager';
-import { WORLD_WIDTH, WORLD_HEIGHT, INITIAL_ZONE_RADIUS, BOT_COUNT, FOOD_COUNT } from './constants';
+import { WORLD_WIDTH, WORLD_HEIGHT, INITIAL_ZONE_RADIUS, BOT_COUNT, FOOD_COUNT, BOSS_RESPAWN_TIME, DUST_STORM_INTERVAL } from './constants';
 import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
 import HUD from './components/HUD';
 import MobileControls from './components/MobileControls';
+import MutationPicker from './components/MutationPicker';
+import { applyMutation, getMutationById } from './services/mutations';
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<GamePhase>(GamePhase.Menu);
   const [isTouchInput, setIsTouchInput] = useState(false);
+  const [mutationChoices, setMutationChoices] = useState<MutationChoice[] | null>(null);
   // GameStateRef holds the TRUTH. We do not sync this to React state every frame.
   const gameStateRef = useRef<GameState | null>(null);
   
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const mutationKeyRef = useRef<string | null>(null);
 
   const initGame = (playerName: string, faction: Faction) => {
+    setMutationChoices(null);
+    mutationKeyRef.current = null;
     // Start Audio Context on user interaction
     audioManager.resume();
     audioManager.startBGM();
@@ -25,11 +31,19 @@ const App: React.FC = () => {
     const player = createPlayer(playerName, faction);
     const bots = Array.from({ length: BOT_COUNT }).map((_, i) => createBot(i.toString()));
     const food = Array.from({ length: FOOD_COUNT }).map(() => createFood());
+    const creeps = createCreeps();
+    const landmarks = createLandmarks();
+    const hazards = createZoneHazards();
 
     gameStateRef.current = {
       player,
       bots,
+      creeps,
+      boss: null,
       food,
+      powerUps: [],
+      hazards,
+      landmarks,
       particles: [],
       projectiles: [],
       floatingTexts: [],
@@ -44,6 +58,22 @@ const App: React.FC = () => {
       kingId: null,
       relicId: null,
       relicTimer: 8,
+      mutationChoices: null,
+      isPaused: false,
+      hazardTimers: {
+        lightning: 6,
+        geyser: 4,
+        icicle: 6,
+        powerUpFire: 12,
+        powerUpWood: 10,
+        powerUpWater: 14,
+        powerUpMetal: 12,
+        powerUpEarth: 16,
+        bossRespawn: BOSS_RESPAWN_TIME,
+        creepRespawn: 20,
+        dustStorm: DUST_STORM_INTERVAL,
+        dustStormActive: false,
+      },
       inputs: { space: false, w: false }
     };
     
@@ -64,6 +94,18 @@ const App: React.FC = () => {
       // (engine.ts was updated to support this pattern efficiently)
       const newState = updateGameState(gameStateRef.current, dt);
       gameStateRef.current = newState;
+
+      const pending = newState.mutationChoices;
+      if (pending && pending.length) {
+        const key = pending.map((choice) => choice.id).join('|');
+        if (mutationKeyRef.current !== key) {
+          mutationKeyRef.current = key;
+          setMutationChoices(pending);
+        }
+      } else if (mutationKeyRef.current) {
+        mutationKeyRef.current = null;
+        setMutationChoices(null);
+      }
 
       // 2. Check Game Over
       if (newState.player.isDead) {
@@ -163,6 +205,27 @@ const App: React.FC = () => {
     if (gameStateRef.current) gameStateRef.current.inputs.w = false;
   };
 
+  const handleMutationSelect = (id: string) => {
+    const state = gameStateRef.current;
+    if (!state) return;
+    applyMutation(state.player, id);
+    const mutation = getMutationById(id);
+    if (mutation) {
+      state.floatingTexts.push({
+        id: Math.random().toString(),
+        position: { ...state.player.position },
+        text: mutation.name,
+        color: '#60a5fa',
+        size: 20,
+        life: 2.5,
+        velocity: { x: 0, y: -2 }
+      });
+    }
+    state.mutationChoices = null;
+    state.isPaused = false;
+    setMutationChoices(null);
+  };
+
   return (
     <div className="w-full h-screen bg-slate-900 relative overflow-hidden select-none">
       {phase === GamePhase.Menu && (
@@ -192,6 +255,9 @@ const App: React.FC = () => {
               onEjectStart={handleEjectStart}
               onEjectEnd={handleEjectEnd}
             />
+          )}
+          {mutationChoices && (
+            <MutationPicker choices={mutationChoices} onSelect={handleMutationSelect} />
           )}
         </>
       )}

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { GameState, Faction } from '../types';
 import { GAME_DURATION, FACTION_CONFIG, SPAWN_PROTECTION_TIME } from '../constants';
+import { getMutationById } from '../services/mutations';
 
 interface HUDProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -19,6 +20,7 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef, isTouchInput = false }) => {
   const roundRef = useRef<HTMLSpanElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const leaderBoardRef = useRef<HTMLDivElement>(null);
+  const mutationRef = useRef<HTMLDivElement>(null);
   const lastStatsUpdateRef = useRef(0);
   
   // We only render the static parts once.
@@ -108,6 +110,13 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef, isTouchInput = false }) => {
         leaderBoardRef.current.innerHTML = html;
       }
 
+      if (shouldUpdateStats && mutationRef.current) {
+        const list = player.mutations.slice(0, 6).map(id => getMutationById(id)?.name || id);
+        mutationRef.current.innerHTML = list.length
+          ? list.map((name) => `<div class="text-[10px] text-slate-300">${name}</div>`).join('')
+          : `<div class="text-[10px] text-slate-500">No mutations</div>`;
+      }
+
       if (shouldUpdateStats) lastStatsUpdateRef.current = now;
 
       animationFrameId = requestAnimationFrame(updateHUD);
@@ -141,10 +150,14 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef, isTouchInput = false }) => {
             <span ref={hpTextRef}></span>
           </div>
 
-          <div className="grid grid-cols-2 gap-1 mt-2 border-t border-slate-700 pt-2 text-[10px] text-slate-400 uppercase tracking-wider">
+            <div className="grid grid-cols-2 gap-1 mt-2 border-t border-slate-700 pt-2 text-[10px] text-slate-400 uppercase tracking-wider">
              <div>DMG: <span className="text-white">{player.damageMultiplier.toFixed(1)}x</span></div>
              <div>DEF: <span className="text-white">{player.defense.toFixed(1)}x</span></div>
              <div>SPD: <span className="text-white">{(player.maxSpeed / 5.5).toFixed(1)}x</span></div>
+          </div>
+          <div className="mt-3 border-t border-slate-700 pt-2">
+            <div className="text-[10px] text-yellow-500 font-bold mb-1 uppercase tracking-wider">Mutations</div>
+            <div ref={mutationRef} className="flex flex-col gap-0.5"></div>
           </div>
         </div>
 

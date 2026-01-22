@@ -48,6 +48,60 @@ export const KING_DAMAGE_DEALT_MULTIPLIER = 0.9;
 export const KING_BOUNTY_SCORE = 200;
 export const KING_BOUNTY_RADIUS = 8;
 
+// Mutations
+export const MUTATION_CHOICES = 3;
+
+// Hazards & Events
+export const LIGHTNING_WARNING_TIME = 1.2;
+export const LIGHTNING_RADIUS = 80;
+export const LIGHTNING_INTERVAL_ROUND_2 = 12;
+export const LIGHTNING_INTERVAL_ROUND_3 = 8;
+export const LIGHTNING_INTERVAL_ROUND_4 = 4;
+export const LIGHTNING_DAMAGE_OUTSIDE = 0.4;
+export const LIGHTNING_DAMAGE_INSIDE = 0.2;
+export const LIGHTNING_DAMAGE_FINAL = 0.3;
+
+export const GEYSER_INTERVAL = 8;
+export const GEYSER_WARNING_TIME = 1.0;
+export const GEYSER_DAMAGE = 20;
+
+export const ICICLE_INTERVAL = 10;
+export const ICICLE_WARNING_TIME = 1.0;
+export const ICICLE_DAMAGE = 15;
+
+export const SPEAR_DAMAGE = 12;
+export const SPEAR_COOLDOWN = 6;
+
+export const VINES_SLOW_MULTIPLIER = 0.8;
+export const VINES_DURATION = 1.2;
+
+export const THIN_ICE_SLOW_MULTIPLIER = 0.5;
+export const THIN_ICE_DURATION = 3;
+
+export const WIND_SPEED_MULTIPLIER = 1.5;
+
+export const MUSHROOM_COOLDOWN = 8;
+
+export const DUST_STORM_INTERVAL = 20;
+export const DUST_STORM_DURATION = 6;
+
+// Power-ups
+export const FIRE_ORB_DURATION = 20;
+export const HEALING_POTION_VALUE = 0.3;
+export const ICE_HEART_DURATION = 30;
+export const SWORD_AURA_HITS = 5;
+export const DIAMOND_SHIELD_VALUE = 50;
+export const HEALING_FRUIT_VALUE = 15;
+
+// Creeps & Boss
+export const CREEPS_PER_ZONE = 3;
+export const ELITE_RESPAWN_TIME = 45;
+export const BOSS_RESPAWN_TIME = 120;
+export const BOSS_MAX_HEALTH = 200;
+export const BOSS_DAMAGE = 15;
+export const BOSS_RADIUS = 80;
+export const BOSS_ATTACK_INTERVAL = 6;
+
 // Elemental Counters 
 export const ELEMENTAL_ADVANTAGE: Record<Faction, Faction> = {
   [Faction.Metal]: Faction.Wood, 
