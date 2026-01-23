@@ -902,26 +902,27 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
       settingsRef.current = getSettings();
     });
 
-    const setup = async () => {
-      if (!containerRef.current) return;
-      const PIXI = await import('pixi.js');
-      if (destroyed) return;
+	    const setup = async () => {
+	      if (!containerRef.current) return;
+	      const PIXI = await import('pixi.js');
+	      if (destroyed) return;
 
-      pixiRef.current = PIXI;
+	      pixiRef.current = PIXI;
 
-      const app = new PIXI.Application({
-        width: window.innerWidth,
-        height: window.innerHeight,
-        backgroundColor: hexToNumber(COLOR_PALETTE.background),
-        antialias: true,
-        resolution: Math.min(window.devicePixelRatio || 1, 2),
-        autoDensity: true,
-      });
-      appRef.current = app;
+	      const app = new PIXI.Application();
+	      await app.init({
+	        width: window.innerWidth,
+	        height: window.innerHeight,
+	        backgroundColor: hexToNumber(COLOR_PALETTE.background),
+	        antialias: true,
+	        resolution: computeEffectiveDpr(),
+	        autoDensity: true,
+	      });
+	      appRef.current = app;
 
-      containerRef.current.appendChild(app.view as HTMLCanvasElement);
-      app.view.style.width = '100%';
-      app.view.style.height = '100%';
+	      containerRef.current.appendChild(app.canvas);
+	      app.canvas.style.width = '100%';
+	      app.canvas.style.height = '100%';
 
       const textures = createTexturePack(PIXI);
       texturesRef.current = textures;
@@ -1735,17 +1736,20 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
     setup();
 
-    return () => {
-      destroyed = true;
-      unsubscribeSettings();
-      cleanupResize?.();
-      if (appRef.current) {
-        appRef.current.destroy(true, { children: true, texture: true, baseTexture: true });
-      }
-      appRef.current = null;
-      pixiRef.current = null;
-    };
-  }, [gameState]);
+	    return () => {
+	      destroyed = true;
+	      unsubscribeSettings();
+	      cleanupResize?.();
+	      if (appRef.current) {
+	        appRef.current.destroy(
+	          { removeView: true },
+	          { children: true, texture: true, textureSource: true, context: true }
+	        );
+	      }
+	      appRef.current = null;
+	      pixiRef.current = null;
+	    };
+	  }, [gameState]);
 
   const handleInput = (e: React.MouseEvent) => {
     if (!enablePointerInput) return;
