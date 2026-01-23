@@ -39,10 +39,10 @@ async function main() {
   // Server info endpoint
   app.get('/info', (req, res) => {
     res.json({
-      name: 'Gu-King Game Server',
+      name: 'CJR Game Server',
       version: '1.0.0',
-      rooms: gameServer.matchMaker.stats.roomCount,
-      clients: gameServer.matchMaker.stats.ccu,
+      rooms: (gameServer as any).matchMaker.stats.roomCount,
+      clients: (gameServer as any).matchMaker.stats.ccu,
     });
   });
 
@@ -68,15 +68,11 @@ async function main() {
   console.log(`
   ╔═══════════════════════════════════════════════════╗
   ║                                                   ║
-  ║   🐍 GU-KING GAME SERVER v1.0.0                  ║
+  ║   🎨 COLOR JELLY RUSH SERVER v1.0.0              ║
   ║                                                   ║
   ║   Server running on:                              ║
   ║   → HTTP:  http://${HOST}:${PORT}                      ║
   ║   → WS:    ws://${HOST}:${PORT}                        ║
-  ║                                                   ║
-  ║   Endpoints:                                      ║
-  ║   → /health  - Health check                       ║
-  ║   → /info    - Server info                        ║
   ║                                                   ║
   ╚═══════════════════════════════════════════════════╝
   `);

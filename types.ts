@@ -1,10 +1,8 @@
-export enum Faction {
-  Metal = 'Kim',
-  Wood = 'Moc',
-  Water = 'Thuy',
-  Fire = 'Hoa',
-  Earth = 'Tho',
-}
+import { PigmentVec3, RingId, Emotion, ShapeId, TattooId, PickupKind } from './services/cjr/cjrTypes';
+
+export type { PigmentVec3, RingId, PickupKind };
+export { Emotion, ShapeId, TattooId } from './services/cjr/cjrTypes';
+export { TattooId as MutationId } from './services/cjr/cjrTypes'; // Keep alias for now if needed, but we are refactoring.
 
 export enum GamePhase {
   Menu = 'MENU',
@@ -12,6 +10,7 @@ export enum GamePhase {
   GameOver = 'GAME_OVER',
 }
 
+// Retaining SizeTier for compatibility with physics engine scaling, but simplifying logic later
 export enum SizeTier {
   Larva = 'Ấu Trùng',      // 0-20%
   Juvenile = 'Thiếu Niên', // 20-40%
@@ -27,29 +26,6 @@ export enum MutationTier {
   Legendary = 'Legendary',
 }
 
-export enum MutationId {
-  Swift = 'swift',
-  ThickSkin = 'thick_skin',
-  LightSpikes = 'light_spikes',
-  KillingIntent = 'killing_intent',
-  KeenHearing = 'keen_hearing',
-  DashBoost = 'dash_boost',
-  Lifesteal = 'lifesteal',
-  ArmorPierce = 'armor_pierce',
-  Stealth = 'stealth',
-  PoisonTouch = 'poison_touch',
-  DoubleCast = 'double_cast',
-  SecondChance = 'second_chance',
-  SpeedSurge = 'speed_surge',
-  MagneticField = 'magnetic_field',
-  SoulAbsorb = 'soul_absorb',
-  Rewind = 'rewind',
-  ThunderCall = 'thunder_call',
-  KingForm = 'king_form',
-  Invulnerable = 'invulnerable',
-  ChaosSwap = 'chaos_swap',
-}
-
 export interface Vector2 {
   x: number;
   y: number;
@@ -60,37 +36,28 @@ export interface Entity {
   position: Vector2;
   velocity: Vector2;
   radius: number; // Represents Mass/Size
-  color: string;
+  color: string;  // CSS string for rendering (derived from pigment)
   isDead: boolean;
-  trail: Vector2[]; // History of positions for rendering trails
+  trail: Vector2[];
 }
 
 export interface Projectile extends Entity {
   ownerId: string;
   damage: number;
-  type: 'web' | 'ice' | 'sting'; // Skill types
+  type: 'web' | 'ice' | 'sting'; // Keep for now as skill effects
   duration: number;
 }
 
-export interface LavaZone {
-  id: string;
-  position: Vector2;
-  radius: number;
-  damage: number;
-  ownerId: string;
-  life: number;
-}
-
+// Renamed from DelayedAction to generic SkillAction if needed, or keep for compatibility
 export interface DelayedAction {
   id: string;
-  type: 'metal_dash' | 'water_shot' | 'fire_land' | 'double_cast';
+  type: 'dash' | 'blast' | 'shield'; // Simplified
   timer: number;
   ownerId: string;
   data?: any;
 }
 
 export interface Player extends Entity {
-  faction: Faction;
   name: string;
   score: number;
   kills: number;
@@ -99,23 +66,32 @@ export interface Player extends Entity {
   tier: SizeTier;
   targetPosition: Vector2; // Mouse/Input target
   spawnTime: number;
-  
+
+  // CJR Core Fields
+  pigment: PigmentVec3;
+  targetPigment: PigmentVec3;
+  matchPercent: number; // 0..1
+  ring: RingId;
+  emotion: Emotion;
+  shape: ShapeId;
+  tattoos: TattooId[];
+
   // Physics Props
   acceleration: number;
   maxSpeed: number;
   friction: number;
 
-  // New Mechanics
+  // Mechanics
   isInvulnerable: boolean;
   skillCooldown: number;
   maxSkillCooldown: number;
 
-  // RPG Stats (Phase 1 Update)
+  // RPG Stats (Simplified)
   defense: number;
   damageMultiplier: number;
 
   // Mutation Stats
-  mutations: MutationId[];
+  mutations: TattooId[]; // redundant with tattoos, sync later
   critChance: number;
   critMultiplier: number;
   lifesteal: number;
@@ -131,6 +107,7 @@ export interface Player extends Entity {
   doubleCast: boolean;
   reviveAvailable: boolean;
   magneticFieldRadius: number;
+
   mutationCooldowns: {
     speedSurge: number;
     invulnerable: number;
@@ -141,24 +118,20 @@ export interface Player extends Entity {
   };
   rewindHistory: { position: Vector2; health: number; time: number }[];
   stationaryTime: number;
-  teleportCooldown: number;
-  landmarkCharge: number;
-  landmarkId: string | null;
-  landmarkCooldown: number;
-  
+
   // Status Effects
   statusEffects: {
-    speedBoost: number; // Multiplier, 1 is normal
+    speedBoost: number;
     shielded: boolean;
     burning: boolean;
     burnTimer: number;
     slowed: boolean;
     slowTimer: number;
     slowMultiplier: number;
-    poisoned: boolean; // New: Earth Tier 5 / Wood Drain
+    poisoned: boolean;
     poisonTimer: number;
-    regen: number; // New: HP per second
-    airborne: boolean; // New: For Fire Jump
+    regen: number;
+    airborne: boolean;
     stealthed: boolean;
     stealthCharge: number;
     invulnerable: number;
@@ -167,21 +140,16 @@ export interface Player extends Entity {
     kingForm: number;
     damageBoost: number;
     defenseBoost: number;
-    damageBoostTimer: number;
-    defenseBoostTimer: number;
-    shieldTimer: number;
-    speedBoostTimer: number;
-    critCharges: number;
-    visionBoost: number;
-    visionBoostTimer: number;
-    damageFlash: number;
+    // New CJR buffs
+    commitShield?: number;
+    pityBoost?: number;
   };
 }
 
 export interface Bot extends Player {
-  aiState: 'wander' | 'chase' | 'flee';
+  aiState: 'wander' | 'chase' | 'flee' | 'forage';
   targetEntityId: string | null;
-  aiReactionTimer: number; // Delay reaction slightly for realism
+  aiReactionTimer: number;
   isCreep?: boolean;
   creepType?: string;
   isElite?: boolean;
@@ -189,66 +157,19 @@ export interface Bot extends Player {
   bossAttackTimer?: number;
   bossAttackCharge?: number;
   respawnTimer?: number;
+  // CJR Bot Personality
+  personality?: 'farmer' | 'hunter' | 'bully' | 'greedy';
 }
 
 export interface Food extends Entity {
   value: number;
-  isEjected?: boolean; // Created by player W key
-  kind?: 'normal' | 'ejected' | 'relic';
+  isEjected?: boolean;
+  kind: PickupKind;       // CJR specific
+  pigment?: PigmentVec3; // For pigment/candy_vein
 }
 
-export type PowerUpType =
-  | 'fire_orb'
-  | 'healing'
-  | 'ice_heart'
-  | 'sword_aura'
-  | 'diamond_shield'
-  | 'healing_fruit'
-  | 'legendary_orb';
-
-export interface PowerUp extends Entity {
-  type: PowerUpType;
-  duration: number;
-}
-
-export type HazardType =
-  | 'lightning'
-  | 'geyser'
-  | 'icicle'
-  | 'spear'
-  | 'vines'
-  | 'thin_ice'
-  | 'wind'
-  | 'mushroom';
-
-export interface Hazard {
-  id: string;
-  type: HazardType;
-  position: Vector2;
-  radius: number;
-  timer: number;
-  duration: number;
-  direction?: Vector2;
-  active: boolean;
-}
-
-export type LandmarkType =
-  | 'fire_furnace'
-  | 'wood_tree'
-  | 'water_statue'
-  | 'metal_altar'
-  | 'earth_pyramid';
-
-export interface Landmark {
-  id: string;
-  type: LandmarkType;
-  position: Vector2;
-  radius: number;
-  timer: number;
-}
-
-export interface MutationChoice {
-  id: MutationId;
+export interface TattooChoice {
+  id: TattooId;
   name: string;
   tier: MutationTier;
   description: string;
@@ -264,7 +185,7 @@ export interface PlayerProfile {
   totalKills: number;
   highScore: number;
   unlockedSkins: string[];
-  unlockedMutations: MutationId[];
+  unlockedTattoos: TattooId[];
   lastUpdated: number;
 }
 
@@ -287,17 +208,10 @@ export interface FloatingText {
   velocity: Vector2;
 }
 
-// Forward declaration for engine (actual implementation in engine.ts)
+// Forward declaration for engine
 export interface IGameEngine {
-  spatialGrid: {
-    clear: () => void;
-    insert: (entity: Entity) => void;
-    getNearby: (entity: Entity) => Entity[];
-  };
-  particlePool: {
-    get: (x: number, y: number, color: string, speed: number) => Particle;
-    release: (particle: Particle) => void;
-  };
+  spatialGrid: any;
+  particlePool: any;
 }
 
 export interface GameState {
@@ -306,46 +220,26 @@ export interface GameState {
   creeps: Bot[];
   boss: Bot | null;
   food: Food[];
-  powerUps: PowerUp[];
-  hazards: Hazard[];
-  landmarks: Landmark[];
+  // Removed PowerUps, Hazards, Landmarks lists
   particles: Particle[];
   projectiles: Projectile[];
   floatingTexts: FloatingText[];
-  lavaZones: LavaZone[]; // New: Fire Skill
-  delayedActions: DelayedAction[]; // New: Skill Queue
-  
-  // S-TIER: Engine instance (encapsulated singletons)
+  delayedActions: DelayedAction[];
+
   engine: IGameEngine;
-  
+
   worldSize: Vector2;
-  zoneRadius: number; 
+  zoneRadius: number; // Keep for compatibility, map to Ring
   gameTime: number;
-  currentRound: number; // New: 1, 2, 3, 4 (Sudden Death)
+  currentRound: number;
   camera: Vector2;
-  shakeIntensity: number; 
-  kingId: string | null; 
-  relicId: string | null;
-  relicTimer: number;
-  mutationChoices: MutationChoice[] | null;
-  unlockedMutations: MutationId[];
+  shakeIntensity: number;
+  kingId: string | null;
+
+  tattooChoices: TattooChoice[] | null;
+  unlockedTattoos: TattooId[];
   isPaused: boolean;
-  hazardTimers: {
-    lightning: number;
-    geyser: number;
-    icicle: number;
-    powerUpFire: number;
-    powerUpWood: number;
-    powerUpWater: number;
-    powerUpMetal: number;
-    powerUpEarth: number;
-    bossRespawn: number;
-    creepRespawn: number;
-    dustStorm: number;
-    dustStormActive: boolean;
-  };
-  
-  // Input State
+
   inputs: {
     space: boolean;
     w: boolean;

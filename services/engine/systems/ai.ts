@@ -1,192 +1,141 @@
+
 import {
-  BOSS_ATTACK_INTERVAL,
-  BOSS_DAMAGE,
-  ELEMENTAL_ADVANTAGE,
-  MAP_RADIUS,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
+  FRICTION_BASE,
+  MAP_RADIUS
 } from '../../../constants';
-import { Bot, Faction, Food, GameState, Player } from '../../../types';
+import { Bot, GameState, Player, Food } from '../../../types';
 import { getCurrentSpatialGrid } from '../context';
-import { distSq, getZoneCenter, randomRange } from '../math';
-import { applyPhysics } from './physics';
-import { castSkill } from './skills';
-import { createFloatingText } from '../effects';
+import { distance, normalize } from '../math';
+import { calcMatchPercent } from '../../cjr/colorMath';
+import { applySkill } from './skills';
 
-export const updateBotAI = (bot: Bot, state: GameState, dt: number, currentZone: Faction | 'Center') => {
-  bot.aiReactionTimer += dt;
-  if (bot.aiReactionTimer < 0.08) {
-    applyPhysics(bot, bot.targetPosition, dt, currentZone, state);
-    return;
-  }
-  bot.aiReactionTimer = 0;
+export const updateAI = (bot: Bot, state: GameState, dt: number) => {
+  if (bot.isDead) return;
 
-  let target = bot.targetPosition;
-  let closestThreat: Player | Bot | null = null;
-  let closestFood: Food | null = null;
-  let closestPrey: Player | Bot | null = null;
-  let minDistSq = Infinity;
+  bot.aiReactionTimer -= dt;
 
-  const scanRadiusSq = 650 * 650;
-  const threatRatio = 1.08;
-  const preyRatio = 0.88;
-  const counterThreatRatio = 0.95;
-  const counterPreyRatio = 1.05;
-  const neighbors = getCurrentSpatialGrid().getNearby(bot);
+  // Decide State occasionally
+  if (bot.aiReactionTimer <= 0) {
+    bot.aiReactionTimer = 0.2 + Math.random() * 0.3; // Re-think every ~0.3s
 
-  neighbors.forEach((e) => {
-    if (e.id === bot.id || e.isDead) return;
+    const nearby = getCurrentSpatialGrid().getNearby(bot);
 
-    const isInvulnerable = 'isInvulnerable' in e ? (e as Bot).isInvulnerable : false;
-    if (isInvulnerable) return;
+    let targetEntity: Player | Bot | null = null;
+    let targetFood: Food | null = null;
+    let threat: Player | Bot | null = null;
 
-    if ('value' in e) {
-      const dSq = distSq(bot.position, e.position);
-      if (dSq < minDistSq) {
-        minDistSq = dSq;
-        closestFood = e as Food;
-      }
-      return;
-    }
+    let closestThreatDist = Infinity;
+    let closestPreyDist = Infinity;
+    let bestFoodScore = -Infinity;
 
-    if (!('faction' in e)) return;
-    const entity = e as Bot;
+    nearby.forEach(e => {
+      if (e === bot) return;
+      const dist = distance(bot.position, e.position);
 
-    const dSq = distSq(bot.position, entity.position);
-    if (dSq > scanRadiusSq) return;
+      if ('score' in e) { // Agent
+        const other = e as Player | Bot;
+        if (other.isDead) return;
 
-    const ratio = entity.radius / bot.radius;
-    const iCounterThem = ELEMENTAL_ADVANTAGE[bot.faction] === entity.faction;
-    const theyCounterMe = ELEMENTAL_ADVANTAGE[entity.faction] === bot.faction;
-
-    if (ratio >= threatRatio || (ratio > counterThreatRatio && theyCounterMe)) {
-      if (!closestThreat || dSq < distSq(bot.position, closestThreat.position)) closestThreat = entity;
-    } else if (ratio <= preyRatio || (ratio < counterPreyRatio && iCounterThem)) {
-      if (!closestPrey || dSq < distSq(bot.position, closestPrey.position)) closestPrey = entity;
-    }
-  });
-
-  if (closestThreat) {
-    bot.aiState = 'flee';
-    const dx = bot.position.x - closestThreat.position.x;
-    const dy = bot.position.y - closestThreat.position.y;
-    target = { x: bot.position.x + dx, y: bot.position.y + dy };
-    if (bot.skillCooldown <= 0 && distSq(bot.position, closestThreat.position) < 360 * 360) castSkill(bot, state, dt);
-  } else if (closestPrey) {
-    bot.aiState = 'chase';
-    target = {
-      x: closestPrey.position.x + closestPrey.velocity.x * 10,
-      y: closestPrey.position.y + closestPrey.velocity.y * 10,
-    };
-    if (bot.skillCooldown <= 0 && distSq(bot.position, closestPrey.position) < 480 * 480) castSkill(bot, state, dt);
-  } else if (closestFood) {
-    bot.aiState = 'chase';
-    target = closestFood.position;
-  } else {
-    if (Math.random() < 0.2) {
-      const homeCenter = getZoneCenter(bot.faction);
-      const biasStrength = 0.3;
-      const randomX = bot.position.x + randomRange(-400, 400);
-      const randomY = bot.position.y + randomRange(-400, 400);
-
-      target = {
-        x: randomX * (1 - biasStrength) + homeCenter.x * biasStrength,
-        y: randomY * (1 - biasStrength) + homeCenter.y * biasStrength,
-      };
-    }
-  }
-
-  const mapCenterX = WORLD_WIDTH / 2;
-  const mapCenterY = WORLD_HEIGHT / 2;
-  const distFromMapCenterSq = distSq(target, { x: mapCenterX, y: mapCenterY });
-
-  if (distFromMapCenterSq > state.zoneRadius ** 2 * 0.9 ** 2) {
-    target = { x: mapCenterX, y: mapCenterY };
-  } else if (distFromMapCenterSq > (MAP_RADIUS * 0.9) ** 2) {
-    target = { x: mapCenterX, y: mapCenterY };
-  }
-
-  bot.targetPosition = target;
-  applyPhysics(bot, target, dt, currentZone, state);
-};
-
-export const updateCreepAI = (creep: Bot, state: GameState, dt: number, currentZone: Faction | 'Center') => {
-  creep.aiReactionTimer += dt;
-  if (creep.aiReactionTimer < 0.2) {
-    applyPhysics(creep, creep.targetPosition, dt, currentZone, state);
-    return;
-  }
-  creep.aiReactionTimer = 0;
-
-  let target = creep.targetPosition;
-  let closestThreat: Bot | null = null;
-  const neighbors = getCurrentSpatialGrid().getNearby(creep);
-
-  neighbors.forEach((e) => {
-    if (!('faction' in e) || e.id === creep.id || e.isDead) return;
-    const entity = e as Bot;
-    if (entity.isInvulnerable) return;
-    const ratio = entity.radius / creep.radius;
-    if (ratio >= 1.1 && distSq(creep.position, entity.position) < 250 * 250) {
-      closestThreat = entity;
-    }
-  });
-
-  if (closestThreat) {
-    const dx = creep.position.x - closestThreat.position.x;
-    const dy = creep.position.y - closestThreat.position.y;
-    target = { x: creep.position.x + dx, y: creep.position.y + dy };
-  } else if (Math.random() < 0.3) {
-    const home = getZoneCenter(creep.faction);
-    const randomX = creep.position.x + randomRange(-200, 200);
-    const randomY = creep.position.y + randomRange(-200, 200);
-    target = {
-      x: randomX * 0.6 + home.x * 0.4,
-      y: randomY * 0.6 + home.y * 0.4,
-    };
-  }
-
-  creep.targetPosition = target;
-  applyPhysics(creep, target, dt, currentZone, state);
-};
-
-export const updateBossAI = (boss: Bot, state: GameState, dt: number, currentZone: Faction | 'Center') => {
-  if (!boss.bossAttackTimer) boss.bossAttackTimer = BOSS_ATTACK_INTERVAL;
-  if (!boss.bossAttackCharge) boss.bossAttackCharge = 0;
-
-  boss.bossAttackTimer -= dt;
-
-  const targets = [state.player, ...state.bots].filter((t) => !t.isDead);
-  const nearest = targets.sort((a, b) => distSq(a.position, boss.position) - distSq(b.position, boss.position))[0];
-
-  if (boss.bossAttackTimer <= 0) {
-    boss.bossAttackCharge += dt;
-    boss.statusEffects.rooted = Math.max(boss.statusEffects.rooted, 0.6);
-    if (boss.bossAttackCharge >= 1) {
-      const impactRadius = boss.radius * 2.2;
-      targets.forEach((target) => {
-        if (distSq(target.position, boss.position) < impactRadius * impactRadius) {
-          if (target.statusEffects.invulnerable <= 0 && !target.isInvulnerable) {
-            target.currentHealth -= BOSS_DAMAGE * boss.damageMultiplier;
-            target.statusEffects.invulnerable = 0.8;
-            const pushAngle = Math.atan2(target.position.y - boss.position.y, target.position.x - boss.position.x);
-            target.velocity.x += Math.cos(pushAngle) * 18;
-            target.velocity.y += Math.sin(pushAngle) * 18;
+        if (other.radius > bot.radius * 1.1) {
+          if (dist < closestThreatDist) {
+            closestThreatDist = dist;
+            threat = other;
+          }
+        } else if (bot.radius > other.radius * 1.1) {
+          if (dist < closestPreyDist) {
+            closestPreyDist = dist;
+            targetEntity = other;
           }
         }
-      });
-      state.floatingTexts.push(createFloatingText(boss.position, 'BOSS SLAM!', '#ef4444', 24));
-      boss.bossAttackCharge = 0;
-      boss.bossAttackTimer = BOSS_ATTACK_INTERVAL;
-    }
-    return;
-  }
+      } else if ('value' in e) { // Food
+        const f = e as Food;
+        if (f.isDead) return;
+        // Score based on distance and COLOR MATCH
+        // If pigment matches target, high score.
+        let score = 100 / (dist + 10);
+        if (f.kind === 'pigment' && f.pigment) {
+          // Calculate hypothetical match improvement?
+          // Simple heuristic: match % of food vs target.
+          const match = calcMatchPercent(f.pigment, bot.targetPigment);
+          score *= (1 + match * 2); // Prefer matching colors
+        }
 
-  if (nearest) {
-    boss.targetPosition = {
-      x: nearest.position.x,
-      y: nearest.position.y,
-    };
-    applyPhysics(boss, boss.targetPosition, dt, currentZone, state);
+        if (score > bestFoodScore) {
+          bestFoodScore = score;
+          targetFood = f;
+        }
+      }
+    });
+
+    // Decision Tree
+    if (threat && closestThreatDist < 300) {
+      bot.aiState = 'flee';
+      bot.targetEntityId = threat.id;
+
+      // Panic Skill
+      if (closestThreatDist < 150) {
+        applySkill(bot);
+      }
+    } else if (targetEntity && closestPreyDist < 400) {
+      bot.aiState = 'chase';
+      bot.targetEntityId = targetEntity.id;
+
+      // Attack Skill (if configured)
+      if (closestPreyDist < 150) {
+        applySkill(bot);
+      }
+    } else if (targetFood) {
+      bot.aiState = 'forage';
+      // Move to food
+      // We don't store food ID in targetEntityId usually, just move logic below
+    } else {
+      bot.aiState = 'wander';
+    }
+
+    // Execute Movement
+    const speed = bot.maxSpeed;
+    let tx = 0, ty = 0;
+
+    if (bot.aiState === 'flee' && threat) {
+      const dir = normalize({ x: bot.position.x - threat.position.x, y: bot.position.y - threat.position.y });
+      tx = dir.x * speed;
+      ty = dir.y * speed;
+    } else if (bot.aiState === 'chase' && targetEntity) {
+      const dir = normalize({ x: targetEntity.position.x - bot.position.x, y: targetEntity.position.y - bot.position.y });
+      tx = dir.x * speed;
+      ty = dir.y * speed;
+    } else if (bot.aiState === 'forage' && targetFood) {
+      const dir = normalize({ x: targetFood.position.x - bot.position.x, y: targetFood.position.y - bot.position.y });
+      tx = dir.x * speed;
+      ty = dir.y * speed;
+    } else {
+      // Wander Center bias
+      const distCenter = distance(bot.position, { x: 0, y: 0 });
+      if (distCenter > MAP_RADIUS * 0.9) {
+        const dir = normalize({ x: -bot.position.x, y: -bot.position.y });
+        tx = dir.x * speed;
+        ty = dir.y * speed;
+      } else {
+        tx = (Math.random() - 0.5) * speed;
+        ty = (Math.random() - 0.5) * speed;
+      }
+    }
+
+    // In Physics 2.0 we set Acceleration (Force), not Velocity directly, theoretically.
+    // But physics.ts currently clamps velocity and applies drag.
+    // So setting velocity here acts as "Self-Propulsion".
+    // To respect inertia, we should ADD to velocity, not set it.
+
+    // Steering Behavior (Seek)
+    const desiredX = tx;
+    const desiredY = ty;
+
+    const steerX = desiredX - bot.velocity.x;
+    const steerY = desiredY - bot.velocity.y;
+
+    // Apply steering force
+    const steerFactor = 0.1; // Turn speed
+    bot.velocity.x += steerX * steerFactor;
+    bot.velocity.y += steerY * steerFactor;
   }
 };

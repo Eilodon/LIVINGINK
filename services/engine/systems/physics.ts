@@ -1,172 +1,176 @@
+
 import {
-  ACCELERATION_BASE,
   FRICTION_BASE,
-  GROWTH_DECAY_END,
-  GROWTH_DECAY_START,
-  MAP_RADIUS,
-  PLAYER_START_RADIUS,
-  TRAIL_LENGTH,
-  TIER_RADIUS_RANGE,
-  WORLD_HEIGHT,
-  WORLD_WIDTH,
+  MAX_SPEED_BASE,
   MAX_ENTITY_RADIUS,
 } from '../../../constants';
-import { FACTION_CONFIG } from '../../../constants';
-import { Bot, Faction, GameState, Player, SizeTier, Vector2 } from '../../../types';
-import { createRingParticle } from '../effects';
+import { Entity, Player, Bot, SizeTier, Vector2 } from '../../../types';
+import { distance, normalize } from '../math';
 
-export const applyPhysics = (
-  entity: Player | Bot,
-  target: Vector2,
-  dt: number,
-  currentZone: Faction | 'Center',
-  state?: GameState
-) => {
-  if (entity.statusEffects.airborne || entity.statusEffects.rooted > 0) return;
+// Physics Tuning
+const BASE_MASS_RADIUS = 28; // Standard starting radius
+const FORCE_SCALAR = 1500; // Tuning force strength
+const MIN_SPEED = 0.5;
 
-  // PHYSICS 4.0: VECTOR FORCE CONTROL
-  // Controls: Direct Force Application (Tighter, Snappier)
-  // No more "tank turning". We apply force in the direction of the target.
+export const applyPhysics = (entity: Player | Bot, dt: number) => {
+  // 1. Calculate Mass (Area-based roughly, or Radius^2)
+  // We normalize so starting jelly has mass ~ 1.0
+  const mass = Math.max(1, Math.pow(entity.radius / BASE_MASS_RADIUS, 1.5));
 
-  const dx = target.x - entity.position.x;
-  const dy = target.y - entity.position.y;
-  const distToTarget = Math.sqrt(dx * dx + dy * dy);
+  // 2. Apply Friction (Drag)
+  // Drag Force = -Velocity * Coeff
+  // Heavier objects have more momentum, so friction slows them down effectively less 'quickly' in terms of speed change?
+  // Actually a=F/m, so Friction Decel = F_fric / m.
+  // Standard friction: vel *= 0.9. This is independent of mass.
+  // For "Heavy" feel, we want drag to be consistent.
+  // Let's stick to simple damping for now but scale max speed.
 
-  // 1. Calculate Stats Modifiers
-  // Size Penalty: Less penalty than before for better high-level play
-  let sizePenalty = Math.max(0.6, PLAYER_START_RADIUS / Math.max(PLAYER_START_RADIUS, entity.radius * 0.7));
-  sizePenalty = Math.min(1, sizePenalty * entity.sizePenaltyMultiplier);
+  // Update Speed Caps based on Size
+  const speedScale = 1 / Math.pow(mass, 0.3); // Slower as you grow
+  const currentMaxSpeed = MAX_SPEED_BASE * speedScale * (entity.statusEffects?.speedBoost || 1);
+  const currentAccel = (entity.acceleration || 1.0) * FORCE_SCALAR / mass;
 
-  const surgeBoost = entity.statusEffects.speedSurge > 0 ? 2.0 : 1.0;
-  let currentMaxSpeed = entity.maxSpeed * sizePenalty * entity.statusEffects.speedBoost * surgeBoost;
-  if (entity.statusEffects.slowed) currentMaxSpeed *= entity.statusEffects.slowMultiplier;
+  // 3. Movement Logic (Input applied externally via entity.targetPosition or inputs)
+  // For Players, input is usually "Mouse Direction".
+  // For Bots, input is "Velocity target".
 
-  // Zone Friction
-  let friction = FRICTION_BASE;
-  if (currentZone === Faction.Water) {
-    friction = entity.faction === Faction.Water ? FRICTION_BASE : 0.96;
-    if (entity.faction === Faction.Water) currentMaxSpeed *= 1.3;
-  } else if (currentZone === Faction.Metal) {
-    currentMaxSpeed *= 1.2;
-  } else if (currentZone === Faction.Wood) {
-    if (entity.faction !== Faction.Wood) currentMaxSpeed *= 0.85;
-  }
+  // Here we assume velocity is already being modified by Input/AI *before* this, 
+  // OR we need to apply forces here based on input.
+  // Current Architecture: AI/Input sets Velocity DIRECTLY or sets flags?
+  // App.tsx/AI.ts sets Velocity directly in Phase 1.
+  // Let's migrate to Force-based.
 
-  // 2. Calculate Force
-  const dirX = distToTarget > 0 ? dx / distToTarget : 0;
-  const dirY = distToTarget > 0 ? dy / distToTarget : 0;
+  // If entity has a "Target Vector" (like mouse pos), we apply force pending that direction.
+  if ('targetPosition' in entity) {
+    const p = entity as Player;
+    if (p.targetPosition) {
+      const dx = p.targetPosition.x - p.position.x;
+      const dy = p.targetPosition.y - p.position.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 10) { // Deadzone
+        const fx = (dx / dist) * currentAccel;
+        const fy = (dy / dist) * currentAccel;
 
-  let thrust = ACCELERATION_BASE;
-  const frameScale = Math.min(2.0, dt * 60);
-  const distanceFactor = Math.min(1, distToTarget / 200);
-  thrust *= 0.55 + distanceFactor * 0.45;
-
-  // 3. Counter-Thrust (The "Snappy" Factor)
-  // If the entity is trying to move opposite to its current velocity, apply EXTRA force.
-  const speed = Math.sqrt(entity.velocity.x * entity.velocity.x + entity.velocity.y * entity.velocity.y);
-  if (speed > 1) {
-    const vX = entity.velocity.x / speed;
-    const vY = entity.velocity.y / speed;
-    const dot = vX * dirX + vY * dirY; // 1.0 = Same Dir, -1.0 = Opposite Dir
-
-    // If turning sharp or reversing (dot < 0.5), apply massive breaking/turning force
-    if (dot < 0.5) {
-      thrust *= 1.4;
-      friction *= 0.97; // Softer turn assist
+        p.velocity.x += fx * dt;
+        p.velocity.y += fy * dt;
+      }
     }
   }
+  // Bots handled in AI.ts - need to ensure AI sets acceleration or target, not direct velocity to fully respect this.
+  // For now, let's assume Velocity is preserved and we just apply drag/clamp.
 
-  // 4. Apply Force
-  entity.velocity.x += dirX * thrust * frameScale;
-  entity.velocity.y += dirY * thrust * frameScale;
-
-  // 5. Cap Speed
-  const newSpeed = Math.sqrt(entity.velocity.x ** 2 + entity.velocity.y ** 2);
-  if (newSpeed > currentMaxSpeed) {
-    const scale = currentMaxSpeed / newSpeed;
+  // Clamp Velocity
+  const speed = Math.hypot(entity.velocity.x, entity.velocity.y);
+  if (speed > currentMaxSpeed) {
+    const scale = currentMaxSpeed / speed;
     entity.velocity.x *= scale;
     entity.velocity.y *= scale;
   }
 
-  // 6. Apply Friction
-  const frictionFactor = Math.pow(friction, frameScale);
-  entity.velocity.x *= frictionFactor;
-  entity.velocity.y *= frictionFactor;
+  // Drag
+  entity.velocity.x *= FRICTION_BASE;
+  entity.velocity.y *= FRICTION_BASE;
 
-  // 7. Arrival Damping (Anti-jitter when close to cursor)
-  if (distToTarget < 50) {
-    const arrivalDamp = Math.pow(0.82, frameScale);
-    entity.velocity.x *= arrivalDamp;
-    entity.velocity.y *= arrivalDamp;
-  }
+  // 4. Update Position
+  entity.position.x += entity.velocity.x * dt * 10; // Scaling factor
+  entity.position.y += entity.velocity.y * dt * 10;
 
-  // 8. Integration
-  entity.position.x += entity.velocity.x;
-  entity.position.y += entity.velocity.y;
+  // Visual Tier
+  updateTier(entity);
+};
 
-  // Map Constraints
-  const mapCenterX = WORLD_WIDTH / 2;
-  const mapCenterY = WORLD_HEIGHT / 2;
-  const dxCenter = entity.position.x - mapCenterX;
-  const dyCenter = entity.position.y - mapCenterY;
-  const distFromCenterSq = dxCenter * dxCenter + dyCenter * dyCenter;
-  const mapRadiusSq = MAP_RADIUS * MAP_RADIUS;
+export const constrainToMap = (entity: Entity, radius: number) => {
+  const dist = distance(entity.position, { x: 0, y: 0 });
+  if (dist + entity.radius > radius) {
+    const angle = Math.atan2(entity.position.y, entity.position.x);
+    // Push back exactly to edge
+    entity.position.x = Math.cos(angle) * (radius - entity.radius);
+    entity.position.y = Math.sin(angle) * (radius - entity.radius);
 
-  if (distFromCenterSq > mapRadiusSq) {
-    const distFromCenter = Math.sqrt(distFromCenterSq);
-    const nx = dxCenter / distFromCenter;
-    const ny = dyCenter / distFromCenter;
-    entity.position.x = mapCenterX + nx * (MAP_RADIUS - 6);
-    entity.position.y = mapCenterY + ny * (MAP_RADIUS - 6);
+    // Bounce velocity (Inelastic collision with wall)
+    const normal = { x: Math.cos(angle), y: Math.sin(angle) };
+    const dot = entity.velocity.x * normal.x + entity.velocity.y * normal.y;
 
-    const outwardSpeed = entity.velocity.x * nx + entity.velocity.y * ny;
-    if (outwardSpeed > 0) {
-      entity.velocity.x -= nx * outwardSpeed;
-      entity.velocity.y -= ny * outwardSpeed;
-    }
-    entity.velocity.x *= 0.5;
-    entity.velocity.y *= 0.5;
+    // Reflect: v' = v - (1 + cor) * (v.n) * n
+    // Simple bounce: reverse normal component
+    if (dot > 0) { // moving towards wall
+      entity.velocity.x -= 2 * dot * normal.x;
+      entity.velocity.y -= 2 * dot * normal.y;
 
-    if (state && entity.id === 'player' && outwardSpeed > 2) {
-      const config = FACTION_CONFIG[entity.faction];
-      state.particles.push(createRingParticle(entity.position.x, entity.position.y, config.stroke, entity.radius * 0.9, 0.35, 2));
-      state.shakeIntensity = Math.max(state.shakeIntensity, 0.2);
+      // Dampen
+      entity.velocity.x *= 0.5;
+      entity.velocity.y *= 0.5;
     }
   }
-
-  if (!entity.trail) entity.trail = [];
-  if (newSpeed > 3 && Math.random() > 0.7) {
-    entity.trail.unshift({ x: entity.position.x, y: entity.position.y });
-    if (entity.trail.length > TRAIL_LENGTH) entity.trail.pop();
-  }
 };
 
-export const updateTier = (player: Player) => {
-  const previousTier = player.tier;
-  const progress = (player.radius - PLAYER_START_RADIUS) / TIER_RADIUS_RANGE;
-  if (progress < 0.2) player.tier = SizeTier.Larva;
-  else if (progress < 0.4) player.tier = SizeTier.Juvenile;
-  else if (progress < 0.6) player.tier = SizeTier.Adult;
-  else if (progress < 0.8) player.tier = SizeTier.Elder;
-  else player.tier = SizeTier.AncientKing;
-  return previousTier !== player.tier;
+export const checkCollisions = (
+  entity: Entity,
+  others: Entity[],
+  onCollide: (other: Entity) => void
+) => {
+  others.forEach(other => {
+    if (entity === other) return;
+
+    const dx = entity.position.x - other.position.x;
+    const dy = entity.position.y - other.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const minDist = entity.radius + other.radius;
+
+    if (dist < minDist) {
+      // Overlap!
+      onCollide(other);
+
+      // Soft Collision Resolution (Push apart)
+      // unless one eats the other (handled in onCollide logic)
+      // We apply separation force here regardless to prevent stacking
+      if (dist > 0 && !other.isDead && !entity.isDead) {
+        const overlap = minDist - dist;
+        const pushX = (dx / dist) * overlap * 0.5; // Shared displacement
+        const pushY = (dy / dist) * overlap * 0.5;
+
+        // Weight by mass ratio?
+        // For simplified "Soft" feeling, just push equally or assume similar density
+        // If entity is player, we want to feel the bump.
+
+        // Only push if "Solid" (Players/Bots)
+        // Food doesn't push back usually
+        if ('score' in other && 'score' in entity) {
+          const eMass = Math.pow(entity.radius, 2);
+          const oMass = Math.pow(other.radius, 2);
+          const totalMass = eMass + oMass;
+
+          const eRatio = oMass / totalMass; // Other is heavy -> I move more
+          const oRatio = eMass / totalMass; // I am heavy -> Other moves more
+
+          entity.position.x += pushX * eRatio;
+          entity.position.y += pushY * eRatio;
+
+          // Apply impulse to velocity too?
+          // Simple position correction is often enough for "Squishy"
+          // But let's add slight bounce
+          entity.velocity.x += (pushX * 2);
+          entity.velocity.y += (pushY * 2);
+        }
+      }
+    }
+  });
 };
 
-export const clampEntityRadius = (entity: Player | Bot) => {
-  if ((entity as Bot).isBoss) return;
-  if (entity.radius > MAX_ENTITY_RADIUS) entity.radius = MAX_ENTITY_RADIUS;
-};
+export const updateTier = (entity: Player | Bot) => {
+  const r = entity.radius;
+  if (r < 40) entity.tier = SizeTier.Larva;
+  else if (r < 70) entity.tier = SizeTier.Juvenile;
+  else if (r < 100) entity.tier = SizeTier.Adult;
+  else if (r < 130) entity.tier = SizeTier.Elder;
+  else entity.tier = SizeTier.AncientKing;
 
-const getGrowthScale = (radius: number) => {
-  if (radius <= GROWTH_DECAY_START) return 1;
-  if (radius >= GROWTH_DECAY_END) return 0.35;
-  const t = (radius - GROWTH_DECAY_START) / (GROWTH_DECAY_END - GROWTH_DECAY_START);
-  return 1 - t * 0.65;
+  // Update visual props or state if needed
 };
 
 export const applyGrowth = (entity: Player | Bot, amount: number) => {
-  if (amount <= 0) return;
-  const scale = getGrowthScale(entity.radius);
-  entity.radius += amount * scale;
-  clampEntityRadius(entity);
+  const currentArea = Math.PI * entity.radius * entity.radius;
+  const newArea = currentArea + amount * 25; // Tuned scalar for gameplay "Juice"
+  entity.radius = Math.sqrt(newArea / Math.PI);
+  if (entity.radius > MAX_ENTITY_RADIUS) entity.radius = MAX_ENTITY_RADIUS;
 };

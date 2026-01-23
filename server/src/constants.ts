@@ -1,5 +1,5 @@
 
-import { PigmentVec3 } from './services/cjr/cjrTypes';
+import { PigmentVec3 } from './cjrTypes';
 
 // World Settings
 export const WORLD_WIDTH = 3400;
