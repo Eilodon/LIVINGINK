@@ -27,6 +27,29 @@ export enum MutationTier {
   Legendary = 'Legendary',
 }
 
+export enum MutationId {
+  Swift = 'swift',
+  ThickSkin = 'thick_skin',
+  LightSpikes = 'light_spikes',
+  KillingIntent = 'killing_intent',
+  KeenHearing = 'keen_hearing',
+  DashBoost = 'dash_boost',
+  Lifesteal = 'lifesteal',
+  ArmorPierce = 'armor_pierce',
+  Stealth = 'stealth',
+  PoisonTouch = 'poison_touch',
+  DoubleCast = 'double_cast',
+  SecondChance = 'second_chance',
+  SpeedSurge = 'speed_surge',
+  MagneticField = 'magnetic_field',
+  SoulAbsorb = 'soul_absorb',
+  Rewind = 'rewind',
+  ThunderCall = 'thunder_call',
+  KingForm = 'king_form',
+  Invulnerable = 'invulnerable',
+  ChaosSwap = 'chaos_swap',
+}
+
 export interface Vector2 {
   x: number;
   y: number;
@@ -75,6 +98,7 @@ export interface Player extends Entity {
   currentHealth: number;
   tier: SizeTier;
   targetPosition: Vector2; // Mouse/Input target
+  spawnTime: number;
   
   // Physics Props
   acceleration: number;
@@ -91,7 +115,7 @@ export interface Player extends Entity {
   damageMultiplier: number;
 
   // Mutation Stats
-  mutations: string[];
+  mutations: MutationId[];
   critChance: number;
   critMultiplier: number;
   lifesteal: number;
@@ -150,6 +174,7 @@ export interface Player extends Entity {
     critCharges: number;
     visionBoost: number;
     visionBoostTimer: number;
+    damageFlash: number;
   };
 }
 
@@ -163,6 +188,7 @@ export interface Bot extends Player {
   isBoss?: boolean;
   bossAttackTimer?: number;
   bossAttackCharge?: number;
+  respawnTimer?: number;
 }
 
 export interface Food extends Entity {
@@ -222,15 +248,33 @@ export interface Landmark {
 }
 
 export interface MutationChoice {
-  id: string;
+  id: MutationId;
   name: string;
   tier: MutationTier;
   description: string;
 }
 
+export interface MatchSummary {
+  score: number;
+  kills: number;
+}
+
+export interface PlayerProfile {
+  gamesPlayed: number;
+  totalKills: number;
+  highScore: number;
+  unlockedSkins: string[];
+  unlockedMutations: MutationId[];
+  lastUpdated: number;
+}
+
 export interface Particle extends Entity {
   life: number;
   maxLife: number;
+  style?: 'dot' | 'ring' | 'line';
+  lineLength?: number;
+  lineWidth?: number;
+  angle?: number;
 }
 
 export interface FloatingText {
@@ -241,6 +285,19 @@ export interface FloatingText {
   size: number;
   life: number;
   velocity: Vector2;
+}
+
+// Forward declaration for engine (actual implementation in engine.ts)
+export interface IGameEngine {
+  spatialGrid: {
+    clear: () => void;
+    insert: (entity: Entity) => void;
+    getNearby: (entity: Entity) => Entity[];
+  };
+  particlePool: {
+    get: (x: number, y: number, color: string, speed: number) => Particle;
+    release: (particle: Particle) => void;
+  };
 }
 
 export interface GameState {
@@ -258,6 +315,9 @@ export interface GameState {
   lavaZones: LavaZone[]; // New: Fire Skill
   delayedActions: DelayedAction[]; // New: Skill Queue
   
+  // S-TIER: Engine instance (encapsulated singletons)
+  engine: IGameEngine;
+  
   worldSize: Vector2;
   zoneRadius: number; 
   gameTime: number;
@@ -268,6 +328,7 @@ export interface GameState {
   relicId: string | null;
   relicTimer: number;
   mutationChoices: MutationChoice[] | null;
+  unlockedMutations: MutationId[];
   isPaused: boolean;
   hazardTimers: {
     lightning: number;

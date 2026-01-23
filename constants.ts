@@ -1,29 +1,36 @@
 import { Faction } from './types';
 
 // World Settings
-export const WORLD_WIDTH = 2500; 
-export const WORLD_HEIGHT = 2500;
-export const MAP_RADIUS = 1200; 
-export const INITIAL_ZONE_RADIUS = 1200;
-export const CENTER_RADIUS = 300; 
+export const WORLD_WIDTH = 3400; 
+export const WORLD_HEIGHT = 3400;
+export const MAP_RADIUS = 1600; 
+export const INITIAL_ZONE_RADIUS = 1600;
+export const CENTER_RADIUS = 320; 
 export const GAME_DURATION = 480; 
 export const SPAWN_PROTECTION_TIME = 5;
 export const GRID_CELL_SIZE = 300; // Optimization: Spatial Grid Cell Size
 
 // Entity Settings
-export const PLAYER_START_RADIUS = 40; 
+export const PLAYER_START_RADIUS = 28; 
+export const TIER_RADIUS_RANGE = 150;
+export const MAX_ENTITY_RADIUS = 155;
+export const GROWTH_DECAY_START = 70;
+export const GROWTH_DECAY_END = 155;
 
 // PHYSICS 4.0: NEURAL-LINK RESPONSIVENESS
 // High Acceleration + High Drag = Snappy Controls
 export const TURN_SPEED_BASE = 0.25; // Faster visual turning
-export const ACCELERATION_BASE = 2.0; // Explosion of speed (was 0.8)
-export const FRICTION_BASE = 0.88; // High grip (was 0.94) - Lower number means more drag
-export const MAX_SPEED_BASE = 9.0; // Higher top speed (was 7.0)
+export const ACCELERATION_BASE = 1.0; // Smoother control
+export const FRICTION_BASE = 0.93; // Less snappy, more glide
+export const MAX_SPEED_BASE = 6.8; // Lower top speed for control
 
-export const FOOD_COUNT = 300; 
-export const BOT_COUNT = 24; 
-export const FOOD_RADIUS = 10;
+export const FOOD_COUNT = 260; 
+export const BOT_COUNT = 28; 
+export const BOT_RESPAWN_TIME = 20;
+export const FOOD_RADIUS = 7;
 export const TRAIL_LENGTH = 12; // Shorter trail for cleaner look at high speeds
+export const FOOD_GROWTH_MULTIPLIER = 0.08;
+export const KILL_GROWTH_MULTIPLIER = 0.16;
 
 // THE HOLY TRINITY RULES
 export const EAT_THRESHOLD_RATIO = 0.90; 
@@ -38,7 +45,7 @@ export const SKILL_COOLDOWN_BASE = 8;
 export const RELIC_RESPAWN_TIME = 35;
 export const RELIC_VALUE = 25;
 export const RELIC_RADIUS = 18;
-export const RELIC_GROWTH = 8;
+export const RELIC_GROWTH = 3;
 export const RELIC_HEAL = 20;
 export const RELIC_REGEN = 12;
 
@@ -46,7 +53,7 @@ export const RELIC_REGEN = 12;
 export const KING_DAMAGE_TAKEN_MULTIPLIER = 1.15;
 export const KING_DAMAGE_DEALT_MULTIPLIER = 0.9;
 export const KING_BOUNTY_SCORE = 200;
-export const KING_BOUNTY_RADIUS = 8;
+export const KING_BOUNTY_RADIUS = 4;
 
 // Mutations
 export const MUTATION_CHOICES = 3;
@@ -94,11 +101,11 @@ export const DIAMOND_SHIELD_VALUE = 50;
 export const HEALING_FRUIT_VALUE = 15;
 
 // Creeps & Boss
-export const CREEPS_PER_ZONE = 3;
-export const ELITE_RESPAWN_TIME = 45;
-export const BOSS_RESPAWN_TIME = 120;
-export const BOSS_MAX_HEALTH = 200;
-export const BOSS_DAMAGE = 15;
+export const CREEPS_PER_ZONE = 4;
+export const ELITE_RESPAWN_TIME = 35;
+export const BOSS_RESPAWN_TIME = 90;
+export const BOSS_MAX_HEALTH = 220;
+export const BOSS_DAMAGE = 20;
 export const BOSS_RADIUS = 80;
 export const BOSS_ATTACK_INTERVAL = 6;
 
