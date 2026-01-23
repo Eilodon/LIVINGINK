@@ -1,6 +1,7 @@
 import { FACTION_CONFIG } from '../../constants';
 import { Bot, Faction, FloatingText, Particle, Player, Vector2 } from '../../types';
-import { audioManager } from '../audioManager';
+import { audioEngine } from '../audio/AudioEngine';
+import { vfxManager } from '../vfx/VFXManager';
 import { triggerHaptic } from '../haptics';
 import { createParticle } from './factories';
 import { randomRange } from './math';
@@ -17,7 +18,8 @@ export const createFloatingText = (pos: Vector2, text: string, color: string, si
 
 export const notifyPlayerDamage = (state: { player: Player }, position: Vector2, amount: number) => {
   if (amount <= 0) return;
-  audioManager.playDamage(position, state.player.position);
+  audioEngine.playDamage(amount);
+  vfxManager.triggerDamageTaken(position, amount, 'unknown');
   triggerHaptic('light');
 };
 

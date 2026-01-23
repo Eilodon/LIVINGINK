@@ -4,6 +4,8 @@ import { Bot, Faction, GameState, Player, SizeTier } from '../types';
 import { CENTER_RADIUS, COLOR_PALETTE, DANGER_THRESHOLD_RATIO, EAT_THRESHOLD_RATIO, ELEMENTAL_ADVANTAGE, FACTION_CONFIG, MAP_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../constants';
 import { getSettings, subscribeSettings, type GameSettings, type QualityMode } from '../services/settings';
 import { setRuntimeStats } from '../services/runtimeStats';
+import { vfxManager } from '../services/vfx/VFXManager';
+import type { ParticleConfig, ScreenEffect } from '../services/vfx/VFXManager';
 
 type PixiModule = typeof import('pixi.js');
 
@@ -907,6 +909,12 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
     floatingTexts: true,
   });
 
+  // VFX state refs
+  const screenShakeRef = useRef({ x: 0, y: 0, intensity: 0 });
+  const screenFlashRef = useRef({ alpha: 0, color: 0xffffff });
+  const screenZoomRef = useRef(1.0);
+  const chromaticRef = useRef(0);
+
   const entityMapRef = useRef(new Map<string, EntityVisual>());
   const foodMapRef = useRef(new Map<string, ItemVisual>());
   const powerUpMapRef = useRef(new Map<string, ItemVisual>());
@@ -944,27 +952,27 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
       settingsRef.current = getSettings();
     });
 
-	    const setup = async () => {
-	      if (!containerRef.current) return;
-	      const PIXI = await import('pixi.js');
-	      if (destroyed) return;
+    const setup = async () => {
+      if (!containerRef.current) return;
+      const PIXI = await import('pixi.js');
+      if (destroyed) return;
 
-	      pixiRef.current = PIXI;
+      pixiRef.current = PIXI;
 
-	      const app = new PIXI.Application();
-	      await app.init({
-	        width: window.innerWidth,
-	        height: window.innerHeight,
-	        backgroundColor: hexToNumber(COLOR_PALETTE.background),
-	        antialias: true,
-	        resolution: computeEffectiveDpr(),
-	        autoDensity: true,
-	      });
-	      appRef.current = app;
+      const app = new PIXI.Application();
+      await app.init({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundColor: hexToNumber(COLOR_PALETTE.background),
+        antialias: true,
+        resolution: computeEffectiveDpr(),
+        autoDensity: true,
+      });
+      appRef.current = app;
 
-	      containerRef.current.appendChild(app.canvas);
-	      app.canvas.style.width = '100%';
-	      app.canvas.style.height = '100%';
+      containerRef.current.appendChild(app.canvas);
+      app.canvas.style.width = '100%';
+      app.canvas.style.height = '100%';
 
       const textures = createTexturePack(PIXI);
       texturesRef.current = textures;
@@ -983,14 +991,14 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
       entities.sortableChildren = true;
       const rings = new PIXI.Graphics();
       const labels = new PIXI.Container();
-	      const particles = new PIXI.ParticleContainer({
-	        texture: textures.softCircleTexture,
-	        dynamicProperties: {
-	          position: true,
-	          vertex: true,
-	          color: true,
-	        },
-	      });
+      const particles = new PIXI.ParticleContainer({
+        texture: textures.softCircleTexture,
+        dynamicProperties: {
+          position: true,
+          vertex: true,
+          color: true,
+        },
+      });
       const particleLines = new PIXI.Graphics();
       const floatingTexts = new PIXI.Container();
       const death = new PIXI.Container();
@@ -1009,15 +1017,15 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
       abyssRing.position.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2);
       background.addChild(abyssRing);
 
-	      const abyssText = new PIXI.Text({
-	        text: 'VỰC VẠN CỔ',
-	        style: {
-	          fontFamily: '"Cinzel", serif',
-	          fontSize: 24,
-	          fontWeight: 'bold',
-	          fill: 'rgba(255,255,255,0.7)',
-	        },
-	      });
+      const abyssText = new PIXI.Text({
+        text: 'VỰC VẠN CỔ',
+        style: {
+          fontFamily: '"Cinzel", serif',
+          fontSize: 24,
+          fontWeight: 'bold',
+          fill: 'rgba(255,255,255,0.7)',
+        },
+      });
       abyssText.anchor.set(0.5);
       abyssText.position.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2 + 10);
       background.addChild(abyssText);
@@ -1079,12 +1087,67 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
       window.addEventListener('resize', updateSize);
       cleanupResize = () => window.removeEventListener('resize', updateSize);
 
-	      const updateScene = (ticker: Ticker) => {
-	        const delta = ticker.deltaTime;
-	        const deltaSeconds = ticker.deltaMS / 1000;
-	        const now = performance.now();
-	        const fpsNow = ticker.deltaMS > 0 ? 1000 / ticker.deltaMS : 60;
-	        fpsAvgRef.current = fpsAvgRef.current * 0.92 + fpsNow * 0.08;
+      // Wire VFX Manager callbacks
+      vfxManager.setCallbacks({
+        onSpawnParticles: (preset: Partial<ParticleConfig>, position: { x: number; y: number }, color?: string) => {
+          const count = preset.count || 10;
+          const speed = preset.speed || 5;
+          const particleColor = color || (Array.isArray(preset.color) ? preset.color[0] : preset.color) || '#ffffff';
+
+          for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const velocity = speed + (Math.random() - 0.5) * (preset.speedVariance || 0);
+            const particle = {
+              x: position.x,
+              y: position.y,
+              vx: Math.cos(angle) * velocity,
+              vy: Math.sin(angle) * velocity,
+              life: preset.life || 1,
+              maxLife: preset.life || 1,
+              radius: (preset.size || 3) + (Math.random() - 0.5) * (preset.sizeVariance || 0),
+              color: particleColor,
+            };
+
+            if (gameState.particles) {
+              gameState.particles.push(particle as any);
+            }
+          }
+        },
+
+        onScreenEffect: (effect: ScreenEffect) => {
+          if (effect.type === 'shake') {
+            screenShakeRef.current.intensity = effect.intensity;
+          } else if (effect.type === 'flash') {
+            screenFlashRef.current.alpha = effect.intensity;
+            screenFlashRef.current.color = effect.color ? parseInt(effect.color.replace('#', ''), 16) : 0xffffff;
+          } else if (effect.type === 'zoom') {
+            screenZoomRef.current = effect.intensity;
+          } else if (effect.type === 'chromatic') {
+            chromaticRef.current = effect.intensity;
+          }
+        },
+
+        onFloatingText: (position: { x: number; y: number }, text: string, color: string, size: number) => {
+          if (gameState.floatingTexts) {
+            gameState.floatingTexts.push({
+              id: Math.random().toString(),
+              position: { x: position.x, y: position.y },
+              text,
+              color,
+              size,
+              life: 1.5,
+              velocity: { x: 0, y: -2 },
+            });
+          }
+        },
+      });
+
+      const updateScene = (ticker: Ticker) => {
+        const delta = ticker.deltaTime;
+        const deltaSeconds = ticker.deltaMS / 1000;
+        const now = performance.now();
+        const fpsNow = ticker.deltaMS > 0 ? 1000 / ticker.deltaMS : 60;
+        fpsAvgRef.current = fpsAvgRef.current * 0.92 + fpsNow * 0.08;
 
         const settings = settingsRef.current;
         if (settings.qualityMode === 'auto') {
@@ -1177,16 +1240,16 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
         const inVision = (pos: { x: number; y: number }) =>
           visionRadiusSq === Infinity || distSq(pos, state.player.position) <= visionRadiusSq;
 
-	        if (zoneRadiusRef.current !== state.zoneRadius) {
-	          layers.zone.clear();
-	          const zoneFill = parsePixiColor(COLOR_PALETTE.zone);
-	          layers.zone.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill({ color: zoneFill.tint, alpha: zoneFill.alpha });
-	          layers.zone.circle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, state.zoneRadius).cut();
-	          layers.zone
-	            .circle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, state.zoneRadius)
-	            .stroke({ width: 6, color: hexToNumber(COLOR_PALETTE.zoneBorder), alpha: 1 });
-	          zoneRadiusRef.current = state.zoneRadius;
-	        }
+        if (zoneRadiusRef.current !== state.zoneRadius) {
+          layers.zone.clear();
+          const zoneFill = parsePixiColor(COLOR_PALETTE.zone);
+          layers.zone.rect(0, 0, WORLD_WIDTH, WORLD_HEIGHT).fill({ color: zoneFill.tint, alpha: zoneFill.alpha });
+          layers.zone.circle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, state.zoneRadius).cut();
+          layers.zone
+            .circle(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, state.zoneRadius)
+            .stroke({ width: 6, color: hexToNumber(COLOR_PALETTE.zoneBorder), alpha: 1 });
+          zoneRadiusRef.current = state.zoneRadius;
+        }
 
         layers.lava.clear();
         if (state.lavaZones) {
@@ -1252,15 +1315,15 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
                     : landmark.type === 'metal_altar'
                       ? 'ĐÀI KIẾM'
                       : 'KIM TỰ THÁP';
-	            const label = new PIXI.Text({
-	              text: labelText,
-	              style: {
-	                fontFamily: '"Cinzel", serif',
-	                fontSize: 16,
-	                fontWeight: 'bold',
-	                fill: '#e2e8f0',
-	              },
-	            });
+            const label = new PIXI.Text({
+              text: labelText,
+              style: {
+                fontFamily: '"Cinzel", serif',
+                fontSize: 16,
+                fontWeight: 'bold',
+                fill: '#e2e8f0',
+              },
+            });
             label.anchor.set(0.5);
             const container = new PIXI.Container();
             container.addChild(ring);
@@ -1301,7 +1364,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             highlight.position.set(-6, -6);
             const glow = new PIXI.Sprite(resources.softCircleTexture);
             glow.anchor.set(0.5);
-	            glow.blendMode = 'add';
+            glow.blendMode = 'add';
             glow.visible = false;
             const ring = new PIXI.Graphics();
             const container = new PIXI.Container();
@@ -1353,7 +1416,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             base.anchor.set(0.5);
             const glow = new PIXI.Sprite(resources.softCircleTexture);
             glow.anchor.set(0.5);
-	            glow.blendMode = 'add';
+            glow.blendMode = 'add';
             const container = new PIXI.Container();
             container.addChild(glow, base);
             layers.powerUps.addChild(container);
@@ -1393,7 +1456,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             base.anchor.set(0.5);
             const glow = new PIXI.Sprite(resources.softCircleTexture);
             glow.anchor.set(0.5);
-	            glow.blendMode = 'add';
+            glow.blendMode = 'add';
             const container = new PIXI.Container();
             container.addChild(glow, base);
             layers.projectiles.addChild(container);
@@ -1466,7 +1529,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
             const glow = new PIXI.Sprite(resources.softCircleTexture);
             glow.anchor.set(0.5);
-	            glow.blendMode = 'add';
+            glow.blendMode = 'add';
             glow.visible = false;
 
             const poison = new PIXI.Sprite(resources.softCircleTexture);
@@ -1577,16 +1640,16 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             labelSeen.add(entity.id);
             let label = labelMapRef.current.get(entity.id);
             if (!label) {
-	              label = new PIXI.Text({
-	                text: entity.name || 'Bot',
-	                style: {
-	                  fontFamily: '"Roboto", sans-serif',
-	                  fontSize: Math.max(12, entity.radius * 0.35),
-	                  fontWeight: 'bold',
-	                  fill: '#ffffff',
-	                  stroke: { color: '#000000', width: 2 },
-	                },
-	              });
+              label = new PIXI.Text({
+                text: entity.name || 'Bot',
+                style: {
+                  fontFamily: '"Roboto", sans-serif',
+                  fontSize: Math.max(12, entity.radius * 0.35),
+                  fontWeight: 'bold',
+                  fill: '#ffffff',
+                  stroke: { color: '#000000', width: 2 },
+                },
+              });
               label.anchor.set(0.5);
               layers.labels.addChild(label);
               labelMapRef.current.set(entity.id, label);
@@ -1701,16 +1764,16 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
             let text = floatingTextMapRef.current.get(t.id);
             if (!text) {
-	              text = new PIXI.Text({
-	                text: t.text,
-	                style: {
-	                  fontFamily: '"Roboto", sans-serif',
-	                  fontSize: t.size,
-	                  fontWeight: 'bold',
-	                  fill: t.color,
-	                  stroke: { color: '#000000', width: 2 },
-	                },
-	              });
+              text = new PIXI.Text({
+                text: t.text,
+                style: {
+                  fontFamily: '"Roboto", sans-serif',
+                  fontSize: t.size,
+                  fontWeight: 'bold',
+                  fill: t.color,
+                  stroke: { color: '#000000', width: 2 },
+                },
+              });
               text.anchor.set(0.5);
               layers.floatingTexts.addChild(text);
               floatingTextMapRef.current.set(t.id, text);
@@ -1736,16 +1799,16 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
           });
         }
 
-	        const deathBursts = deathBurstRef.current;
-	        for (let i = deathBursts.length - 1; i >= 0; i--) {
-	          const burst = deathBursts[i];
-	          burst.life -= deltaSeconds;
-	          const progress = Math.max(0, burst.life / burst.maxLife);
-	          burst.container.alpha = progress;
-	          burst.particles.forEach((particle) => {
-	            particle.sprite.x += particle.velocity.x * delta;
-	            particle.sprite.y += particle.velocity.y * delta;
-	          });
+        const deathBursts = deathBurstRef.current;
+        for (let i = deathBursts.length - 1; i >= 0; i--) {
+          const burst = deathBursts[i];
+          burst.life -= deltaSeconds;
+          const progress = Math.max(0, burst.life / burst.maxLife);
+          burst.container.alpha = progress;
+          burst.particles.forEach((particle) => {
+            particle.sprite.x += particle.velocity.x * delta;
+            particle.sprite.y += particle.velocity.y * delta;
+          });
           if (burst.life <= 0) {
             layers.death.removeChild(burst.container);
             burst.container.destroy({ children: true });
@@ -1774,20 +1837,20 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
     setup();
 
-	    return () => {
-	      destroyed = true;
-	      unsubscribeSettings();
-	      cleanupResize?.();
-	      if (appRef.current) {
-	        appRef.current.destroy(
-	          { removeView: true },
-	          { children: true, texture: true, textureSource: true, context: true }
-	        );
-	      }
-	      appRef.current = null;
-	      pixiRef.current = null;
-	    };
-	  }, [gameState]);
+    return () => {
+      destroyed = true;
+      unsubscribeSettings();
+      cleanupResize?.();
+      if (appRef.current) {
+        appRef.current.destroy(
+          { removeView: true },
+          { children: true, texture: true, textureSource: true, context: true }
+        );
+      }
+      appRef.current = null;
+      pixiRef.current = null;
+    };
+  }, [gameState]);
 
   const handleInput = (e: React.MouseEvent) => {
     if (!enablePointerInput) return;

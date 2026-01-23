@@ -53,9 +53,12 @@ import {
   Player,
   PowerUp,
 } from '../../types';
-import { audioManager } from '../audioManager';
+import { audioEngine } from '../audio/AudioEngine';
+import { vfxManager } from '../vfx/VFXManager';
 import { getSizeInteraction } from '../combatRules';
 import { applyMutation, getMutationChoices } from '../mutations';
+import { checkForLegendaryEvolution, applyLegendaryEvolution } from '../legendaryEvolutions';
+import { triggerBloodlinePassive } from '../bloodlines';
 import { bindEngine, createGameEngine, GameEngine, getCurrentSpatialGrid } from './context';
 import {
   createBoss,
@@ -177,8 +180,9 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
   newState.currentRound = newRound;
 
   if (newRound > previousRound) {
-    audioManager.playWarning();
-    audioManager.setBgmIntensity(newRound);
+    audioEngine.playWarning();
+    audioEngine.setBGMIntensity(newRound);
+    vfxManager.triggerRoundChange(newRound);
     newState.shakeIntensity = 1.0;
     let roundText = '';
     if (newRound === 2) roundText = 'BO ROUND 1: TOXIC SPREADING!';
@@ -376,7 +380,7 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
     food.velocity = { x: dir.x * EJECT_SPEED, y: dir.y * EJECT_SPEED };
     newState.food.push(food);
-    audioManager.playEject(newState.player.position, newState.player.position);
+    audioEngine.playEject(newState.player.position);
     state.inputs.w = false;
   }
 
@@ -623,6 +627,14 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
     const tierUp = updateTier(entity as Player);
     if (tierUp && entity.id === 'player') {
+      // Trigger evolution VFX and audio
+      const fromTier = entity.tier === SizeTier.Juvenile ? SizeTier.Larva :
+        entity.tier === SizeTier.Adult ? SizeTier.Juvenile :
+          entity.tier === SizeTier.Elder ? SizeTier.Adult :
+            SizeTier.Elder;
+      vfxManager.triggerEvolutionTransform(entity.position, fromTier, entity.tier, entity.faction);
+      audioEngine.playEvolution();
+
       if (!newState.mutationChoices) {
         const owned = new Set(entity.mutations);
         newState.mutationChoices = getMutationChoices(owned, entity.tier, MUTATION_CHOICES, allowedMutations);
@@ -632,6 +644,26 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
       const owned = new Set(entity.mutations);
       const choices = getMutationChoices(owned, entity.tier, 1, allowedMutations);
       if (choices[0]) applyMutation(entity, choices[0].id);
+    }
+
+    // Check for legendary evolution after tier up
+    if (tierUp && entity.id === 'player') {
+      const legendaryEvolution = checkForLegendaryEvolution(entity);
+      if (legendaryEvolution) {
+        applyLegendaryEvolution(entity, legendaryEvolution.id);
+        // Legendary VFX is triggered inside applyLegendaryEvolution
+      }
+    }
+
+    // Trigger passive bloodline abilities (continuous effects)
+    const bloodlineId = (entity as any).bloodline;
+    if (bloodlineId) {
+      triggerBloodlinePassive(entity, bloodlineId, 'passive', {});
+
+      // Check low HP passive
+      if (entity.currentHealth / entity.maxHealth < 0.3) {
+        triggerBloodlinePassive(entity, bloodlineId, 'on_low_hp', {});
+      }
     }
 
     // --- ZONE HAZARDS & BUFFS ---
@@ -847,7 +879,7 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
             const growth = f.value * FOOD_GROWTH_MULTIPLIER;
             applyGrowth(entity, growth);
             entity.score += f.value;
-            if (entity.id === 'player') audioManager.playEat(entity.position, newState.player.position);
+            if (entity.id === 'player') audioEngine.playEat(entity.position);
             if (f.value > 2) newState.floatingTexts.push(createFloatingText(entity.position, `+${f.value}`, '#4ade80', 16));
           }
         }

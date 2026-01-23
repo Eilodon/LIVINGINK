@@ -8,7 +8,9 @@ import {
   KILL_GROWTH_MULTIPLIER,
 } from '../../../constants';
 import { Bot, Faction, GameState, Player, Projectile, SizeTier } from '../../../types';
-import { audioManager } from '../../audioManager';
+import { audioEngine } from '../../audio/AudioEngine';
+import { vfxManager } from '../../vfx/VFXManager';
+import { triggerBloodlinePassive } from '../../bloodlines';
 import { triggerHaptic } from '../../haptics';
 import { applyMutation, getMutationChoices } from '../../mutations';
 import { createParticle, createPowerUp } from '../factories';
@@ -46,11 +48,21 @@ export const applyProjectileEffect = (proj: Projectile, target: Player | Bot, st
   if (owner) damageDealt *= owner.statusEffects.damageBoost;
 
   if (owner) {
+    // Trigger bloodline passive on hit
+    const bloodlineId = (owner as any).bloodline;
+    if (bloodlineId) {
+      const context = { target, damage: damageDealt };
+      triggerBloodlinePassive(owner, bloodlineId, 'on_hit', context);
+    }
+
     const critRoll = owner.statusEffects.critCharges > 0 || Math.random() < owner.critChance;
     if (critRoll) {
       damageDealt *= owner.critMultiplier;
       if (owner.statusEffects.critCharges > 0) owner.statusEffects.critCharges -= 1;
       state.floatingTexts.push(createFloatingText(target.position, 'CRIT!', '#facc15', 14));
+      vfxManager.triggerHitConfirm(target.position, damageDealt, true);
+    } else {
+      vfxManager.triggerHitConfirm(target.position, damageDealt, false);
     }
   }
   if (isTargetKing) damageDealt *= KING_DAMAGE_TAKEN_MULTIPLIER;
@@ -128,6 +140,13 @@ export const consume = (predator: Player | Bot, prey: Player | Bot, state: GameS
   }
   applyGrowth(predator, gain);
 
+  // Trigger bloodline passive on kill
+  const bloodlineId = (predator as any).bloodline;
+  if (bloodlineId) {
+    const context = { victim: prey, gainedRadius: gain };
+    triggerBloodlinePassive(predator, bloodlineId, 'on_kill', context);
+  }
+
   if ((prey as Bot).isElite && !(predator as Bot).isCreep) {
     const allowed = state.unlockedMutations?.length ? new Set(state.unlockedMutations) : undefined;
     const choices = getMutationChoices(new Set(predator.mutations), predator.tier, 1, allowed);
@@ -142,10 +161,13 @@ export const consume = (predator: Player | Bot, prey: Player | Bot, state: GameS
   }
 
   state.floatingTexts.push(createFloatingText(predator.position, 'DEVOUR!', '#ef4444', 30));
-  if (predator.id === 'player') state.shakeIntensity = 0.8;
+
+  // VFX and Audio for kill
+  vfxManager.triggerKillCelebration(prey.position, predator.faction, prey.radius);
+  audioEngine.playKill(prey.position);
 
   if (predator.id === 'player') {
-    audioManager.playKill(prey.position, state.player.position);
+    state.shakeIntensity = 0.8;
     triggerHaptic('heavy');
   }
 };
@@ -176,11 +198,13 @@ export const resolveCombat = (e1: Player | Bot, e2: Player | Bot, dt: number, st
     e2Dmg *= e1.critMultiplier;
     if (e1.statusEffects.critCharges > 0) e1.statusEffects.critCharges -= 1;
     state.floatingTexts.push(createFloatingText(e2.position, 'CRIT!', '#facc15', 12));
+    vfxManager.triggerHitConfirm(e2.position, e2Dmg, true);
   }
   if (e2.statusEffects.critCharges > 0 || Math.random() < e2.critChance) {
     e1Dmg *= e2.critMultiplier;
     if (e2.statusEffects.critCharges > 0) e2.statusEffects.critCharges -= 1;
     state.floatingTexts.push(createFloatingText(e1.position, 'CRIT!', '#facc15', 12));
+    vfxManager.triggerHitConfirm(e1.position, e1Dmg, true);
   }
 
   if (e1CountersE2) e2Dmg *= 3;
@@ -230,6 +254,22 @@ export const resolveCombat = (e1: Player | Bot, e2: Player | Bot, dt: number, st
   e2.currentHealth -= e2Dmg;
   applyDamageFlash(e1, e1Dmg);
   applyDamageFlash(e2, e2Dmg);
+
+  // Trigger bloodline passives on damage taken
+  if (e1Dmg > 0) {
+    const bloodlineId1 = (e1 as any).bloodline;
+    if (bloodlineId1) {
+      const context = { attacker: e2, damage: e1Dmg, isMelee: true };
+      triggerBloodlinePassive(e1, bloodlineId1, 'on_damage_taken', context);
+    }
+  }
+  if (e2Dmg > 0) {
+    const bloodlineId2 = (e2 as any).bloodline;
+    if (bloodlineId2) {
+      const context = { attacker: e1, damage: e2Dmg, isMelee: true };
+      triggerBloodlinePassive(e2, bloodlineId2, 'on_damage_taken', context);
+    }
+  }
   if (e1.id === 'player' && e1Dmg > 0.5) notifyPlayerDamage(state, e1.position, e1Dmg);
   if (e2.id === 'player' && e2Dmg > 0.5) notifyPlayerDamage(state, e2.position, e2Dmg);
 

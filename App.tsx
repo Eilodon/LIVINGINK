@@ -1,14 +1,18 @@
 import React, { Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { GamePhase, GameState, Faction, MutationChoice, MutationId, PlayerProfile } from './types';
 import { createPlayer, createBot, createFood, createCreeps, createLandmarks, createZoneHazards, updateGameState, createGameEngine } from './services/engine';
-import { audioManager } from './services/audioManager';
+import { audioEngine } from './services/audio/AudioEngine';
+import { vfxManager } from './services/vfx/VFXManager';
 import { WORLD_WIDTH, WORLD_HEIGHT, INITIAL_ZONE_RADIUS, BOT_COUNT, FOOD_COUNT, BOSS_RESPAWN_TIME, DUST_STORM_INTERVAL } from './constants';
 import MainMenu from './components/MainMenu';
 import HUD from './components/HUD';
 import MobileControls from './components/MobileControls';
 import MutationPicker from './components/MutationPicker';
+import BloodlinePicker from './components/BloodlinePicker';
 import { applyMutation, getAllMutationIds, getMutationById } from './services/mutations';
 import { applyMatchResult, loadProfile, saveProfile } from './services/profile';
+import { BloodlineId, applyBloodlineStats } from './services/bloodlines';
+import { checkForLegendaryEvolution, applyLegendaryEvolution } from './services/legendaryEvolutions';
 
 const totalMutationCount = getAllMutationIds().length;
 const PixiGameCanvas = React.lazy(() => import('./components/PixiGameCanvas'));
@@ -19,6 +23,9 @@ const App: React.FC = () => {
   const [mutationChoices, setMutationChoices] = useState<MutationChoice[] | null>(null);
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   const [newUnlocks, setNewUnlocks] = useState<MutationId[]>([]);
+  const [showBloodlinePicker, setShowBloodlinePicker] = useState(false);
+  const [selectedBloodline, setSelectedBloodline] = useState<BloodlineId | null>(null);
+  const [pendingGameStart, setPendingGameStart] = useState<{ name: string; faction: Faction } | null>(null);
   const phaseRef = useRef<GamePhase>(phase);
   // GameStateRef holds the TRUTH. We do not sync this to React state every frame.
   const gameStateRef = useRef<GameState | null>(null);
@@ -46,16 +53,45 @@ const App: React.FC = () => {
     void import('./components/PixiGameCanvas');
   };
 
-  const initGame = (playerName: string, faction: Faction) => {
+  const handleStartGame = (playerName: string, faction: Faction) => {
+    // Show bloodline picker before starting game
+    setPendingGameStart({ name: playerName, faction });
+    setShowBloodlinePicker(true);
+  };
+
+  const handleBloodlineSelect = (bloodlineId: BloodlineId) => {
+    setSelectedBloodline(bloodlineId);
+    setShowBloodlinePicker(false);
+
+    if (pendingGameStart) {
+      initGame(pendingGameStart.name, pendingGameStart.faction, bloodlineId);
+      setPendingGameStart(null);
+    }
+  };
+
+  const handleBloodlineBack = () => {
+    setShowBloodlinePicker(false);
+    setPendingGameStart(null);
+  };
+
+  const initGame = (playerName: string, faction: Faction, bloodlineId: BloodlineId) => {
     setMutationChoices(null);
     mutationKeyRef.current = null;
     setNewUnlocks([]);
-    // Start Audio Context on user interaction
-    audioManager.resume();
-    audioManager.startBGM();
-    audioManager.setBgmIntensity(1);
+
+    // Initialize Audio Engine on user interaction
+    audioEngine.initialize().then(() => {
+      audioEngine.resume();
+      audioEngine.startBGM();
+      audioEngine.setBGMIntensity(1);
+    });
 
     const player = createPlayer(playerName, faction, 0);
+
+    // Apply bloodline stats and passives
+    applyBloodlineStats(player, bloodlineId);
+    (player as any).bloodline = bloodlineId;
+
     const bots = Array.from({ length: BOT_COUNT }).map((_, i) => createBot(i.toString(), 0));
     const food = Array.from({ length: FOOD_COUNT }).map(() => createFood());
     const creeps = createCreeps();
@@ -120,10 +156,14 @@ const App: React.FC = () => {
     lastTimeRef.current = time;
 
     if (gameStateRef.current) {
-      // 1. Update Physics / Game Logic
+      // 0. Update VFX Manager (handles time scaling for slow-mo)
+      vfxManager.update(dt);
+      const timeScale = vfxManager.getTimeScale();
+
+      // 1. Update Physics / Game Logic (with time scaling)
       // Note: updateGameState mutates the object for performance in this architecture
       // (engine.ts was updated to support this pattern efficiently)
-      const newState = updateGameState(gameStateRef.current, dt);
+      const newState = updateGameState(gameStateRef.current, dt * timeScale);
       gameStateRef.current = newState;
 
       const pending = newState.mutationChoices;
@@ -291,7 +331,15 @@ const App: React.FC = () => {
   const handleMutationSelect = (id: MutationId) => {
     const state = gameStateRef.current;
     if (!state) return;
+
     applyMutation(state.player, id);
+
+    // Check for legendary evolution after mutation
+    const legendaryEvolution = checkForLegendaryEvolution(state.player);
+    if (legendaryEvolution) {
+      applyLegendaryEvolution(state.player, legendaryEvolution.id);
+    }
+
     const mutation = getMutationById(id);
     if (mutation) {
       state.floatingTexts.push({
@@ -316,8 +364,16 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-screen bg-slate-900 relative overflow-hidden select-none">
-      {phase === GamePhase.Menu && (
-        <MainMenu onStart={initGame} onPreload={preloadPixiCanvas} profile={profile} totalMutations={totalMutationCount} />
+      {phase === GamePhase.Menu && !showBloodlinePicker && (
+        <MainMenu onStart={handleStartGame} onPreload={preloadPixiCanvas} profile={profile} totalMutations={totalMutationCount} />
+      )}
+
+      {showBloodlinePicker && (
+        <BloodlinePicker
+          profile={profile}
+          onSelect={handleBloodlineSelect}
+          onBack={handleBloodlineBack}
+        />
       )}
 
       {phase === GamePhase.Playing && gameStateRef.current && (

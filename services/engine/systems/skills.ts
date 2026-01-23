@@ -4,7 +4,7 @@ import {
 } from '../../../constants';
 import { FACTION_CONFIG } from '../../../constants';
 import { Bot, DelayedAction, Faction, GameState, MutationId, Player, SizeTier } from '../../../types';
-import { audioManager } from '../../audioManager';
+import { audioEngine } from '../../audio/AudioEngine';
 import { triggerHaptic } from '../../haptics';
 import { createHazard, createParticle, createProjectile } from '../factories';
 import { applyDamageFlash, createFloatingText, createLineParticle, createRingParticle, notifyPlayerDamage } from '../effects';
@@ -41,7 +41,7 @@ export const executeDelayedAction = (action: DelayedAction, state: GameState) =>
 
   if (action.type === 'metal_dash') {
     performDash(caster, state);
-    audioManager.playSkill(caster.position, state.player.position);
+    audioEngine.playSkill(caster.position);
   } else if (action.type === 'water_shot') {
     const { angleOffset } = action.data;
     const currentAngle = Math.atan2(caster.velocity.y, caster.velocity.x);
@@ -143,7 +143,7 @@ const spawnSkillTelegraph = (caster: Player | Bot, state: GameState) => {
 export const castSkill = (caster: Player | Bot, state: GameState, dt: number, triggeredByDouble: boolean = false) => {
   if (!triggeredByDouble) {
     caster.skillCooldown = Math.max(0.5, caster.maxSkillCooldown * caster.skillCooldownMultiplier);
-    audioManager.playSkill(caster.position, state.player.position);
+    audioEngine.playSkill(caster.position);
     if (caster.id === 'player') triggerHaptic('medium');
     state.floatingTexts.push(createFloatingText(caster.position, 'SKILL!', '#fbbf24', 24));
     spawnSkillTelegraph(caster, state);
