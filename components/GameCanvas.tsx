@@ -20,6 +20,33 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mapCacheRef = useRef<HTMLCanvasElement | null>(null);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
+  const gradientCacheRef = useRef(new Map<string, CanvasGradient>());
+
+  const hexToRgb = (hex: string) => {
+    const clean = hex.replace('#', '');
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    return { r, g, b };
+  };
+
+  const tint = (value: number, delta: number) => Math.max(0, Math.min(255, value + delta));
+
+  const getBodyGradient = (ctx: CanvasRenderingContext2D, color: string, radius: number) => {
+    const bucket = Math.max(8, Math.round(radius / 6) * 6);
+    const key = `${color}-${bucket}`;
+    const cache = gradientCacheRef.current;
+    const cached = cache.get(key);
+    if (cached) return cached;
+
+    const { r, g, b } = hexToRgb(color);
+    const gradient = ctx.createRadialGradient(-bucket * 0.3, -bucket * 0.3, 0, 0, 0, bucket);
+    gradient.addColorStop(0, `rgb(${tint(r, 35)}, ${tint(g, 35)}, ${tint(b, 35)})`);
+    gradient.addColorStop(0.55, color);
+    gradient.addColorStop(1, `rgb(${tint(r, -25)}, ${tint(g, -25)}, ${tint(b, -25)})`);
+    cache.set(key, gradient);
+    return gradient;
+  };
 
   useEffect(() => {
     const offscreen = document.createElement('canvas');
@@ -313,17 +340,46 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
             entity.id === 'player', 
             player.radius, player.faction, 
             frameCount,
+            gameState.gameTime,
             entity.id === kingId
           );
       });
 
       // 5. Particles
       particles.forEach(p => {
-          ctx.globalAlpha = p.life;
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.arc(p.position.x, p.position.y, p.radius, 0, Math.PI * 2);
-          ctx.fill();
+          const lifeRatio = p.maxLife > 0 ? p.life / p.maxLife : p.life;
+          if (p.style === 'ring') {
+              const progress = 1 - Math.max(0, lifeRatio);
+              const ringRadius = p.radius * (1 + progress * 1.6);
+              ctx.globalAlpha = Math.max(0, lifeRatio);
+              ctx.strokeStyle = p.color;
+              ctx.lineWidth = p.lineWidth ?? Math.max(2, p.radius * 0.15);
+              ctx.beginPath();
+              ctx.arc(p.position.x, p.position.y, ringRadius, 0, Math.PI * 2);
+              ctx.stroke();
+          } else if (p.style === 'line') {
+              const angle = p.angle ?? Math.atan2(p.velocity.y, p.velocity.x);
+              const length = p.lineLength ?? p.radius * 4;
+              ctx.globalAlpha = Math.max(0, lifeRatio);
+              ctx.strokeStyle = p.color;
+              ctx.lineWidth = p.lineWidth ?? Math.max(2, p.radius * 0.2);
+              ctx.beginPath();
+              ctx.moveTo(
+                  p.position.x - Math.cos(angle) * length * 0.5,
+                  p.position.y - Math.sin(angle) * length * 0.5
+              );
+              ctx.lineTo(
+                  p.position.x + Math.cos(angle) * length * 0.5,
+                  p.position.y + Math.sin(angle) * length * 0.5
+              );
+              ctx.stroke();
+          } else {
+              ctx.globalAlpha = p.life;
+              ctx.fillStyle = p.color;
+              ctx.beginPath();
+              ctx.arc(p.position.x, p.position.y, p.radius, 0, Math.PI * 2);
+              ctx.fill();
+          }
       });
       ctx.globalAlpha = 1.0;
 
@@ -758,12 +814,144 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       }
   };
 
+  const drawFactionUnderlay = (ctx: CanvasRenderingContext2D, entity: Player | Bot, r: number) => {
+      const config = FACTION_CONFIG[entity.faction as Faction];
+      if (entity.faction === Faction.Metal) {
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath();
+          ctx.ellipse(-r * 0.1, -r * 0.8, r * 0.7, r * 0.25, -0.2, 0, Math.PI * 2);
+          ctx.ellipse(-r * 0.1, r * 0.8, r * 0.7, r * 0.25, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = config.secondary;
+          ctx.lineWidth = Math.max(1, r * 0.05);
+          ctx.stroke();
+          ctx.restore();
+      }
+  };
+
+  const drawFactionOverlay = (ctx: CanvasRenderingContext2D, entity: Player | Bot, r: number) => {
+      const config = FACTION_CONFIG[entity.faction as Faction];
+      if (entity.faction === Faction.Fire) {
+          // Frog mouth + warts
+          ctx.strokeStyle = config.stroke;
+          ctx.lineWidth = Math.max(2, r * 0.1);
+          ctx.beginPath();
+          ctx.arc(r * 0.35, 0, r * 0.45, -0.2 * Math.PI, 0.2 * Math.PI);
+          ctx.stroke();
+
+          ctx.fillStyle = config.secondary;
+          const warts = [
+              { x: -0.35, y: -0.25 },
+              { x: -0.1, y: 0.15 },
+              { x: 0.1, y: -0.35 },
+              { x: 0.35, y: 0.25 },
+          ];
+          warts.forEach((spot) => {
+              ctx.beginPath();
+              ctx.arc(r * spot.x, r * spot.y, r * 0.08, 0, Math.PI * 2);
+              ctx.fill();
+          });
+      } else if (entity.faction === Faction.Metal) {
+          // Bee stinger + stripes + antennae
+          ctx.fillStyle = config.stroke;
+          ctx.beginPath();
+          ctx.moveTo(-r * 1.05, 0);
+          ctx.lineTo(-r * 0.75, -r * 0.2);
+          ctx.lineTo(-r * 0.75, r * 0.2);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = config.secondary;
+          ctx.lineWidth = Math.max(2, r * 0.08);
+          for (let i = -0.35; i <= 0.35; i += 0.35) {
+              ctx.beginPath();
+              ctx.ellipse(0, r * i, r * 0.9, r * 0.22, 0, 0, Math.PI * 2);
+              ctx.stroke();
+          }
+
+          ctx.strokeStyle = config.stroke;
+          ctx.lineWidth = Math.max(2, r * 0.08);
+          ctx.beginPath();
+          ctx.moveTo(r * 0.6, -r * 0.3);
+          ctx.lineTo(r * 0.9, -r * 0.6);
+          ctx.moveTo(r * 0.6, r * 0.3);
+          ctx.lineTo(r * 0.9, r * 0.6);
+          ctx.stroke();
+      } else if (entity.faction === Faction.Wood) {
+          // Snake tongue + tail fin + scale line
+          ctx.strokeStyle = config.secondary;
+          ctx.lineWidth = Math.max(2, r * 0.07);
+          ctx.beginPath();
+          ctx.moveTo(r * 0.9, 0);
+          ctx.lineTo(r * 1.2, -r * 0.12);
+          ctx.moveTo(r * 0.9, 0);
+          ctx.lineTo(r * 1.2, r * 0.12);
+          ctx.stroke();
+
+          ctx.fillStyle = config.stroke;
+          ctx.beginPath();
+          ctx.moveTo(-r * 1.05, 0);
+          ctx.lineTo(-r * 0.65, -r * 0.25);
+          ctx.lineTo(-r * 0.65, r * 0.25);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = config.secondary;
+          ctx.lineWidth = Math.max(1, r * 0.05);
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.75, -0.6, 0.6);
+          ctx.stroke();
+      } else if (entity.faction === Faction.Water) {
+          // Silkworm segments + silk tuft
+          ctx.strokeStyle = config.secondary;
+          ctx.lineWidth = Math.max(2, r * 0.08);
+          for (let i = -0.4; i <= 0.4; i += 0.4) {
+              ctx.beginPath();
+              ctx.ellipse(0, r * i, r * 0.85, r * 0.25, 0, 0, Math.PI * 2);
+              ctx.stroke();
+          }
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = Math.max(1, r * 0.05);
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.9, -r * 0.2);
+          ctx.lineTo(-r * 1.15, -r * 0.45);
+          ctx.moveTo(-r * 0.9, r * 0.2);
+          ctx.lineTo(-r * 1.15, r * 0.45);
+          ctx.stroke();
+      } else if (entity.faction === Faction.Earth) {
+          // Scorpion claws + tail + stinger
+          ctx.fillStyle = config.stroke;
+          ctx.beginPath();
+          ctx.arc(r * 0.75, -r * 0.45, r * 0.22, 0, Math.PI * 2);
+          ctx.arc(r * 0.75, r * 0.45, r * 0.22, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = config.stroke;
+          ctx.lineWidth = Math.max(2, r * 0.1);
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.6, 0);
+          ctx.quadraticCurveTo(-r * 1.2, -r * 0.8, -r * 0.2, -r * 1.25);
+          ctx.stroke();
+
+          ctx.fillStyle = config.stroke;
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.2, -r * 1.25);
+          ctx.lineTo(-r * 0.05, -r * 1.05);
+          ctx.lineTo(-r * 0.35, -r * 1.05);
+          ctx.closePath();
+          ctx.fill();
+      }
+  };
+
   const drawEntity = (
       ctx: CanvasRenderingContext2D, 
       entity: Player | Bot, 
       isPlayer: boolean, 
       playerR: number, playerFaction: Faction,
       frameCount: number,
+      gameTime: number,
       isKing: boolean
   ) => {
       const config = FACTION_CONFIG[entity.faction as Faction];
@@ -771,6 +959,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       const x = entity.position.x;
       const y = entity.position.y;
       const stealthAlpha = entity.statusEffects.stealthed && !isPlayer ? 0.2 : 1;
+      const spawnDuration = 0.7;
+      const timeSinceSpawn = Math.max(0, gameTime - entity.spawnTime);
+      const spawnProgress = Math.min(1, timeSinceSpawn / spawnDuration);
+      const spawnAlpha = spawnProgress;
+      const spawnScale = 0.6 + spawnProgress * 0.4;
 
       // --- 1. DETERMINE VISUAL TIER ---
       let visualMultiplier = 1.0;
@@ -819,7 +1012,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
         ctx.shadowBlur = glowBlur;
         ctx.shadowColor = glowColor;
         ctx.fillStyle = glowColor;
-        ctx.globalAlpha = stealthAlpha;
+        ctx.globalAlpha = stealthAlpha * spawnAlpha;
         ctx.beginPath();
         ctx.arc(x, y, r * visualMultiplier * 1.1, 0, Math.PI*2);
         ctx.fill();
@@ -843,7 +1036,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       const angle = Math.atan2(entity.velocity.y, entity.velocity.x);
       ctx.save();
       ctx.translate(x, y);
-      ctx.globalAlpha = stealthAlpha;
+      ctx.globalAlpha = stealthAlpha * spawnAlpha;
+      ctx.scale(spawnScale, spawnScale);
       
       // FIRE JUMP VISUAL (Scaling)
       if (entity.statusEffects.airborne) {
@@ -865,28 +1059,27 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
       if (entity.tier === SizeTier.AncientKing) {
           drawTransformation(ctx, entity, 'under', frameCount);
       }
+      drawFactionUnderlay(ctx, entity, r);
 
       // --- 4. BODY RENDERING (Local Space 0,0) ---
       
+      if (entity.statusEffects.damageFlash > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, entity.statusEffects.damageFlash * 0.7);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 1.1, r * 0.95, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
       // Main Body
-      ctx.fillStyle = config.color;
+      ctx.fillStyle = getBodyGradient(ctx, config.color, r);
       ctx.beginPath();
       ctx.ellipse(0, 0, r, r*0.9, 0, 0, Math.PI*2);
       ctx.fill();
       
-      // Faction Details
-      ctx.fillStyle = config.secondary;
-      if (entity.faction === Faction.Fire) {
-          ctx.beginPath(); ctx.arc(-r*0.4, -r*0.4, r*0.2, 0, Math.PI*2); ctx.fill();
-          ctx.beginPath(); ctx.arc(r*0.2, -r*0.6, r*0.15, 0, Math.PI*2); ctx.fill();
-      } else if (entity.faction === Faction.Metal) {
-          ctx.fillRect(-r*0.2, -r*0.8, r*0.2, r*1.6);
-          ctx.fillRect(-r*0.6, -r*0.7, r*0.2, r*1.4);
-      } else if (entity.faction === Faction.Water) {
-          ctx.strokeStyle = 'white';
-          ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(0, 0, r*0.6, 0, Math.PI); ctx.stroke();
-      }
+      drawFactionOverlay(ctx, entity, r);
 
       // Eyes
       const eyeX = r * 0.35;
@@ -987,6 +1180,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
 
       // --- 8. NAME TAG ---
       if (entity.radius > 20) {
+        ctx.save();
+        ctx.globalAlpha = spawnAlpha * stealthAlpha;
         ctx.fillStyle = '#fff';
         ctx.shadowColor = 'black';
         ctx.shadowBlur = 4;
@@ -994,6 +1189,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, onMouseMove, onMouse
         ctx.textAlign = 'center';
         ctx.fillText(entity.name || 'Bot', x, y - entity.radius - 8);
         ctx.shadowBlur = 0;
+        ctx.restore();
       }
   };
 

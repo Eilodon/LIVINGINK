@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { Faction } from '../types';
+import { Faction, PlayerProfile } from '../types';
 import { FACTION_CONFIG } from '../constants';
 
 interface MainMenuProps {
   onStart: (name: string, faction: Faction) => void;
+  profile: PlayerProfile;
+  totalMutations: number;
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onStart, profile, totalMutations }) => {
   const [name, setName] = useState('');
   const [selectedFaction, setSelectedFaction] = useState<Faction>(Faction.Metal);
+  const mutationProgress = totalMutations > 0
+    ? Math.round((profile.unlockedMutations.length / totalMutations) * 100)
+    : 0;
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-slate-900 bg-opacity-95 z-50 text-white">
@@ -59,6 +64,39 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
               <p className="text-sm text-slate-300 mt-1 italic">{FACTION_CONFIG[selectedFaction].desc}</p>
               <div className="mt-4 border-t border-slate-700 pt-2">
                  <p className="text-xs text-yellow-500 font-bold mb-1">TUYỆT KỸ: {FACTION_CONFIG[selectedFaction].skillName}</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 p-4 rounded-lg border border-slate-700">
+              <h3 className="text-sm font-bold text-yellow-400 mb-3 uppercase tracking-widest">Meta Progress</h3>
+              <div className="grid grid-cols-2 gap-3 text-xs text-slate-300">
+                <div>
+                  <div className="text-slate-500 uppercase tracking-wide">Games</div>
+                  <div className="text-white font-bold">{profile.gamesPlayed}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 uppercase tracking-wide">Total Kills</div>
+                  <div className="text-white font-bold">{profile.totalKills}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 uppercase tracking-wide">High Score</div>
+                  <div className="text-white font-bold">{profile.highScore.toFixed(0)}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 uppercase tracking-wide">Mutations</div>
+                  <div className="text-white font-bold">
+                    {profile.unlockedMutations.length}/{totalMutations}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-400 via-yellow-400 to-orange-400"
+                  style={{ width: `${mutationProgress}%` }}
+                ></div>
+              </div>
+              <div className="mt-2 text-[10px] text-slate-500">
+                Unlock more mutations by playing and getting kills.
               </div>
             </div>
           </div>

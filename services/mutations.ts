@@ -1,4 +1,4 @@
-import { MutationChoice, MutationTier, Player, SizeTier } from '../types';
+import { MutationChoice, MutationId, MutationTier, Player, SizeTier } from '../types';
 
 export interface MutationDefinition extends MutationChoice {
   apply: (player: Player) => void;
@@ -6,7 +6,7 @@ export interface MutationDefinition extends MutationChoice {
 
 const MUTATIONS: MutationDefinition[] = [
   {
-    id: 'swift',
+    id: MutationId.Swift,
     name: 'Tốc Hành',
     tier: MutationTier.Common,
     description: '+15% tốc độ di chuyển.',
@@ -15,7 +15,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'thick_skin',
+    id: MutationId.ThickSkin,
     name: 'Máu Dày',
     tier: MutationTier.Common,
     description: 'Giảm penalty tốc độ khi lớn.',
@@ -24,7 +24,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'light_spikes',
+    id: MutationId.LightSpikes,
     name: 'Gai Nhẹ',
     tier: MutationTier.Common,
     description: 'Phản 10% sát thương nhận vào.',
@@ -33,7 +33,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'killing_intent',
+    id: MutationId.KillingIntent,
     name: 'Sát Khí',
     tier: MutationTier.Common,
     description: '+10% sát thương.',
@@ -42,7 +42,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'keen_hearing',
+    id: MutationId.KeenHearing,
     name: 'Thính Giác',
     tier: MutationTier.Common,
     description: '+30% tầm nhìn hiệu dụng.',
@@ -51,7 +51,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'dash_boost',
+    id: MutationId.DashBoost,
     name: 'Dash Boost',
     tier: MutationTier.Rare,
     description: '+50% hiệu lực dash/skill.',
@@ -61,7 +61,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'lifesteal',
+    id: MutationId.Lifesteal,
     name: 'Hút Máu',
     tier: MutationTier.Rare,
     description: 'Hồi 15% sát thương gây ra.',
@@ -70,7 +70,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'armor_pierce',
+    id: MutationId.ArmorPierce,
     name: 'Xuyên Giáp',
     tier: MutationTier.Rare,
     description: 'Bỏ qua 20% phòng thủ.',
@@ -79,7 +79,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'stealth',
+    id: MutationId.Stealth,
     name: 'Tàng Hình',
     tier: MutationTier.Rare,
     description: 'Đứng yên 3s để tàng hình.',
@@ -88,7 +88,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'poison_touch',
+    id: MutationId.PoisonTouch,
     name: 'Độc Tố',
     tier: MutationTier.Rare,
     description: 'Đòn đánh gây độc 3 DPS trong 3s.',
@@ -97,7 +97,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'double_cast',
+    id: MutationId.DoubleCast,
     name: 'Phân Thân',
     tier: MutationTier.Epic,
     description: 'Kích hoạt kỹ năng thêm một lần.',
@@ -106,7 +106,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'second_chance',
+    id: MutationId.SecondChance,
     name: 'Bất Tử',
     tier: MutationTier.Epic,
     description: 'Một lần sống lại với 1 HP.',
@@ -115,7 +115,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'speed_surge',
+    id: MutationId.SpeedSurge,
     name: 'Ma Tốc',
     tier: MutationTier.Epic,
     description: 'Dùng skill để kích hoạt tăng tốc.',
@@ -124,7 +124,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'magnetic_field',
+    id: MutationId.MagneticField,
     name: 'Từ Trường',
     tier: MutationTier.Epic,
     description: 'Đẩy lùi kẻ nhỏ trong bán kính gần.',
@@ -133,7 +133,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'soul_absorb',
+    id: MutationId.SoulAbsorb,
     name: 'Hấp Tinh',
     tier: MutationTier.Epic,
     description: 'Kill cho tăng trưởng gấp đôi.',
@@ -142,7 +142,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'rewind',
+    id: MutationId.Rewind,
     name: 'Thời Gian Ngược',
     tier: MutationTier.Legendary,
     description: 'Kích hoạt hồi phục vị trí/HP gần nhất.',
@@ -151,7 +151,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'thunder_call',
+    id: MutationId.ThunderCall,
     name: 'Thiên Kiếp',
     tier: MutationTier.Legendary,
     description: 'Gọi sét vào kẻ địch gần nhất.',
@@ -160,7 +160,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'king_form',
+    id: MutationId.KingForm,
     name: 'Cổ Vương Hóa',
     tier: MutationTier.Legendary,
     description: 'Tăng sức mạnh trong 15s.',
@@ -169,7 +169,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'invulnerable',
+    id: MutationId.Invulnerable,
     name: 'Bất Diệt',
     tier: MutationTier.Legendary,
     description: 'Miễn nhiễm sát thương 3s.',
@@ -178,7 +178,7 @@ const MUTATIONS: MutationDefinition[] = [
     },
   },
   {
-    id: 'chaos_swap',
+    id: MutationId.ChaosSwap,
     name: 'Hỗn Độn',
     tier: MutationTier.Legendary,
     description: 'Hoán đổi kích thước với kẻ địch.',
@@ -188,7 +188,9 @@ const MUTATIONS: MutationDefinition[] = [
   },
 ];
 
-const MUTATION_BY_ID = new Map(MUTATIONS.map((mutation) => [mutation.id, mutation]));
+const MUTATION_BY_ID = new Map<MutationId, MutationDefinition>(
+  MUTATIONS.map((mutation) => [mutation.id, mutation])
+);
 
 const tierWeightsBySizeTier: Record<SizeTier, Array<{ tier: MutationTier; weight: number }>> = {
   [SizeTier.Larva]: [
@@ -228,9 +230,19 @@ const pickTier = (sizeTier: SizeTier) => {
   return weighted[weighted.length - 1].tier;
 };
 
-export const getMutationById = (id: string) => MUTATION_BY_ID.get(id) || null;
+export const getMutationById = (id: MutationId) => MUTATION_BY_ID.get(id) || null;
 
-export const getMutationChoices = (owned: Set<string>, sizeTier: SizeTier, count: number): MutationChoice[] => {
+export const getAllMutationIds = (): MutationId[] => MUTATIONS.map((mutation) => mutation.id);
+
+export const getMutationIdsByTier = (tier: MutationTier): MutationId[] =>
+  MUTATIONS.filter((mutation) => mutation.tier === tier).map((mutation) => mutation.id);
+
+export const getMutationChoices = (
+  owned: Set<MutationId>,
+  sizeTier: SizeTier,
+  count: number,
+  allowed?: Set<MutationId>
+): MutationChoice[] => {
   const choices: MutationChoice[] = [];
   const attemptsLimit = 40;
   let attempts = 0;
@@ -238,7 +250,12 @@ export const getMutationChoices = (owned: Set<string>, sizeTier: SizeTier, count
   while (choices.length < count && attempts < attemptsLimit) {
     attempts += 1;
     const tier = pickTier(sizeTier);
-    const pool = MUTATIONS.filter((mutation) => mutation.tier === tier && !owned.has(mutation.id));
+    const pool = MUTATIONS.filter((mutation) => {
+      if (mutation.tier !== tier) return false;
+      if (owned.has(mutation.id)) return false;
+      if (allowed && !allowed.has(mutation.id)) return false;
+      return true;
+    });
     if (!pool.length) continue;
     const mutation = pool[Math.floor(Math.random() * pool.length)];
     if (choices.some((choice) => choice.id === mutation.id)) continue;
@@ -251,7 +268,12 @@ export const getMutationChoices = (owned: Set<string>, sizeTier: SizeTier, count
   }
 
   if (choices.length < count) {
-    const fallbackPool = MUTATIONS.filter((mutation) => !owned.has(mutation.id) && !choices.some((choice) => choice.id === mutation.id));
+    const fallbackPool = MUTATIONS.filter((mutation) => {
+      if (owned.has(mutation.id)) return false;
+      if (choices.some((choice) => choice.id === mutation.id)) return false;
+      if (allowed && !allowed.has(mutation.id)) return false;
+      return true;
+    });
     while (choices.length < count && fallbackPool.length > 0) {
       const mutation = fallbackPool.splice(Math.floor(Math.random() * fallbackPool.length), 1)[0];
       choices.push({
@@ -266,7 +288,7 @@ export const getMutationChoices = (owned: Set<string>, sizeTier: SizeTier, count
   return choices;
 };
 
-export const applyMutation = (player: Player, mutationId: string) => {
+export const applyMutation = (player: Player, mutationId: MutationId) => {
   const mutation = MUTATION_BY_ID.get(mutationId);
   if (!mutation) return;
   mutation.apply(player);
@@ -275,8 +297,18 @@ export const applyMutation = (player: Player, mutationId: string) => {
   }
 };
 
-export const getMutationChoicesByTier = (owned: Set<string>, tier: MutationTier, count: number): MutationChoice[] => {
-  const pool = MUTATIONS.filter((mutation) => mutation.tier === tier && !owned.has(mutation.id));
+export const getMutationChoicesByTier = (
+  owned: Set<MutationId>,
+  tier: MutationTier,
+  count: number,
+  allowed?: Set<MutationId>
+): MutationChoice[] => {
+  const pool = MUTATIONS.filter((mutation) => {
+    if (mutation.tier !== tier) return false;
+    if (owned.has(mutation.id)) return false;
+    if (allowed && !allowed.has(mutation.id)) return false;
+    return true;
+  });
   const choices: MutationChoice[] = [];
   const localPool = [...pool];
   while (choices.length < count && localPool.length > 0) {

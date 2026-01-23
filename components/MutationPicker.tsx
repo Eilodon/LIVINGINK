@@ -1,9 +1,9 @@
 import React from 'react';
-import { MutationChoice, MutationTier } from '../types';
+import { MutationChoice, MutationId, MutationTier } from '../types';
 
 interface MutationPickerProps {
   choices: MutationChoice[];
-  onSelect: (id: string) => void;
+  onSelect: (id: MutationId) => void;
 }
 
 const tierColor = (tier: MutationTier) => {
