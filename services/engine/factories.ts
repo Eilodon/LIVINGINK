@@ -30,6 +30,50 @@ import {
 import { getCurrentEngine } from './context';
 import { getZoneCenter, normalize, randomPos, randomPosInCenter, randomPosInZone, randomRelicPos } from './math';
 
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+const hslToHex = (h: number, s: number, l: number) => {
+  const hue = ((h % 360) + 360) % 360;
+  const saturation = clamp01(s / 100);
+  const lightness = clamp01(l / 100);
+
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const segment = hue / 60;
+  const second = chroma * (1 - Math.abs((segment % 2) - 1));
+
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+
+  if (segment >= 0 && segment < 1) {
+    r1 = chroma;
+    g1 = second;
+  } else if (segment >= 1 && segment < 2) {
+    r1 = second;
+    g1 = chroma;
+  } else if (segment >= 2 && segment < 3) {
+    g1 = chroma;
+    b1 = second;
+  } else if (segment >= 3 && segment < 4) {
+    g1 = second;
+    b1 = chroma;
+  } else if (segment >= 4 && segment < 5) {
+    r1 = second;
+    b1 = chroma;
+  } else {
+    r1 = chroma;
+    b1 = second;
+  }
+
+  const match = lightness - chroma / 2;
+  const r = Math.round((r1 + match) * 255);
+  const g = Math.round((g1 + match) * 255);
+  const b = Math.round((b1 + match) * 255);
+
+  const toHex = (value: number) => value.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
 // --- Factory Methods ---
 export const createPlayer = (name: string, faction: Faction, spawnTime: number = 0): Player => {
   const stats = FACTION_CONFIG[faction].stats;
@@ -216,7 +260,8 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food => (
   position: pos ? { ...pos } : randomPos(),
   velocity: { x: 0, y: 0 },
   radius: isEjected ? FOOD_RADIUS * 1.5 : FOOD_RADIUS + Math.random() * 4,
-  color: isEjected ? '#FFFFFF' : `hsl(${Math.random() * 360}, 70%, 60%)`,
+  // Renderer expects PIXI tints; keep food colors in hex to avoid NaN tint crashes.
+  color: isEjected ? '#ffffff' : hslToHex(Math.random() * 360, 70, 60),
   isDead: false,
   value: isEjected ? 5 : 1,
   trail: [],

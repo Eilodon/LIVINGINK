@@ -95,7 +95,26 @@ type LayerPack = {
   abyssRing: Sprite;
 };
 
-const hexToNumber = (hex: string) => Number.parseInt(hex.replace('#', ''), 16);
+const hexToNumber = (input: string, fallback: number = 0xffffff) => {
+  const trimmed = input.trim();
+  if (!trimmed) return fallback;
+
+  const hexMatch = trimmed.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const raw = hexMatch[1];
+    const expanded = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+    const parsed = Number.parseInt(expanded, 16);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  const oxMatch = trimmed.match(/^0x([0-9a-f]{6})$/i);
+  if (oxMatch) {
+    const parsed = Number.parseInt(oxMatch[1], 16);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+};
 
 const parsePixiColor = (value: string): { tint: number; alpha: number } => {
   const trimmed = value.trim();
@@ -117,7 +136,7 @@ const parsePixiColor = (value: string): { tint: number; alpha: number } => {
   }
 
   // Fallback: avoid crashing render loop on unexpected strings
-  return { tint: 0x000000, alpha: 1 };
+  return { tint: 0xffffff, alpha: 1 };
 };
 
 const distSq = (v1: { x: number; y: number }, v2: { x: number; y: number }) => {
@@ -1176,13 +1195,9 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             if (!inView(zone.position, zone.radius)) return;
             if (!inVision(zone.position)) return;
             const alpha = 0.5 + Math.sin(frame * 0.1) * 0.2;
-            layers.lava.beginFill(0xf97316, alpha);
-            layers.lava.drawCircle(zone.position.x, zone.position.y, zone.radius);
-            layers.lava.endFill();
-            layers.lava.lineStyle(3, 0x7c2d12, 1);
+            layers.lava.circle(zone.position.x, zone.position.y, zone.radius).fill({ color: 0xf97316, alpha });
             const pulse = zone.radius * (0.55 + Math.abs(Math.sin(frame * 0.2)) * 0.45);
-            layers.lava.drawCircle(zone.position.x, zone.position.y, pulse);
-            layers.lava.lineStyle(0);
+            layers.lava.circle(zone.position.x, zone.position.y, pulse).stroke({ width: 3, color: 0x7c2d12, alpha: 1 });
           });
         }
 
@@ -1194,39 +1209,30 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
           if (!inView(hazard.position, hazard.radius)) return;
           if (!inVision(hazard.position)) return;
 
+          const hx = hazard.position.x;
+          const hy = hazard.position.y;
+          const hr = hazard.radius;
+
           if (hazard.type === 'lightning') {
-            layers.hazards.lineStyle(3, hazard.active ? 0xef4444 : 0xfacc15, hazard.active ? 0.8 : 0.9);
-          }
-          if (hazard.type === 'geyser') {
-            layers.hazards.lineStyle(3, 0xf97316, 0.8);
-          }
-          if (hazard.type === 'icicle') {
-            layers.hazards.lineStyle(3, 0x38bdf8, 0.8);
-          }
-          if (hazard.type === 'vines') {
-            layers.hazards.beginFill(0x22c55e, 0.2);
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
-            layers.hazards.endFill();
-          }
-          if (hazard.type === 'thin_ice') {
-            layers.hazards.beginFill(0x7dd3fc, 0.2);
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
-            layers.hazards.endFill();
-          }
-          if (hazard.type === 'wind') {
-            layers.hazards.lineStyle(2, 0x94a3b8, 0.6);
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
-          }
-          if (hazard.type === 'mushroom') {
-            layers.hazards.lineStyle(2, 0xa855f7, 0.6);
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
-          }
-          if (hazard.type === 'spear') {
-            layers.hazards.lineStyle(2, 0x94a3b8, 0.5);
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
-          }
-          if (hazard.type === 'lightning' || hazard.type === 'geyser' || hazard.type === 'icicle') {
-            layers.hazards.drawCircle(hazard.position.x, hazard.position.y, hazard.radius);
+            layers.hazards.circle(hx, hy, hr).stroke({
+              width: 3,
+              color: hazard.active ? 0xef4444 : 0xfacc15,
+              alpha: hazard.active ? 0.8 : 0.9,
+            });
+          } else if (hazard.type === 'geyser') {
+            layers.hazards.circle(hx, hy, hr).stroke({ width: 3, color: 0xf97316, alpha: 0.8 });
+          } else if (hazard.type === 'icicle') {
+            layers.hazards.circle(hx, hy, hr).stroke({ width: 3, color: 0x38bdf8, alpha: 0.8 });
+          } else if (hazard.type === 'vines') {
+            layers.hazards.circle(hx, hy, hr).fill({ color: 0x22c55e, alpha: 0.2 });
+          } else if (hazard.type === 'thin_ice') {
+            layers.hazards.circle(hx, hy, hr).fill({ color: 0x7dd3fc, alpha: 0.2 });
+          } else if (hazard.type === 'wind') {
+            layers.hazards.circle(hx, hy, hr).stroke({ width: 2, color: 0x94a3b8, alpha: 0.6 });
+          } else if (hazard.type === 'mushroom') {
+            layers.hazards.circle(hx, hy, hr).stroke({ width: 2, color: 0xa855f7, alpha: 0.6 });
+          } else if (hazard.type === 'spear') {
+            layers.hazards.circle(hx, hy, hr).stroke({ width: 2, color: 0x94a3b8, alpha: 0.5 });
           }
         });
 
@@ -1236,8 +1242,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
           let visual = landmarkMapRef.current.get(landmark.id);
           if (!visual) {
             const ring = new PIXI.Graphics();
-            ring.lineStyle(3, 0xfacc15, 0.6);
-            ring.drawCircle(0, 0, landmark.radius);
+            ring.circle(0, 0, landmark.radius).stroke({ width: 3, color: 0xfacc15, alpha: 0.6 });
             const labelText =
               landmark.type === 'fire_furnace'
                 ? 'LÒ LỬA'
@@ -1317,8 +1322,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             visual.glow!.alpha = 0.7 + Math.sin(frame * 0.1) * 0.1;
             visual.glow!.scale.set(0.9);
             visual.ring!.clear();
-            visual.ring!.lineStyle(3, 0x78350f, 1);
-            visual.ring!.drawCircle(0, 0, (ITEM_TEXTURE_SIZE / 2) * 1.2);
+            visual.ring!.circle(0, 0, (ITEM_TEXTURE_SIZE / 2) * 1.2).stroke({ width: 3, color: 0x78350f, alpha: 1 });
           } else {
             visual.glow!.visible = false;
             visual.ring!.clear();
@@ -1425,11 +1429,11 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
           if (!inView(entity.position, entity.radius * 4)) return;
           if (!inVision(entity.position)) return;
           const config = FACTION_CONFIG[entity.faction];
-          layers.trails.lineStyle(Math.max(2, entity.radius * 0.4), hexToNumber(config.color), 0.2);
           layers.trails.moveTo(entity.trail[0].x, entity.trail[0].y);
           for (let i = 1; i < entity.trail.length; i++) {
             layers.trails.lineTo(entity.trail[i].x, entity.trail[i].y);
           }
+          layers.trails.stroke({ width: Math.max(2, entity.radius * 0.4), color: hexToNumber(config.color), alpha: 0.2 });
         });
 
         layers.rings.clear();
@@ -1548,13 +1552,11 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
           visual.shield.clear();
           if (entity.statusEffects.kingForm > 0) {
-            visual.shield.lineStyle(4, 0xf59e0b, 0.6);
-            visual.shield.drawCircle(0, 0, BASE_RADIUS * 1.4);
+            visual.shield.circle(0, 0, BASE_RADIUS * 1.4).stroke({ width: 4, color: 0xf59e0b, alpha: 0.6 });
           }
           if (entity.statusEffects.shielded) {
             const pulse = 0.6 + Math.sin(frame * 0.2) * 0.2;
-            visual.shield.lineStyle(5, 0xeab308, pulse);
-            visual.shield.drawCircle(0, 0, BASE_RADIUS + 5);
+            visual.shield.circle(0, 0, BASE_RADIUS + 5).stroke({ width: 5, color: 0xeab308, alpha: pulse });
           }
 
           if (!isPlayer && visual.container.visible) {
@@ -1568,8 +1570,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
               else ringColor = hexToNumber(COLOR_PALETTE.indicatorCombat);
             }
             if (ringColor) {
-              layers.rings.lineStyle(4, ringColor, 1);
-              layers.rings.drawCircle(entity.position.x, entity.position.y, entity.radius + 8);
+              layers.rings.circle(entity.position.x, entity.position.y, entity.radius + 8).stroke({ width: 4, color: ringColor, alpha: 1 });
             }
           }
 
@@ -1645,12 +1646,14 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
             if (layers.particleLines.visible && p.style === 'ring') {
               const progress = 1 - Math.max(0, lifeRatio);
               const ringRadius = p.radius * (1 + progress * 1.6);
-              layers.particleLines.lineStyle(p.lineWidth ?? Math.max(2, p.radius * 0.15), hexToNumber(p.color), Math.max(0, lifeRatio));
-              layers.particleLines.drawCircle(p.position.x, p.position.y, ringRadius);
+              layers.particleLines.circle(p.position.x, p.position.y, ringRadius).stroke({
+                width: p.lineWidth ?? Math.max(2, p.radius * 0.15),
+                color: hexToNumber(p.color),
+                alpha: Math.max(0, lifeRatio),
+              });
             } else if (layers.particleLines.visible && p.style === 'line') {
               const angle = p.angle ?? Math.atan2(p.velocity.y, p.velocity.x);
               const length = p.lineLength ?? p.radius * 4;
-              layers.particleLines.lineStyle(p.lineWidth ?? Math.max(2, p.radius * 0.2), hexToNumber(p.color), Math.max(0, lifeRatio));
               layers.particleLines.moveTo(
                 p.position.x - Math.cos(angle) * length * 0.5,
                 p.position.y - Math.sin(angle) * length * 0.5
@@ -1659,6 +1662,11 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
                 p.position.x + Math.cos(angle) * length * 0.5,
                 p.position.y + Math.sin(angle) * length * 0.5
               );
+              layers.particleLines.stroke({
+                width: p.lineWidth ?? Math.max(2, p.radius * 0.2),
+                color: hexToNumber(p.color),
+                alpha: Math.max(0, lifeRatio),
+              });
             } else if (layers.particles.visible) {
               let sprite = particleMapRef.current.get(p.id);
               if (!sprite) {
@@ -1750,9 +1758,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({
 
         layers.screenOverlay.clear();
         if (playerZone === Faction.Earth && state.hazardTimers?.dustStormActive && state.player.faction !== Faction.Water) {
-          layers.screenOverlay.beginFill(0x785032, 0.18);
-          layers.screenOverlay.drawRect(0, 0, width, height);
-          layers.screenOverlay.endFill();
+          layers.screenOverlay.rect(0, 0, width, height).fill({ color: 0x785032, alpha: 0.18 });
         }
 
         if (now - lastStatsPublishRef.current > 250) {
