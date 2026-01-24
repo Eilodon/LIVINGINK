@@ -15,8 +15,10 @@ export default defineConfig(({ mode }) => {
         }
       },
       test: {
-        environment: 'node',
-        include: ['tests/**/*.test.ts']
+        environment: 'jsdom',
+        include: ['tests/**/*.test.ts'],
+        setupFiles: ['./tests/setupTests.vitest.ts'],
+        globals: true
       },
       build: {
         rollupOptions: {

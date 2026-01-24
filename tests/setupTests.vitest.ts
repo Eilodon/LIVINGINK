@@ -1,9 +1,9 @@
 /**
- * TEST SETUP FOR AUTOMATED TESTING
- * Initialize test environment
+ * VITEST TEST SETUP FOR AUTOMATED TESTING
+ * Initialize test environment for Vitest
  */
 
-import { expect, beforeAll, afterAll, describe, jest } from '@jest/globals';
+import { beforeAll, afterAll, vi } from 'vitest';
 
 // Setup test environment
 beforeAll(() => {
@@ -29,27 +29,16 @@ beforeAll(() => {
     value: class MockAudioContext {
       createGainNode() { return {} as GainNode; }
       createOscillator() { return {} as OscillatorNode; }
-      createAnalyser() { return {} as AnalyserNode; }
       createBiquadFilter() { return {} as BiquadFilterNode; }
       createChannelMerger() { return {} as ChannelMergerNode; }
       createDelayNode() { return {} as DelayNode; }
       createConvolver() { return {} as ConvolverNode; }
-      createScriptProcessor() { return {} as ScriptProcessor; }
+      createScriptProcessorNode() { return {} as ScriptProcessorNode; }
       createWaveShaper() { return {} as WaveShaperNode; }
       createPanner() { return {} as PannerNode; }
-      createPeriodicWave() { return {} as PeriodicWaveShaperNode; }
+      createPeriodicWave() { return {} as PeriodicWave; }
       createStereoPanner() { return {} as StereoPannerNode; }
-      createAnalyser() { return {} as AnalyserNode; }
-      createDynamicCompressor() { return {} as DynamicCompressorNode; }
-      createDelayNode() { return {} as DelayNode; }
-      createConvolver() { return {} as ConvolverNode; }
-      createScriptProcessor() { return {} as ScriptProcessor; }
-      createWaveShaper() { return {} as WaveShaperNode; }
-      createPanner() { return {} as PannerNode; }
-      createPeriodicWave() { return {} as PeriodicWaveShaperNode; }
-      createStereoPanner() { return {} as StereoPannerNode; }
-      createAnalyser() { return {} as AnalyserNode; }
-      createDynamicCompressor() { return {} as DynamicCompressorNode; }
+      createDynamicsCompressor() { return {} as DynamicsCompressorNode; }
       close() { return Promise.resolve(); }
       resume() { return Promise.resolve(); }
       suspend() { return Promise.resolve(); }
@@ -63,45 +52,53 @@ beforeAll(() => {
   });
 
   // Mock fetch API
-  global.fetch = jest.fn(() =>
+  global.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
       status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      redirected: false,
+      type: 'basic',
+      url: 'http://localhost',
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
       blob: () => Promise.resolve(new Blob()),
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
-      formData: () => Promise.resolve(new FormData())
-    }
-  ));
+      formData: () => Promise.resolve(new FormData()),
+      clone: () => Promise.resolve({}),
+      body: null,
+      bodyUsed: false,
+      bytes: () => Promise.resolve(new Uint8Array())
+    })
+  );
 
   // Mock performance API
   global.performance = {
-    now: jest.fn(() => performance.now()),
-    mark: jest.fn(),
-    measure: jest.fn(),
-    getEntriesByType: jest.fn(() => []),
-    getEntriesByType: jest.fn(() => []),
-    clearResourceTimings: jest.fn(),
-    setResourceTimingBufferSize: jest.fn(),
-    getTotalMemoryUsage: jest.fn(() => ({
-      usedJSHeapSize: 1000000,
-      totalJSHeapSize: 10000,
-      jsHeapSizeLimit: 50000
-    })),
+    now: vi.fn(() => performance.now()),
+    mark: vi.fn(),
+    measure: vi.fn(),
+    getEntriesByType: vi.fn(() => []),
+    clearResourceTimings: vi.fn(),
+    setResourceTimingBufferSize: vi.fn(),
+    toJSON: vi.fn(() => ({})),
+    eventCounts: new Map(),
+    navigation: {
+      redirectCount: 0,
+      type: 'navigate',
+      toJSON: () => ({})
+    },
+    onresourcetimingbufferfull: null,
+    timeOrigin: 0
   };
 
   // Mock WebSocket
-  global.WebSocket = jest.fn(() => ({
-    close: jest.fn(() => Promise.resolve()),
-    send: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
+  global.WebSocket = vi.fn(() => ({
+    close: vi.fn(() => Promise.resolve()),
+    send: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     readyState: WebSocket.CONNECTING,
-    CONNECTING: 0,
-    OPEN: 1,
-    CLOSING: 2,
-    CLOSED: 3,
     CONNECTING: 0,
     OPEN: 1,
     CLOSING: 2,
@@ -110,14 +107,12 @@ beforeAll(() => {
 
   // Mock localStorage
   const localStorage = {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    clear: jest.fn(),
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
     length: 0,
-    key: jest.fn(),
-    clear: jest.fn(),
-    key: jest.fn()
+    key: vi.fn()
   };
 
   Object.defineProperty(window, 'localStorage', {
@@ -126,23 +121,34 @@ beforeAll(() => {
   });
 
   // Mock matchMedia
-  global.matchMedia = jest.fn(() => ({
+  global.matchMedia = vi.fn(() => ({
     matches: false,
     media: '',
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    matches: jest.fn(() => ({ matches: false, media: '' }))
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
   }));
 
-  console.log('✅ Test environment setup complete');
+  // Mock performance.memory
+  Object.defineProperty(global.performance, 'memory', {
+    value: {
+      usedJSHeapSize: 1000000,
+      totalJSHeapSize: 10000,
+      jsHeapSizeLimit: 50000
+    },
+    configurable: true
+  });
+
+  console.log('✅ Vitest test environment setup complete');
 });
 
 // Cleanup after tests
 afterAll(() => {
   document.body.innerHTML = '';
-  console.log('✅ Test environment cleaned up');
+  console.log('✅ Vitest test environment cleaned up');
 });
 
 // Export test utilities
@@ -156,20 +162,18 @@ export const testUtils = {
   createMockWebSocket: () => new WebSocket('ws://localhost:8080'),
   createMockLocalStorage: () => localStorage,
   simulateClick: (element: HTMLElement) => element.click(),
-  waitFor: (condition: () => boolean) => new Promise(resolve => {
-    const check = () => {
-      if (condition()) {
-        resolve(true);
-      } else {
-        setTimeout(check, 100);
-      }
-    };
-    check();
-  }),
   simulateWait: (ms: number) => new Promise(resolve => setTimeout(resolve, ms)),
   simulateKeyPress: (key: string) => {
     const event = new KeyboardEvent('keydown', { key });
     document.dispatchEvent(event);
+  },
+  simulateTouch: (element: HTMLElement) => {
+    const touch = new TouchEvent('touch', {
+      bubbles: true,
+      cancelable: true,
+      target: element
+    });
+    element.dispatchEvent(touch);
   }
 };
 
