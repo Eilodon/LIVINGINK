@@ -1,16 +1,14 @@
 
 import {
     RING_RADII,
-    THRESHOLDS,
     COMMIT_BUFFS
 } from './cjrConstants';
 import { Player, Bot, RingId } from '../../types';
-import { distance, normalize } from '../engine/math';
-import { isRingAccessible, isRushWindowActive, getRushThreshold } from './bossCjr';
+import { distance } from '../engine/math';
+import { LevelConfig } from './levels';
 
-export const updateRingLogic = (entity: Player | Bot, dt: number) => {
+export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelConfig) => {
     const dist = distance(entity.position, { x: 0, y: 0 });
-    const r = entity.radius;
 
     // 1. Check current Ring based on position
     let physicalRing: RingId = 1;
@@ -18,10 +16,8 @@ export const updateRingLogic = (entity: Player | Bot, dt: number) => {
     else if (dist < RING_RADII.R2_BOUNDARY) physicalRing = 2;
     else physicalRing = 1;
 
-    // 2. Logic: One-way gates with BOSS BLOCKING
-    // If entity.ring (committed ring) < physicalRing, valid transition if:
-    //   a) Boss for that ring is defeated
-    //   b) Match threshold met (reduced if Rush Window active)
+    // 2. Logic: One-way membrane, no gate blocking
+    // If entity.ring (committed ring) < physicalRing, allow only if match threshold met.
     // If entity.ring > physicalRing, must push back (Trap)
 
     // --- GATE CHECK (Entering inner ring) ---
@@ -31,33 +27,17 @@ export const updateRingLogic = (entity: Player | Bot, dt: number) => {
         let deniedReason = '';
 
         if (physicalRing === 2) {
-            // Check Boss1 defeated
-            if (!isRingAccessible(2)) {
-                deniedReason = 'BOSS_BLOCKING';
+            // Check threshold
+            if (entity.matchPercent >= config.thresholds.ring2) {
+                allowed = true;
             } else {
-                // Check threshold (with rush window reduction)
-                const threshold = isRushWindowActive(2)
-                    ? getRushThreshold(THRESHOLDS.INTO_RING2)
-                    : THRESHOLDS.INTO_RING2;
-                if (entity.matchPercent >= threshold) {
-                    allowed = true;
-                } else {
-                    deniedReason = 'LOW_MATCH';
-                }
+                deniedReason = 'LOW_MATCH';
             }
         } else if (physicalRing === 3) {
-            // Check Boss2 defeated
-            if (!isRingAccessible(3)) {
-                deniedReason = 'BOSS_BLOCKING';
+            if (entity.matchPercent >= config.thresholds.ring3) {
+                allowed = true;
             } else {
-                const threshold = isRushWindowActive(3)
-                    ? getRushThreshold(THRESHOLDS.INTO_RING3)
-                    : THRESHOLDS.INTO_RING3;
-                if (entity.matchPercent >= threshold) {
-                    allowed = true;
-                } else {
-                    deniedReason = 'LOW_MATCH';
-                }
+                deniedReason = 'LOW_MATCH';
             }
         }
 
@@ -77,13 +57,44 @@ export const updateRingLogic = (entity: Player | Bot, dt: number) => {
         const boundary = (entity.ring === 3) ? RING_RADII.R3_BOUNDARY : RING_RADII.R2_BOUNDARY;
         applyMembraneTrap(entity, boundary);
     }
+
+    // Ring 3 low-match debuff
+    if (entity.ring === 3) {
+        if (config.ring3Debuff.enabled && entity.matchPercent < config.ring3Debuff.threshold) {
+            entity.ring3LowMatchTime += dt;
+            if (entity.ring3LowMatchTime >= config.ring3Debuff.duration) {
+                applyTempSpeedBoost(entity, config.ring3Debuff.speedMultiplier, config.ring3Debuff.duration);
+                entity.ring3LowMatchTime = 0;
+            }
+        } else {
+            entity.ring3LowMatchTime = 0;
+        }
+    }
+
+    // Pity boost when stuck below threshold too long
+    const targetThreshold = entity.ring === 1
+        ? config.thresholds.ring2
+        : entity.ring === 2
+            ? config.thresholds.ring3
+            : config.thresholds.win;
+    if (entity.matchPercent < targetThreshold) {
+        entity.matchStuckTime += dt;
+        if (entity.matchStuckTime >= config.pity.stuckThreshold) {
+            entity.statusEffects.colorBoostMultiplier = config.pity.multiplier;
+            entity.statusEffects.colorBoostTimer = config.pity.duration;
+            entity.statusEffects.pityBoost = config.pity.duration;
+            entity.matchStuckTime = 0;
+        }
+    } else {
+        entity.matchStuckTime = 0;
+    }
 };
 
 const commitToRing = (entity: Player | Bot, ring: RingId) => {
     entity.ring = ring;
 
     // Apply Commit Buffs
-    entity.statusEffects.speedBoost = COMMIT_BUFFS.SPEED_BOOST;
+    applyTempSpeedBoost(entity, COMMIT_BUFFS.SPEED_BOOST, COMMIT_BUFFS.SPEED_DURATION);
     entity.statusEffects.shielded = true;
     entity.statusEffects.commitShield = COMMIT_BUFFS.SHIELD_DURATION;
 
@@ -99,9 +110,7 @@ const applyMembraneBounce = (entity: Player | Bot, targetRing: RingId, reason?: 
     bounceVelocity(entity, 1.5); // Strong bounce
 
     // Log reason for debugging/VFX
-    if (reason === 'BOSS_BLOCKING') {
-        console.log(`[CJR] ${entity.name} blocked by Boss! Defeat boss to enter Ring ${targetRing}.`);
-    } else if (reason === 'LOW_MATCH') {
+    if (reason === 'LOW_MATCH') {
         console.log(`[CJR] ${entity.name} needs higher match% to enter Ring ${targetRing}.`);
     }
 };
@@ -127,4 +136,14 @@ const bounceVelocity = (entity: Player | Bot, elasticity: number) => {
     const dot = entity.velocity.x * normal.x + entity.velocity.y * normal.y;
     entity.velocity.x -= (1 + elasticity) * dot * normal.x;
     entity.velocity.y -= (1 + elasticity) * dot * normal.y;
+};
+
+const applyTempSpeedBoost = (entity: Player | Bot, multiplier: number, duration: number) => {
+    const current = entity.statusEffects.tempSpeedBoost || 1;
+    if (multiplier >= 1) {
+        entity.statusEffects.tempSpeedBoost = Math.max(current, multiplier);
+    } else {
+        entity.statusEffects.tempSpeedBoost = Math.min(current, multiplier);
+    }
+    entity.statusEffects.tempSpeedTimer = Math.max(entity.statusEffects.tempSpeedTimer || 0, duration);
 };

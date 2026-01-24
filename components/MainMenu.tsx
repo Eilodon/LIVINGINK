@@ -3,10 +3,26 @@ import React, { useState } from 'react';
 import { ShapeId } from '../services/cjr/cjrTypes';
 
 interface MainMenuProps {
+  level: number;
+  unlockedLevel: number;
+  usePixi: boolean;
+  onTogglePixi: (usePixi: boolean) => void;
+  onOpenLevels: () => void;
+  onOpenTutorial: () => void;
+  onOpenSettings: () => void;
   onStart: (name: string, shape: ShapeId) => void;
 }
 
-const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
+const MainMenu: React.FC<MainMenuProps> = ({
+  level,
+  unlockedLevel,
+  usePixi,
+  onTogglePixi,
+  onOpenLevels,
+  onOpenTutorial,
+  onOpenSettings,
+  onStart,
+}) => {
   const [name, setName] = useState('');
   const [shape, setShape] = useState<ShapeId>('circle');
 
@@ -20,6 +36,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
       <h1 className="text-6xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-500">
         COLOR JELLY RUSH
       </h1>
+      <div className="text-slate-400 mb-6 tracking-widest">LEVEL {level} · UNLOCKED {unlockedLevel}</div>
 
       <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-96">
         <div className="mb-6">
@@ -51,6 +68,16 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
           </div>
         </div>
 
+        <div className="mb-6 flex items-center justify-between">
+          <div className="text-sm text-slate-400">GRAPHICS</div>
+          <button
+            onClick={() => onTogglePixi(!usePixi)}
+            className={`px-3 py-1 rounded border text-xs font-bold tracking-widest ${usePixi ? 'bg-violet-600/30 border-violet-400/50 text-violet-200' : 'bg-slate-700 border-slate-600 text-slate-300'}`}
+          >
+            {usePixi ? 'PIXI (FULL)' : 'CANVAS (LITE)'}
+          </button>
+        </div>
+
         <button
           onClick={handleStart}
           disabled={!name.trim()}
@@ -61,6 +88,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
         >
           PLAY NOW
         </button>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <button onClick={onOpenLevels} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">LEVELS</button>
+          <button onClick={onOpenTutorial} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">HOW</button>
+          <button onClick={onOpenSettings} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">SET</button>
+        </div>
       </div>
     </div>
   );

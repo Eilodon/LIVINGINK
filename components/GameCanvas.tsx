@@ -1,10 +1,10 @@
 
 import React, { useRef, useEffect } from 'react';
-import { GameState, Entity, Player, Bot, Food, Projectile } from '../types';
+import { GameState, Entity, Player } from '../types';
 import { MAP_RADIUS, CENTER_RADIUS, RING_RADII, WORLD_WIDTH, WORLD_HEIGHT, COLOR_PALETTE } from '../constants';
 
 interface GameCanvasProps {
-  gameState: GameState;
+  gameStateRef: React.MutableRefObject<GameState | null>;
   width: number;
   height: number;
   onMouseMove?: (x: number, y: number) => void;
@@ -14,7 +14,7 @@ interface GameCanvasProps {
 }
 
 const GameCanvas: React.FC<GameCanvasProps> = ({
-  gameState,
+  gameStateRef,
   width,
   height,
   onMouseMove,
@@ -60,11 +60,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     let animationId: number;
 
     const render = () => {
+      const gameState = gameStateRef.current;
       // Clear
       ctx.fillStyle = COLOR_PALETTE.background;
       ctx.fillRect(0, 0, width, height);
 
-      if (!gameState.player) return;
+      if (!gameState?.player) {
+        animationId = requestAnimationFrame(render);
+        return;
+      }
 
       // Camera
       ctx.save();
@@ -126,7 +130,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
     render();
     return () => cancelAnimationFrame(animationId);
-  }, [gameState, width, height]);
+  }, [gameStateRef, width, height]);
 
   const drawEntity = (ctx: CanvasRenderingContext2D, e: Entity) => {
     ctx.save();
@@ -155,15 +159,49 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     } else {
       // Food / Projectile
-      ctx.beginPath();
-      ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
-      ctx.fill();
+      if ((e as any).kind === 'shield') {
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.moveTo(0, -e.radius);
+        ctx.lineTo(e.radius, e.radius);
+        ctx.lineTo(-e.radius, e.radius);
+        ctx.closePath();
+        ctx.fill();
+      } else if ((e as any).kind === 'catalyst') {
+        ctx.fillStyle = '#d946ef';
+        drawPolygon(ctx, 0, 0, e.radius, 6);
+      } else if ((e as any).kind === 'solvent') {
+        ctx.fillStyle = '#a5b4fc';
+        ctx.fillRect(-e.radius * 0.7, -e.radius * 0.7, e.radius * 1.4, e.radius * 1.4);
+      } else if ((e as any).kind === 'neutral') {
+        ctx.fillStyle = '#9ca3af';
+        ctx.beginPath();
+        ctx.arc(0, 0, e.radius * 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     ctx.restore();
   };
 
   return <canvas ref={canvasRef} width={width} height={height} className="block" />;
+};
+
+const drawPolygon = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, sides: number) => {
+  ctx.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+    const px = x + Math.cos(angle) * radius;
+    const py = y + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
 };
 
 export default GameCanvas;

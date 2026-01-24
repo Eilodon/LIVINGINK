@@ -8,10 +8,20 @@ import { getCurrentSpatialGrid } from '../context';
 import { distance, normalize } from '../math';
 import { calcMatchPercent } from '../../cjr/colorMath';
 import { applySkill } from './skills';
+import { updateBotPersonality } from '../../cjr/botPersonalities';
 
 export const updateAI = (bot: Bot, state: GameState, dt: number) => {
   if (bot.isDead) return;
 
+  // BOT PERSONALITIES: Use personality-based AI if set
+  if (bot.personality && bot.personality !== 'farmer') {
+    // Delegate to personality system for hunter/bully/greedy
+    // (Farmer uses fallback generic AI below which is similar)
+    updateBotPersonality(bot, state, dt);
+    return;
+  }
+
+  // Fallback: Generic AI (similar to farmer behavior)
   bot.aiReactionTimer -= dt;
 
   // Decide State occasionally
@@ -58,6 +68,10 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
           // Simple heuristic: match % of food vs target.
           const match = calcMatchPercent(f.pigment, bot.targetPigment);
           score *= (1 + match * 2); // Prefer matching colors
+        } else if (f.kind === 'catalyst' || f.kind === 'solvent') {
+          score *= 1.4;
+        } else if (f.kind === 'shield') {
+          score *= 1.2;
         }
 
         if (score > bestFoodScore) {
@@ -74,7 +88,7 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
 
       // Panic Skill
       if (closestThreatDist < 150) {
-        applySkill(bot);
+        applySkill(bot, undefined, state);
       }
     } else if (targetEntity && closestPreyDist < 400) {
       bot.aiState = 'chase';
@@ -82,7 +96,7 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
 
       // Attack Skill (if configured)
       if (closestPreyDist < 150) {
-        applySkill(bot);
+        applySkill(bot, undefined, state);
       }
     } else if (targetFood) {
       bot.aiState = 'forage';

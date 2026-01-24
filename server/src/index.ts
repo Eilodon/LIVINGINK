@@ -1,5 +1,5 @@
 /**
- * GU-KING MULTIPLAYER SERVER - ENTRY POINT
+ * COLOR JELLY RUSH MULTIPLAYER SERVER - ENTRY POINT
  *
  * Production-ready Colyseus server with:
  * - Express integration for health checks

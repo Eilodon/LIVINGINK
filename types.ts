@@ -1,4 +1,5 @@
 import { PigmentVec3, RingId, Emotion, ShapeId, TattooId, PickupKind } from './services/cjr/cjrTypes';
+import type { LevelConfig } from './services/cjr/levels';
 
 export type { PigmentVec3, RingId, PickupKind };
 export { Emotion, ShapeId, TattooId } from './services/cjr/cjrTypes';
@@ -75,6 +76,12 @@ export interface Player extends Entity {
   emotion: Emotion;
   shape: ShapeId;
   tattoos: TattooId[];
+  lastHitTime: number;
+  lastEatTime: number;
+  matchStuckTime: number;
+  ring3LowMatchTime: number;
+  emotionTimer: number;
+  emotionOverride?: Emotion;
 
   // Physics Props
   acceleration: number;
@@ -90,8 +97,7 @@ export interface Player extends Entity {
   defense: number;
   damageMultiplier: number;
 
-  // Mutation Stats
-  mutations: TattooId[]; // redundant with tattoos, sync later
+  // Tattoo Stats (formerly mutations, now consolidated)
   critChance: number;
   critMultiplier: number;
   lifesteal: number;
@@ -122,6 +128,8 @@ export interface Player extends Entity {
   // Status Effects
   statusEffects: {
     speedBoost: number;
+    tempSpeedBoost: number;
+    tempSpeedTimer: number;
     shielded: boolean;
     burning: boolean;
     burnTimer: number;
@@ -143,6 +151,10 @@ export interface Player extends Entity {
     // New CJR buffs
     commitShield?: number;
     pityBoost?: number;
+    colorBoostTimer?: number;
+    colorBoostMultiplier?: number;
+    overdriveTimer?: number;
+    magnetTimer?: number;
   };
 }
 
@@ -158,7 +170,7 @@ export interface Bot extends Player {
   bossAttackCharge?: number;
   respawnTimer?: number;
   // CJR Bot Personality
-  personality?: 'farmer' | 'hunter' | 'bully' | 'greedy';
+  personality?: 'farmer' | 'hunter' | 'bully' | 'greedy' | 'trickster' | 'rubber';
 }
 
 export interface Food extends Entity {
@@ -235,10 +247,13 @@ export interface GameState {
   camera: Vector2;
   shakeIntensity: number;
   kingId: string | null;
+  level: number;
+  levelConfig: LevelConfig;
 
   tattooChoices: TattooChoice[] | null;
   unlockedTattoos: TattooId[];
   isPaused: boolean;
+  result: 'win' | 'lose' | null;
 
   inputs: {
     space: boolean;

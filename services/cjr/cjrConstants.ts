@@ -23,16 +23,16 @@ export const WAVE_INTERVALS = {
 
 // Spawn Ratios per Ring (Pigment / Neutral / Special)
 export const SPAWN_WEIGHTS = {
-    RING1: { pigment: 0.7, neutral: 0.2, special: 0.1 },
-    RING2: { pigment: 0.5, neutral: 0.3, special: 0.2 },
-    RING3: { pigment: 0.3, neutral: 0.4, special: 0.3 },
+    RING1: { pigment: 0.6, neutral: 0.25, special: 0.15 },
+    RING2: { pigment: 0.6, neutral: 0.25, special: 0.15 },
+    RING3: { pigment: 0.6, neutral: 0.25, special: 0.15 },
 };
 
 // Commit Buffs (Momentum for entering new ring)
 export const COMMIT_BUFFS = {
-    SPEED_DURATION: 3.0,
-    SPEED_BOOST: 1.2,
-    SHIELD_DURATION: 3.0,
+    SPEED_DURATION: 2.0,
+    SPEED_BOOST: 1.1,
+    SHIELD_DURATION: 2.0,
 };
 
 export const CONTRIBUTION_TIERS = [

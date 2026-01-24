@@ -27,7 +27,11 @@ export const applyPhysics = (entity: Player | Bot, dt: number) => {
 
   // Update Speed Caps based on Size
   const speedScale = 1 / Math.pow(mass, 0.3); // Slower as you grow
-  const currentMaxSpeed = MAX_SPEED_BASE * speedScale * (entity.statusEffects?.speedBoost || 1);
+  const speedMultiplier =
+    (entity.statusEffects?.speedBoost ?? 1) *
+    (entity.statusEffects?.tempSpeedBoost ?? 1) *
+    (entity.statusEffects?.slowMultiplier ?? 1);
+  const currentMaxSpeed = MAX_SPEED_BASE * speedScale * speedMultiplier;
   const currentAccel = (entity.acceleration || 1.0) * FORCE_SCALAR / mass;
 
   // 3. Movement Logic (Input applied externally via entity.targetPosition or inputs)
@@ -67,9 +71,12 @@ export const applyPhysics = (entity: Player | Bot, dt: number) => {
     entity.velocity.y *= scale;
   }
 
-  // Drag
-  entity.velocity.x *= FRICTION_BASE;
-  entity.velocity.y *= FRICTION_BASE;
+  // PERFORMANCE FIX: Frame-rate independent friction
+  // Old: velocity *= 0.93 (depends on FPS!)
+  // New: Apply friction consistently regardless of frame rate
+  const frictionPerSecond = Math.pow(FRICTION_BASE, dt * 60);
+  entity.velocity.x *= frictionPerSecond;
+  entity.velocity.y *= frictionPerSecond;
 
   // 4. Update Position
   entity.position.x += entity.velocity.x * dt * 10; // Scaling factor

@@ -7,21 +7,14 @@ export interface PigmentVec3 {
 
 // Curated 12 Tattoos for CJR
 export enum TattooId {
-    Swift = 'swift',
-    ThickSkin = 'thick_skin',
-    KillingIntent = 'killing_intent',
-    KeenHearing = 'keen_hearing',
-    DashBoost = 'dash_boost',
-    Lifesteal = 'lifesteal',
-    ArmorPierce = 'armor_pierce',
-    SecondChance = 'second_chance',
-    SpeedSurge = 'speed_surge',
-    MagneticField = 'magnetic_field',
-    SoulAbsorb = 'soul_absorb',
-    Rewind = 'rewind',
-    ThunderCall = 'thunder_call',
-    KingForm = 'king_form',
-    Invulnerable = 'invulnerable',
+    FilterInk = 'filter_ink',
+    Overdrive = 'overdrive',
+    DepositShield = 'deposit_shield',
+    PigmentBomb = 'pigment_bomb',
+    PerfectMatch = 'perfect_match',
+    CatalystSense = 'catalyst_sense',
+    NeutralMastery = 'neutral_mastery',
+    SolventExpert = 'solvent_expert',
 }
 
 // Ring progression (1 → 2 → 3)

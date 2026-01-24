@@ -45,7 +45,7 @@
 
 ## 1) Nguyên tắc: “Core Rules” phải nằm riêng
 
-Tạo module mới để tránh trộn với Gu-King cũ:
+Tạo module mới để tránh trộn với bản cũ:
 
 ```
 services/cjr/
@@ -458,4 +458,3 @@ Nếu fen muốn “chơi được ngay” rồi mới polish:
 5. PR12–PR13 (multiplayer) → .io thật
 
 ---
-

@@ -8,7 +8,7 @@ export type GameSettings = {
   showFloatingTexts: boolean;
 };
 
-const STORAGE_KEY = 'gu-king-settings-v1';
+const STORAGE_KEY = 'color-jelly-rush-settings-v1';
 
 const DEFAULT_SETTINGS: GameSettings = {
   qualityMode: 'auto',
@@ -73,4 +73,3 @@ export const subscribeSettings = (listener: () => void) => {
   listeners.add(listener);
   return () => listeners.delete(listener);
 };
-

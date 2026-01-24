@@ -1,95 +1,207 @@
-
-import React, { Suspense, useState, useEffect, useRef } from 'react';
-import { GamePhase, GameState, TattooId, PlayerProfile } from './types';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GameState, TattooId } from './types';
 import { ShapeId } from './services/cjr/cjrTypes';
 import { createInitialState, updateGameState } from './services/engine';
-import { networkClient } from './services/networking/NetworkClient';
-
-
 import MainMenu from './components/MainMenu';
 import HUD from './components/HUD';
 import MobileControls from './components/MobileControls';
 import GameCanvas from './components/GameCanvas';
 import TattooPicker from './components/TattooPicker';
 import ErrorBoundary from './components/ErrorBoundary';
+import BootScreen from './components/screens/BootScreen';
+import LevelSelectScreen from './components/screens/LevelSelectScreen';
+import GameOverScreen from './components/screens/GameOverScreen';
+import PauseOverlay from './components/overlays/PauseOverlay';
+import SettingsOverlay from './components/overlays/SettingsOverlay';
+import TutorialOverlay from './components/overlays/TutorialOverlay';
+import {
+  clearOverlays,
+  initialUiState,
+  popOverlay,
+  pushOverlay,
+  topOverlay,
+  type UiState,
+} from './services/ui/screenMachine';
+import {
+  defaultProgression,
+  defaultSettings,
+  loadProgression,
+  loadSettings,
+  saveProgression,
+  saveSettings,
+  type Progression,
+  type Settings,
+} from './services/ui/storage';
+import { applyTattoo } from './services/cjr/tattoos';
 
-// Lazy load heavy Pixi
 const PixiGameCanvas = React.lazy(() => import('./components/PixiGameCanvas'));
 
+const clampLevel = (n: number) => Math.max(1, Math.min(20, Math.round(n)));
+
 const App: React.FC = () => {
-  const [phase, setPhase] = useState<GamePhase>(GamePhase.Menu);
-  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [ui, setUi] = useState<UiState>(initialUiState);
+  const uiRef = useRef(ui);
+  useEffect(() => {
+    uiRef.current = ui;
+  }, [ui]);
+
+  const [settings, setSettings] = useState<Settings>(() => {
+    try {
+      return typeof window !== 'undefined' ? loadSettings() : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
+  });
+
+  const [progression, setProgression] = useState<Progression>(() => {
+    try {
+      return typeof window !== 'undefined' ? loadProgression() : defaultProgression;
+    } catch {
+      return defaultProgression;
+    }
+  });
+
+  const [selectedLevel, setSelectedLevel] = useState(() => clampLevel(progression.unlockedLevel));
+
+  useEffect(() => {
+    try {
+      saveSettings(settings);
+    } catch {
+      // ignore
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    try {
+      saveProgression(progression);
+    } catch {
+      // ignore
+    }
+  }, [progression]);
+
   const gameStateRef = useRef<GameState | null>(null);
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const lastStartRef = useRef<{ name: string; shape: ShapeId } | null>(null);
+  const resultHandledRef = useRef<GameState['result']>(null);
+  const tattooOverlayArmedRef = useRef(false);
 
-  // Settings
-  const [usePixi, setUsePixi] = useState(true); // Default to Pixi for "Full Power"
   const [isTouch, setIsTouch] = useState(false);
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1280,
+    h: typeof window !== 'undefined' ? window.innerHeight : 720,
+  }));
 
   useEffect(() => {
     setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
   }, []);
 
-  const handleStartGame = (name: string, shape: ShapeId) => {
-    const state = createInitialState();
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setUi(s => ({ ...s, screen: 'menu' })), 250);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const startGame = useCallback((name: string, shape: ShapeId, nextLevel: number) => {
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    requestRef.current = 0;
+
+    const state = createInitialState(nextLevel);
     state.player.name = name;
     state.player.shape = shape;
 
-    networkClient.setLocalState(state);
-
-    // Connect to server if not connected (Logic could be refined to connect before start)
-    networkClient.connect(name, shape);
-
     gameStateRef.current = state;
-    setGameState(state);
-    setPhase(GamePhase.Playing);
+    resultHandledRef.current = null;
+    tattooOverlayArmedRef.current = false;
+    lastStartRef.current = { name, shape };
+    setSelectedLevel(nextLevel);
 
-    lastTimeRef.current = performance.now();
-    requestRef.current = requestAnimationFrame(gameLoop);
-  };
+    setUi(() => ({ screen: 'playing', overlays: [] }));
 
-  const gameLoop = (time: number) => {
-    if (phase !== GamePhase.Playing || !gameStateRef.current) return;
+    if (!progression.tutorialSeen && nextLevel <= 3) {
+      state.isPaused = true;
+      setUi((s) => pushOverlay(s, { type: 'tutorial', step: 0 }));
+    }
+  }, [progression.tutorialSeen]);
+
+  const gameLoop = useCallback((time: number) => {
+    const state = gameStateRef.current;
+    if (!state) return;
 
     const dt = (time - lastTimeRef.current) / 1000;
     lastTimeRef.current = time;
 
-    // Fixed time step cap
     const safeDt = Math.min(dt, 0.1);
+    if (!state.isPaused) updateGameState(state, safeDt);
 
-    if (!gameStateRef.current.isPaused) {
-      updateGameState(gameStateRef.current, safeDt);
+    if (state.tattooChoices && !tattooOverlayArmedRef.current) {
+      tattooOverlayArmedRef.current = true;
+      setUi((s) => pushOverlay(s, { type: 'tattooPick' }));
+    }
+    if (!state.tattooChoices && tattooOverlayArmedRef.current) {
+      tattooOverlayArmedRef.current = false;
+      setUi((s) => popOverlay(s, 'tattooPick'));
     }
 
-    // Force re-render for React UI (HUD) occasionally, or use ref for high perf
-    // In React 18+ automatic batching helps. 
-    // Ideally HUD reads from Ref directly via useFrame or interval, but here simply:
-    setGameState({ ...gameStateRef.current }); // Trigger React update
+    if (state.result && resultHandledRef.current !== state.result) {
+      resultHandledRef.current = state.result;
+
+      if (state.result === 'win') {
+        setProgression((p) => ({
+          ...p,
+          unlockedLevel: Math.max(p.unlockedLevel, clampLevel((state.level ?? selectedLevel) + 1)),
+        }));
+      }
+
+      setUi(() => ({ screen: 'gameOver', overlays: [] }));
+      return;
+    }
 
     requestRef.current = requestAnimationFrame(gameLoop);
-  };
+  }, [selectedLevel]);
 
-  // Cleanup
   useEffect(() => {
+    if (ui.screen !== 'playing' || !gameStateRef.current) return;
+
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    lastTimeRef.current = performance.now();
+    requestRef.current = requestAnimationFrame(gameLoop);
+
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      requestRef.current = 0;
     };
-  }, []);
+  }, [ui.screen, gameLoop]);
 
-  // Input Handling (Keyboard)
+  useEffect(() => {
+    const state = gameStateRef.current;
+    if (!state) return;
+    if (ui.screen !== 'playing') return;
+    if (state.result) return;
+    if (state.tattooChoices) return;
+    state.isPaused = ui.overlays.length > 0;
+  }, [ui.overlays.length, ui.screen]);
+
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
-      if (!gameStateRef.current) return;
-      if (e.code === 'Space') gameStateRef.current.inputs.space = true;
-      if (e.code === 'KeyW') gameStateRef.current.inputs.w = true;
+      const state = gameStateRef.current;
+      if (!state) return;
+      if (uiRef.current.screen !== 'playing') return;
+      if (uiRef.current.overlays.length > 0) return;
+      if (e.code === 'Space') state.inputs.space = true;
+      if (e.code === 'KeyW') state.inputs.w = true;
     };
     const handleUp = (e: KeyboardEvent) => {
-      if (!gameStateRef.current) return;
-      if (e.code === 'Space') gameStateRef.current.inputs.space = false;
-      if (e.code === 'KeyW') gameStateRef.current.inputs.w = false;
+      const state = gameStateRef.current;
+      if (!state) return;
+      if (e.code === 'Space') state.inputs.space = false;
+      if (e.code === 'KeyW') state.inputs.w = false;
     };
-
     window.addEventListener('keydown', handleDown);
     window.addEventListener('keyup', handleUp);
     return () => {
@@ -98,69 +210,174 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleTattooSelect = (id: TattooId) => {
-    if (gameStateRef.current) {
-      // Apply tattoo logic (should be handled by engine/applyTattoo really, 
-      // but for now we just push to unlocked and close choice)
-      import('./services/cjr/tattoos').then(({ applyTattoo }) => {
-        if (gameStateRef.current) {
-          applyTattoo(gameStateRef.current.player, id);
-          gameStateRef.current.tattooChoices = null;
-          gameStateRef.current.isPaused = false;
-        }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'Escape') return;
+      if (uiRef.current.screen !== 'playing') return;
+      e.preventDefault();
+      setUi((s) => {
+        const top = topOverlay(s);
+        if (top?.type === 'pause') return popOverlay(s, 'pause');
+        return pushOverlay(s, { type: 'pause' });
       });
-    }
-  };
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const handleTattooSelect = useCallback((id: TattooId) => {
+    const state = gameStateRef.current;
+    if (!state) return;
+    applyTattoo(state.player, id);
+    state.tattooChoices = null;
+    state.isPaused = false;
+    setUi((s) => popOverlay(s, 'tattooPick'));
+  }, []);
+
+  const inputEnabled = ui.screen === 'playing' && ui.overlays.length === 0;
+  const top = useMemo(() => topOverlay(ui), [ui]);
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black select-none font-sans">
       <ErrorBoundary>
-        {phase === GamePhase.Menu && (
-          <MainMenu onStart={handleStartGame} />
+        {ui.screen === 'boot' && <BootScreen />}
+
+        {ui.screen === 'menu' && (
+          <MainMenu
+            level={selectedLevel}
+            unlockedLevel={progression.unlockedLevel}
+            usePixi={settings.usePixi}
+            onTogglePixi={(next) => setSettings((s) => ({ ...s, usePixi: next }))}
+            onOpenLevels={() => setUi((s) => ({ ...clearOverlays(s), screen: 'levelSelect' }))}
+            onOpenTutorial={() => setUi((s) => pushOverlay(s, { type: 'tutorial', step: 0 }))}
+            onOpenSettings={() => setUi((s) => pushOverlay(s, { type: 'settings' }))}
+            onStart={(name, shape) => startGame(name, shape, selectedLevel)}
+          />
         )}
 
-        {phase === GamePhase.Playing && gameState && (
+        {ui.screen === 'levelSelect' && (
+          <LevelSelectScreen
+            currentLevel={selectedLevel}
+            unlockedLevel={progression.unlockedLevel}
+            onBack={() => setUi((s) => ({ ...clearOverlays(s), screen: 'menu' }))}
+            onPlay={(lvl) => {
+              const next = clampLevel(lvl);
+              setSelectedLevel(next);
+              const last = lastStartRef.current;
+              if (last) startGame(last.name, last.shape, next);
+              else setUi((s) => ({ ...clearOverlays(s), screen: 'menu' }));
+            }}
+          />
+        )}
+
+        {ui.screen === 'playing' && gameStateRef.current && (
           <>
-            <Suspense fallback={<div className="text-white">Loading Engine...</div>}>
-              {usePixi ? (
-                <PixiGameCanvas gameState={gameState} isTouchInput={isTouch} />
+            <Suspense fallback={<div className="text-white">Loading Renderer…</div>}>
+              {settings.usePixi ? (
+                <PixiGameCanvas gameStateRef={gameStateRef} inputEnabled={inputEnabled} />
               ) : (
-                <GameCanvas gameState={gameState} width={window.innerWidth} height={window.innerHeight} />
+                <GameCanvas
+                  gameStateRef={gameStateRef}
+                  width={viewport.w}
+                  height={viewport.h}
+                  enablePointerInput={inputEnabled}
+                />
               )}
             </Suspense>
 
             <HUD gameStateRef={gameStateRef} isTouchInput={isTouch} />
 
-            {isTouch && (
+            {isTouch && inputEnabled && (
               <MobileControls
                 onMove={(x, y) => {
-                  if (gameStateRef.current) gameStateRef.current.player.targetPosition = {
-                    x: gameStateRef.current.player.position.x + x * 100,
-                    y: gameStateRef.current.player.position.y + y * 100
+                  const state = gameStateRef.current;
+                  if (!state) return;
+                  state.player.targetPosition = {
+                    x: state.player.position.x + x * 240,
+                    y: state.player.position.y + y * 240,
                   };
                 }}
                 onAction={(btn) => {
-                  if (gameStateRef.current) {
-                    if (btn === 'skill') gameStateRef.current.inputs.space = true;
-                    if (btn === 'eject') gameStateRef.current.inputs.w = true;
-                  }
+                  const state = gameStateRef.current;
+                  if (!state) return;
+                  if (btn === 'skill') state.inputs.space = true;
+                  if (btn === 'eject') state.inputs.w = true;
                 }}
                 onActionEnd={(btn) => {
-                  if (gameStateRef.current) {
-                    if (btn === 'skill') gameStateRef.current.inputs.space = false;
-                    if (btn === 'eject') gameStateRef.current.inputs.w = false;
-                  }
+                  const state = gameStateRef.current;
+                  if (!state) return;
+                  if (btn === 'skill') state.inputs.space = false;
+                  if (btn === 'eject') state.inputs.w = false;
                 }}
-              />
-            )}
-
-            {gameState.tattooChoices && (
-              <TattooPicker
-                choices={gameState.tattooChoices}
-                onSelect={handleTattooSelect}
               />
             )}
           </>
+        )}
+
+        {ui.screen === 'gameOver' && (
+          <GameOverScreen
+            level={gameStateRef.current?.level ?? selectedLevel}
+            result={gameStateRef.current?.result ?? 'lose'}
+            canNext={(gameStateRef.current?.level ?? selectedLevel) < 20}
+            onRetry={() => {
+              const last = lastStartRef.current;
+              if (!last) return setUi({ screen: 'menu', overlays: [] });
+              startGame(last.name, last.shape, gameStateRef.current?.level ?? selectedLevel);
+            }}
+            onNext={() => {
+              const last = lastStartRef.current;
+              if (!last) return setUi({ screen: 'menu', overlays: [] });
+              const next = clampLevel((gameStateRef.current?.level ?? selectedLevel) + 1);
+              startGame(last.name, last.shape, next);
+            }}
+            onLevels={() => setUi({ screen: 'levelSelect', overlays: [] })}
+          />
+        )}
+
+        {top?.type === 'pause' && (
+          <PauseOverlay
+            onResume={() => setUi((s) => popOverlay(s, 'pause'))}
+            onRestart={() => {
+              const last = lastStartRef.current;
+              if (!last) return setUi({ screen: 'menu', overlays: [] });
+              startGame(last.name, last.shape, gameStateRef.current?.level ?? selectedLevel);
+            }}
+            onQuit={() => {
+              if (requestRef.current) cancelAnimationFrame(requestRef.current);
+              requestRef.current = 0;
+              gameStateRef.current = null;
+              setUi({ screen: 'menu', overlays: [] });
+            }}
+            onSettings={() => setUi((s) => pushOverlay(s, { type: 'settings' }))}
+          />
+        )}
+
+        {top?.type === 'settings' && (
+          <SettingsOverlay
+            usePixi={settings.usePixi}
+            onTogglePixi={(next) => setSettings((s) => ({ ...s, usePixi: next }))}
+            onClose={() => setUi((s) => popOverlay(s, 'settings'))}
+          />
+        )}
+
+        {top?.type === 'tutorial' && (
+          <TutorialOverlay
+            step={top.step}
+            onNext={() => setUi((s) => ({ ...s, overlays: [...s.overlays.slice(0, -1), { type: 'tutorial', step: top.step + 1 }] }))}
+            onPrev={() => setUi((s) => ({ ...s, overlays: [...s.overlays.slice(0, -1), { type: 'tutorial', step: Math.max(0, top.step - 1) }] }))}
+            onClose={(didFinish) => {
+              setUi((s) => popOverlay(s, 'tutorial'));
+              if (didFinish) setProgression((p) => ({ ...p, tutorialSeen: true }));
+              const state = gameStateRef.current;
+              if (state && uiRef.current.screen === 'playing') {
+                if (!state.result && !state.tattooChoices) state.isPaused = false;
+              }
+            }}
+          />
+        )}
+
+        {top?.type === 'tattooPick' && gameStateRef.current?.tattooChoices && (
+          <TattooPicker choices={gameStateRef.current.tattooChoices} onSelect={handleTattooSelect} />
         )}
       </ErrorBoundary>
     </div>

@@ -1,15 +1,14 @@
 
 import {
-    THRESHOLDS,
     RING_RADII
 } from './cjrConstants';
-import { GameState, Player, GamePhase } from '../../types';
+import { GameState } from '../../types';
+import { TattooId } from './cjrTypes';
 import { distance } from '../engine/math';
+import { LevelConfig } from './levels';
 
-const CHANNEL_DURATION = 1.5; // Seconds
-
-export const updateWinCondition = (state: GameState, dt: number) => {
-    if (state.isPaused || !state.player || state.player.isDead) return;
+export const updateWinCondition = (state: GameState, dt: number, config: LevelConfig) => {
+    if (state.isPaused || !state.player || state.player.isDead || state.result) return;
 
     const p = state.player;
 
@@ -19,30 +18,30 @@ export const updateWinCondition = (state: GameState, dt: number) => {
 
     const dist = distance(p.position, { x: 0, y: 0 });
     const inCenter = dist < RING_RADII.CENTER;
-    const matchReady = p.matchPercent >= THRESHOLDS.WIN_HOLD; // 0.90
+    const matchReady = p.matchPercent >= config.thresholds.win;
 
     if (inCenter && matchReady) {
         if (!p.stationaryTime) p.stationaryTime = 0;
 
-        // Is holding? We just check position.
-        // Do we enforce stationary? "Hold" implies stay.
-        // Let's use stationary check: velocity small.
-        const speed = Math.hypot(p.velocity.x, p.velocity.y);
-        if (speed < 100) { // Relatively still
-            p.stationaryTime += dt;
+        // Reset hold if recently hit
+        if (p.lastHitTime < 0.5) {
+            p.stationaryTime = 0;
+            return;
+        }
 
-            // Visual: Pulse/Heartbeat
-            state.shakeIntensity = Math.min(5, p.stationaryTime * 2);
+        if (p.tattoos?.includes(TattooId.DepositShield)) {
+            p.statusEffects.shielded = true;
+            p.statusEffects.commitShield = Math.max(p.statusEffects.commitShield || 0, 1.0);
+        }
 
-            // WIN CHECK
-            if (p.stationaryTime >= CHANNEL_DURATION) {
-                triggerWin(state);
-            }
-        } else {
-            // Moving resets? Or just pauses?
-            // "Hold" usually means defend the spot. 
-            // If you drift out or move fast, reset.
-            p.stationaryTime = Math.max(0, p.stationaryTime - dt * 2); // Decay
+        p.stationaryTime += dt;
+
+        // Visual: Pulse/Heartbeat
+        state.shakeIntensity = Math.min(5, p.stationaryTime * 2);
+
+        // WIN CHECK
+        if (p.stationaryTime >= config.winHoldSeconds) {
+            triggerWin(state);
         }
     } else {
         p.stationaryTime = 0;
@@ -52,6 +51,7 @@ export const updateWinCondition = (state: GameState, dt: number) => {
 const triggerWin = (state: GameState) => {
     // Game Over - Victory
     console.log("VICTORY!");
+    state.player.emotion = 'victory';
     // Set Phase?
     // We typically don't have GamePhase in GameState (it's in App.tsx).
     // But we can signal via state flag or event.
@@ -66,7 +66,6 @@ const triggerWin = (state: GameState) => {
         velocity: { x: 0, y: -10 }
     });
 
-    // Pause?
-    // state.isPaused = true; 
-    // Usually let it run for celebration?
+    state.result = 'win';
+    state.isPaused = true;
 };

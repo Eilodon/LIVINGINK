@@ -11,6 +11,7 @@ import {
   RELIC_RESPAWN_TIME,
   WORLD_HEIGHT,
   WORLD_WIDTH,
+  MUTATION_CHOICES,
 } from '../../constants';
 import {
   Bot,
@@ -40,11 +41,14 @@ import { applyProjectileEffect, resolveCombat, consumePickup } from './systems/c
 import { applyPhysics, checkCollisions, constrainToMap } from './systems/physics';
 import { applySkill } from './systems/skills';
 import { updateRingLogic } from '../cjr/ringSystem';
-import { updateWaveSpawner } from '../cjr/waveSpawner';
+import { updateWaveSpawner, resetWaveTimers } from '../cjr/waveSpawner';
 import { updateWinCondition } from '../cjr/winCondition';
-import { updateBossLogic } from '../cjr/bossCjr';
+import { updateBossLogic, resetBossState } from '../cjr/bossCjr';
 import { updateEmotion } from '../cjr/emotions';
-import { updateDynamicBounty } from '../cjr/dynamicBounty';
+import { updateDynamicBounty, resetDynamicBounty } from '../cjr/dynamicBounty';
+import { getTattooChoices } from '../cjr/tattoos';
+import { TattooId } from '../cjr/cjrTypes';
+import { getLevelConfig } from '../cjr/levels';
 
 // --- Main Game Loop ---
 export const updateGameState = (state: GameState, dt: number): GameState => {
@@ -57,8 +61,9 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
   // 2. Game Time & Round Logic
   state.gameTime += dt;
-  if (state.gameTime > GAME_DURATION) {
-    // Basic timeout win/loss
+  if (state.gameTime > state.levelConfig.timeLimit && !state.result) {
+    state.result = 'lose';
+    state.isPaused = true;
   }
 
   // 3. Insert Entities into Grid
@@ -90,11 +95,11 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
   // 10. Ring Logic (Check every frame or slower?)
   // Frame is fine for physics
-  updateRingLogic(state.player, dt);
-  state.bots.forEach(b => updateRingLogic(b, dt));
+  updateRingLogic(state.player, dt, state.levelConfig);
+  state.bots.forEach(b => updateRingLogic(b, dt, state.levelConfig));
 
   // 11. Win Condition
-  updateWinCondition(state, dt);
+  updateWinCondition(state, dt, state.levelConfig);
 
   // 12. Boss Logic
   updateBossLogic(state, dt);
@@ -106,6 +111,8 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
   if (state.player) updateEmotion(state.player, dt);
   state.bots.forEach(b => updateEmotion(b, dt));
 
+  checkTattooUnlock(state);
+
   return state;
 };
 
@@ -113,7 +120,7 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
   if (player.isDead) return;
 
   // Input Handling
-  handleInput(player, state.inputs, dt);
+  handleInput(player, state.inputs, dt, state);
 
   // Physics
   applyPhysics(player, dt);
@@ -125,9 +132,34 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
     handleCollision(player, other, state, dt);
   });
 
+  const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
+  const magnetRadius = player.magneticFieldRadius || 0;
+  if (magnetRadius > 0 || catalystSense) {
+    const radius = catalystSense ? 260 : magnetRadius;
+    state.food.forEach(f => {
+      if (f.isDead) return;
+      if (catalystSense && f.kind !== 'catalyst') return;
+      const dx = player.position.x - f.position.x;
+      const dy = player.position.y - f.position.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < radius && dist > 1) {
+        const pull = 120 * dt;
+        f.velocity.x += (dx / dist) * pull;
+        f.velocity.y += (dy / dist) * pull;
+      }
+    });
+  }
+
   // Regen / Decay
   if (player.currentHealth < player.maxHealth) {
     player.currentHealth += player.statusEffects.regen * dt;
+  }
+
+  player.lastEatTime += dt;
+  player.lastHitTime += dt;
+
+  if (player.skillCooldown > 0) {
+    player.skillCooldown = Math.max(0, player.skillCooldown - dt * player.skillCooldownMultiplier);
   }
 
   // Decay status effect timers
@@ -137,8 +169,32 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
       player.statusEffects.shielded = false;
     }
   }
+  if (player.statusEffects.tempSpeedTimer > 0) {
+    player.statusEffects.tempSpeedTimer -= dt;
+    if (player.statusEffects.tempSpeedTimer <= 0) {
+      player.statusEffects.tempSpeedBoost = 1;
+    }
+  }
+  if (player.statusEffects.colorBoostTimer && player.statusEffects.colorBoostTimer > 0) {
+    player.statusEffects.colorBoostTimer -= dt;
+    if (player.statusEffects.colorBoostTimer <= 0) {
+      player.statusEffects.colorBoostMultiplier = 1;
+    }
+  }
   if (player.statusEffects.pityBoost && player.statusEffects.pityBoost > 0) {
     player.statusEffects.pityBoost -= dt;
+  }
+  if (player.statusEffects.overdriveTimer && player.statusEffects.overdriveTimer > 0) {
+    player.statusEffects.overdriveTimer -= dt;
+  }
+  if (player.statusEffects.magnetTimer && player.statusEffects.magnetTimer > 0) {
+    player.statusEffects.magnetTimer -= dt;
+    if (player.statusEffects.magnetTimer <= 0) {
+      player.magneticFieldRadius = 0;
+    }
+  }
+  if (player.statusEffects.invulnerable && player.statusEffects.invulnerable > 0) {
+    player.statusEffects.invulnerable -= dt;
   }
 };
 
@@ -157,15 +213,46 @@ const updateBot = (bot: Bot, state: GameState, dt: number) => {
   checkCollisions(bot, nearby, (other) => {
     handleCollision(bot, other, state, dt);
   });
+
+  bot.lastEatTime += dt;
+  bot.lastHitTime += dt;
+
+  if (bot.skillCooldown > 0) {
+    bot.skillCooldown = Math.max(0, bot.skillCooldown - dt * bot.skillCooldownMultiplier);
+  }
+  if (bot.statusEffects.tempSpeedTimer > 0) {
+    bot.statusEffects.tempSpeedTimer -= dt;
+    if (bot.statusEffects.tempSpeedTimer <= 0) {
+      bot.statusEffects.tempSpeedBoost = 1;
+    }
+  }
+  if (bot.statusEffects.colorBoostTimer && bot.statusEffects.colorBoostTimer > 0) {
+    bot.statusEffects.colorBoostTimer -= dt;
+    if (bot.statusEffects.colorBoostTimer <= 0) {
+      bot.statusEffects.colorBoostMultiplier = 1;
+    }
+  }
+  if (bot.statusEffects.overdriveTimer && bot.statusEffects.overdriveTimer > 0) {
+    bot.statusEffects.overdriveTimer -= dt;
+  }
+  if (bot.statusEffects.magnetTimer && bot.statusEffects.magnetTimer > 0) {
+    bot.statusEffects.magnetTimer -= dt;
+    if (bot.statusEffects.magnetTimer <= 0) {
+      bot.magneticFieldRadius = 0;
+    }
+  }
+  if (bot.statusEffects.invulnerable && bot.statusEffects.invulnerable > 0) {
+    bot.statusEffects.invulnerable -= dt;
+  }
 };
 
-const handleInput = (player: Player, inputs: { space: boolean; w: boolean }, dt: number) => {
+const handleInput = (player: Player, inputs: { space: boolean; w: boolean }, dt: number, state: GameState) => {
   // Movement vector is set by UI/Mouse elsewhere (player.targetPosition)
   // Here we just process actions like Space (Dash/Split in original, Skill in new)
 
   if (inputs.space) {
     // Trigger Skill
-    applySkill(player, undefined, undefined); // Placeholder for skill system
+    applySkill(player, undefined, state);
   }
 
   // W for Eject? (Maybe keep for team play later)
@@ -269,19 +356,38 @@ const updateCamera = (state: GameState) => {
   }
 };
 
+const TATTOO_UNLOCK_RADII = [45, 70, 100];
+
+const checkTattooUnlock = (state: GameState) => {
+  if (state.tattooChoices || state.result) return;
+  const idx = state.player.tattoos.length;
+  if (idx >= TATTOO_UNLOCK_RADII.length) return;
+  if (state.player.radius >= TATTOO_UNLOCK_RADII[idx]) {
+    state.tattooChoices = getTattooChoices(MUTATION_CHOICES);
+    state.isPaused = true;
+  }
+};
+
 // Initial State Factory
-export const createInitialState = (): GameState => {
+export const createInitialState = (level: number = 1): GameState => {
   const engine = createGameEngine();
   bindEngine(engine);
 
   const player = createPlayer("Hero");
+  const levelConfig = getLevelConfig(level);
+
+  resetWaveTimers(levelConfig);
+  resetBossState();
+  resetDynamicBounty();
+
+  const initialFood = Math.max(30, levelConfig.burstSizes.ring1 * 5);
 
   return {
     player,
-    bots: Array.from({ length: 10 }, (_, i) => createBot(`${i}`)),
+    bots: Array.from({ length: levelConfig.botCount }, (_, i) => createBot(`${i}`)),
     creeps: [], // Deprecated
     boss: null,
-    food: Array.from({ length: 50 }, () => createFood()),
+    food: Array.from({ length: initialFood }, () => createFood()),
     particles: [],
     projectiles: [],
     floatingTexts: [],
@@ -294,9 +400,12 @@ export const createInitialState = (): GameState => {
     camera: { x: 0, y: 0 },
     shakeIntensity: 0,
     kingId: null,
+    level,
+    levelConfig,
     tattooChoices: null,
     unlockedTattoos: [],
     isPaused: false,
+    result: null,
     inputs: { space: false, w: false },
   };
 };

@@ -21,8 +21,10 @@ import {
   Vector2,
 } from '../../types'; // Note: OrbitingObject missing in types? I'll check types.ts again, might need to remove
 import { getCurrentEngine } from './context';
-import { randomRange, randomPos, randomPosInCenter } from './math';
+import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from './math';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
+import { pigmentToHex } from '../cjr/colorMath';
+import { assignRandomPersonality } from '../cjr/botPersonalities';
 
 // Helper: Random Pigment
 export const randomPigment = (): PigmentVec3 => ({
@@ -32,7 +34,7 @@ export const randomPigment = (): PigmentVec3 => ({
 });
 
 export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime: number = 0): Player => {
-  const position = randomPos();
+  const position = randomPosInRing(1);
   const pigment = randomPigment();
 
   return {
@@ -60,6 +62,11 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
     emotion: 'happy',
     shape,
     tattoos: [],
+    lastHitTime: 999,
+    lastEatTime: 0,
+    matchStuckTime: 0,
+    ring3LowMatchTime: 0,
+    emotionTimer: 0,
 
     acceleration: ACCELERATION_BASE,
     maxSpeed: MAX_SPEED_BASE,
@@ -72,7 +79,6 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
     defense: 1,
     damageMultiplier: 1,
 
-    mutations: [],
     critChance: 0,
     critMultiplier: 1.5,
     lifesteal: 0,
@@ -102,6 +108,8 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
 
     statusEffects: {
       speedBoost: 1,
+      tempSpeedBoost: 1,
+      tempSpeedTimer: 0,
       shielded: false,
       burning: false,
       burnTimer: 0,
@@ -120,20 +128,29 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
       kingForm: 0,
       damageBoost: 1,
       defenseBoost: 1,
+      colorBoostTimer: 0,
+      colorBoostMultiplier: 1,
+      overdriveTimer: 0,
+      magnetTimer: 0,
     },
   };
 };
 
 export const createBot = (id: string, spawnTime: number = 0): Bot => {
   const player = createPlayer(`Bot ${id.substr(0, 4)}`, 'circle', spawnTime);
-  return {
+
+  const bot: Bot = {
     ...player,
     id,
     aiState: 'wander',
     targetEntityId: null,
     aiReactionTimer: 0,
-    personality: 'farmer', // Default
+    personality: 'farmer',
   };
+
+  assignRandomPersonality(bot);
+
+  return bot;
 };
 
 export const createBoss = (spawnTime: number = 0): Bot => {
@@ -161,18 +178,19 @@ export const createBotCreeps = (count: number): Bot[] => {
 };
 
 export const createFood = (pos?: Vector2, isEjected: boolean = false): Food => {
+  const pigment = randomPigment();
   return {
     id: Math.random().toString(),
-    position: pos || randomPos(),
+    position: pos || randomPosInRing(1),
     velocity: { x: 0, y: 0 },
     radius: FOOD_RADIUS,
-    color: '#ffffff', // Placeholder, updated by kind logic usually
+    color: pigmentToHex(pigment),
     isDead: false,
     trail: [],
     value: 1,
     isEjected,
     kind: 'pigment', // Default
-    pigment: randomPigment(),
+    pigment,
   };
 };
 

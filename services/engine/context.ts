@@ -6,24 +6,44 @@ import { randomRange } from './math';
 // WE DO NOT DESTROY THE GRID EVERY FRAME. WE REUSE THE ARRAYS.
 class SpatialGrid {
   private cellSize: number;
-  private grid: Map<string, Entity[]> = new Map();
+  private grid: Map<number, Entity[]> = new Map(); // INTEGER keys, not string!
+  private usageTimestamps: Map<number, number> = new Map();
+  private frameCount: number = 0;
 
   constructor(cellSize: number) {
     this.cellSize = cellSize;
   }
 
+  // PERFORMANCE FIX: Integer key via bit-shifting
+  // Supports maps up to 65536x65536 cells (more than enough)
+  private getKey(cellX: number, cellY: number): number {
+    return (cellX << 16) | (cellY & 0xFFFF);
+  }
+
   clear() {
+    this.frameCount++;
+
     // Optimization: Don't delete keys, just empty the arrays.
-    // This reduces GC pressure significantly.
-    for (const bucket of this.grid.values()) {
+    for (const [key, bucket] of this.grid.entries()) {
       bucket.length = 0;
+
+      // PERFORMANCE FIX: Clean up stale buckets every 60 frames (~1 second)
+      if (this.frameCount % 60 === 0) {
+        const lastUsed = this.usageTimestamps.get(key) || 0;
+        if (this.frameCount - lastUsed > 300) { // 5 seconds unused
+          this.grid.delete(key);
+          this.usageTimestamps.delete(key);
+        }
+      }
     }
   }
 
   insert(entity: Entity) {
     const cellX = Math.floor(entity.position.x / this.cellSize);
     const cellY = Math.floor(entity.position.y / this.cellSize);
-    const key = `${cellX},${cellY}`;
+    const key = this.getKey(cellX, cellY); // INTEGER key - 0 allocations!
+
+    this.usageTimestamps.set(key, this.frameCount);
 
     let bucket = this.grid.get(key);
     if (!bucket) {
@@ -40,7 +60,7 @@ class SpatialGrid {
     const nearby: Entity[] = [];
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        const key = `${cellX + dx},${cellY + dy}`;
+        const key = this.getKey(cellX + dx, cellY + dy); // INTEGER key!
         const bucket = this.grid.get(key);
         if (bucket && bucket.length > 0) {
           // Fast array copy

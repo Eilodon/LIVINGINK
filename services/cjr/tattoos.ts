@@ -11,109 +11,60 @@ export interface TattooDefinition {
 
 const TATTOOS: TattooDefinition[] = [
     {
-        id: TattooId.Swift,
-        name: 'Ink Flow',
+        id: TattooId.FilterInk,
+        name: 'Filter Ink',
         tier: MutationTier.Common,
-        description: 'Movement Speed +15%',
-        apply: (p) => { p.statusEffects.speedBoost = (p.statusEffects.speedBoost || 0) + 0.15; }
+        description: 'Reduce impact of wrong pigments.',
+        apply: () => { }
     },
     {
-        id: TattooId.ThickSkin,
-        name: 'Hardened Gel',
+        id: TattooId.Overdrive,
+        name: 'Overdrive',
         tier: MutationTier.Common,
-        description: 'Reduce size penalty on speed.',
-        apply: (p) => { p.sizePenaltyMultiplier *= 0.8; }
+        description: 'Skill triggers 3s fast-eat.',
+        apply: () => { }
     },
     {
-        id: TattooId.KillingIntent,
-        name: 'Spiked Pigment',
+        id: TattooId.DepositShield,
+        name: 'Deposit Shield',
         tier: MutationTier.Common,
-        description: 'Damage +10%.',
-        apply: (p) => { p.damageMultiplier += 0.1; }
+        description: 'Gain shield while holding core.',
+        apply: () => { }
     },
     {
-        id: TattooId.KeenHearing,
-        name: 'Vibration Sense',
+        id: TattooId.PigmentBomb,
+        name: 'Pigment Bomb',
         tier: MutationTier.Common,
-        description: 'Vision Range +30%.',
-        apply: (p) => { p.visionMultiplier += 0.3; }
+        description: 'Getting hit splashes color on enemy.',
+        apply: () => { }
     },
     {
-        id: TattooId.DashBoost,
-        name: 'Jet Stream',
+        id: TattooId.PerfectMatch,
+        name: 'Perfect Match Bonus',
         tier: MutationTier.Rare,
-        description: 'Dash efficiency +50%.',
-        apply: (p) => { p.skillDashMultiplier += 0.5; }
+        description: 'High match grants extra reward.',
+        apply: () => { }
     },
     {
-        id: TattooId.Lifesteal,
-        name: 'Absorb',
+        id: TattooId.CatalystSense,
+        name: 'Catalyst Sense',
         tier: MutationTier.Rare,
-        description: 'Heal 15% of damage dealt.',
-        apply: (p) => { p.lifesteal += 0.15; }
+        description: 'Attract catalysts from farther.',
+        apply: () => { }
     },
     {
-        id: TattooId.ArmorPierce,
-        name: 'Corrosive Touch',
+        id: TattooId.NeutralMastery,
+        name: 'Neutral Mastery',
         tier: MutationTier.Rare,
-        description: 'Ignore 20% protection.',
-        apply: (p) => { p.armorPen += 0.2; }
+        description: 'Neutral gives extra mass.',
+        apply: () => { }
     },
     {
-        id: TattooId.SecondChance,
-        name: 'Re-Coalesce',
+        id: TattooId.SolventExpert,
+        name: 'Solvent Expert',
         tier: MutationTier.Epic,
-        description: 'Revive once with 1 HP.',
-        apply: (p) => { p.reviveAvailable = true; }
-    },
-    {
-        id: TattooId.SpeedSurge,
-        name: 'Turbo Injector',
-        tier: MutationTier.Epic,
-        description: 'Skills grant temporary speed boost.',
-        apply: (p) => { /* Logic in system */ }
-    },
-    {
-        id: TattooId.MagneticField,
-        name: 'Vortex',
-        tier: MutationTier.Epic,
-        description: 'Passively pull small drops.',
-        apply: (p) => { p.magneticFieldRadius = 150; }
-    },
-    {
-        id: TattooId.SoulAbsorb,
-        name: 'Gluttony',
-        tier: MutationTier.Epic,
-        description: 'Doubles mass gain from kills.',
-        apply: (p) => { p.killGrowthMultiplier += 1.0; }
-    },
-    {
-        id: TattooId.Rewind,
-        name: 'Time Anchor',
-        tier: MutationTier.Legendary,
-        description: 'Teleport back to 3s ago when hit hard.',
-        apply: (p) => { /* Logic in system */ }
-    },
-    {
-        id: TattooId.ThunderCall,
-        name: 'Storm Caller',
-        tier: MutationTier.Legendary,
-        description: 'Strikes nearby enemies with lightning.',
-        apply: (p) => { /* Logic in system */ }
-    },
-    {
-        id: TattooId.KingForm,
-        name: 'Apex Predator',
-        tier: MutationTier.Legendary,
-        description: 'Briefly grow gargantuan on skill use.',
-        apply: (p) => { /* Logic in system */ }
-    },
-    {
-        id: TattooId.Invulnerable,
-        name: 'Phase Shift',
-        tier: MutationTier.Legendary,
-        description: 'Become intangible for 3s when low HP.',
-        apply: (p) => { /* Logic in system */ }
+        description: 'Solvent cleanses faster.',
+        apply: () => { }
     }
 ];
 

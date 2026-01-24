@@ -2,20 +2,21 @@
  * CJR BOSS SYSTEM - Drama Style
  * 
  * Features:
- * - Boss1 guards Ring2, Boss2 guards Ring3
- * - Ring entry BLOCKED until respective boss defeated
+ * - Boss1 appears in Ring2, Boss2 in Ring3
+ * - Boss death triggers Rush Window
  * - Telegraph attack patterns with visual warnings
  * - Contribution tracking for tier rewards
  * - "Rush Window" buff when boss dies
  */
 
-import { RING_RADII, THRESHOLDS } from './cjrConstants';
+import { RING_RADII } from './cjrConstants';
 import { GameState, Bot, Player, Vector2 } from '../../types';
 import { createBoss, createProjectile } from '../engine/factories';
 import { getCurrentSpatialGrid } from '../engine/context';
 import { distance, normalize } from '../engine/math';
-import { trackDamage, applyContributionBuffs, resetContributionLog } from './contribution';
+import { applyContributionBuffs, resetContributionLog, getContributionRanking, getLastHitter, getPlayerDamage } from './contribution';
 import { createFloatingText } from '../engine/effects';
+import { LevelConfig } from './levels';
 
 // ============================================
 // BOSS CONFIGURATION
@@ -60,9 +61,6 @@ const BOSS_CONFIGS: Record<string, BossConfig> = {
         telegraphDuration: 0.5,
     },
 };
-
-// Rush Window: buff granted when boss dies
-const RUSH_WINDOW_DURATION = 5.0;
 
 // State tracking
 interface BossState {
@@ -117,12 +115,19 @@ export const getRushThreshold = (baseThreshold: number): number => {
  * Main update function
  */
 export const updateBossLogic = (state: GameState, dt: number) => {
+    const levelConfig = state.levelConfig;
+    const bossConfigs = getBossConfigs(levelConfig);
+
     // Update rush window timer
     if (bossState.rushWindowTimer > 0) {
         bossState.rushWindowTimer -= dt;
         if (bossState.rushWindowTimer <= 0) {
             bossState.rushWindowRing = null;
         }
+    }
+
+    if (bossState.rushWindowRing === 3 && bossState.rushWindowTimer > 0) {
+        applyCandyWind(state, dt);
     }
 
     // Check if current boss is dead
@@ -134,24 +139,23 @@ export const updateBossLogic = (state: GameState, dt: number) => {
 
     // Spawn boss based on game time
     if (!state.boss) {
-        if (!bossState.boss1Defeated && state.gameTime >= BOSS_CONFIGS.boss1.spawnTime) {
-            spawnBoss(state, 'boss1');
-        } else if (bossState.boss1Defeated && !bossState.boss2Defeated &&
-            state.gameTime >= BOSS_CONFIGS.boss2.spawnTime) {
-            spawnBoss(state, 'boss2');
+        if (levelConfig.boss.boss1Enabled && !bossState.boss1Defeated && state.gameTime >= bossConfigs.boss1.spawnTime) {
+            spawnBoss(state, 'boss1', bossConfigs.boss1);
+        } else if (levelConfig.boss.boss2Enabled && bossState.boss1Defeated && !bossState.boss2Defeated &&
+            state.gameTime >= bossConfigs.boss2.spawnTime) {
+            spawnBoss(state, 'boss2', bossConfigs.boss2);
         }
         return;
     }
 
     // Boss AI
-    updateBossAI(state, dt);
+    updateBossAI(state, dt, bossConfigs);
 };
 
 /**
  * Spawn a boss
  */
-const spawnBoss = (state: GameState, bossId: 'boss1' | 'boss2') => {
-    const config = BOSS_CONFIGS[bossId];
+const spawnBoss = (state: GameState, bossId: 'boss1' | 'boss2', config: BossConfig) => {
     const boss = createBoss();
 
     boss.id = bossId;
@@ -188,7 +192,7 @@ const handleBossDefeat = (state: GameState) => {
     const bossId = bossState.currentBossId;
     if (!bossId) return;
 
-    const config = BOSS_CONFIGS[bossId];
+    const config = getBossConfigs(state.levelConfig)[bossId];
 
     // Mark defeated
     if (bossId === 'boss1') {
@@ -201,22 +205,24 @@ const handleBossDefeat = (state: GameState) => {
     const allPlayers = [state.player, ...state.bots.filter(b => !b.isBoss)] as Player[];
     applyContributionBuffs(allPlayers);
 
+    applyFinisherHeadstart(state, config);
+
     // Start Rush Window
-    bossState.rushWindowTimer = RUSH_WINDOW_DURATION;
+    bossState.rushWindowTimer = state.levelConfig.rushWindowDuration;
     bossState.rushWindowRing = config.guardsRing;
 
-    console.log(`[CJR] ${config.name} DEFEATED! Ring ${config.guardsRing} unlocked! Rush Window active for ${RUSH_WINDOW_DURATION}s!`);
+    console.log(`[CJR] ${config.name} DEFEATED! Ring ${config.guardsRing} unlocked! Rush Window active for ${state.levelConfig.rushWindowDuration}s!`);
     createFloatingText({ x: 0, y: 0 }, `RING ${config.guardsRing} UNLOCKED!`, '#00ff00', 40, state);
 };
 
 /**
  * Boss AI Logic
  */
-const updateBossAI = (state: GameState, dt: number) => {
+const updateBossAI = (state: GameState, dt: number, bossConfigs: Record<'boss1' | 'boss2', BossConfig>) => {
     const boss = state.boss;
     if (!boss || boss.isDead) return;
 
-    const config = BOSS_CONFIGS[bossState.currentBossId || 'boss1'];
+    const config = bossConfigs[bossState.currentBossId || 'boss1'];
 
     // Leash to zone
     const distToCenter = distance(boss.position, { x: 0, y: 0 });
@@ -326,4 +332,62 @@ export const resetBossState = () => {
     };
 };
 
+export const getRushWindowInfo = () => ({
+    ring: bossState.rushWindowRing,
+    timer: bossState.rushWindowTimer,
+});
+
 export { bossState, BOSS_CONFIGS };
+
+const applyCandyWind = (state: GameState, dt: number) => {
+    const all = [state.player, ...state.bots.filter(b => !b.isDead)] as Player[];
+    all.forEach(p => {
+        if (p.ring !== 3) return;
+        const dir = normalize({ x: -p.position.x, y: -p.position.y });
+        const strength = 30;
+        p.velocity.x += dir.x * strength * dt;
+        p.velocity.y += dir.y * strength * dt;
+    });
+};
+
+const applyFinisherHeadstart = (state: GameState, config: BossConfig) => {
+    const ranking = getContributionRanking();
+    if (ranking.length === 0) return;
+
+    const lastHitterId = getLastHitter(config.id);
+    const topContributorId = ranking[0]?.id;
+    let winnerId = topContributorId;
+
+    if (lastHitterId) {
+        const dmg = getPlayerDamage(lastHitterId);
+        const rankIdx = ranking.findIndex(r => r.id === lastHitterId);
+        const isTop3 = rankIdx >= 0 && rankIdx < 3;
+        if (dmg >= config.health * 0.1 || isTop3) {
+            winnerId = lastHitterId;
+        }
+    }
+
+    const allPlayers = [state.player, ...state.bots.filter(b => !b.isBoss)] as Player[];
+    const winner = allPlayers.find(p => p.id === winnerId);
+    if (!winner) return;
+
+    winner.statusEffects.tempSpeedBoost = Math.max(winner.statusEffects.tempSpeedBoost || 1, 1.15);
+    winner.statusEffects.tempSpeedTimer = Math.max(winner.statusEffects.tempSpeedTimer || 0, 3.0);
+    winner.statusEffects.shielded = true;
+    winner.statusEffects.commitShield = 1.5;
+
+    createFloatingText(winner.position, 'FINISHER BOOST!', '#00ff99', 22, state);
+};
+
+const getBossConfigs = (levelConfig: LevelConfig): Record<'boss1' | 'boss2', BossConfig> => ({
+    boss1: {
+        ...BOSS_CONFIGS.boss1,
+        spawnTime: levelConfig.boss.boss1Time,
+        health: levelConfig.boss.boss1Health,
+    },
+    boss2: {
+        ...BOSS_CONFIGS.boss2,
+        spawnTime: levelConfig.boss.boss2Time,
+        health: levelConfig.boss.boss2Health,
+    },
+});

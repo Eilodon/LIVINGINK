@@ -7,7 +7,7 @@ export const WORLD_HEIGHT = 3400;
 export const MAP_RADIUS = 1600;
 export const INITIAL_ZONE_RADIUS = 1600;
 export const CENTER_RADIUS = 320;
-export const GAME_DURATION = 480;
+export const GAME_DURATION = 150;
 export const SPAWN_PROTECTION_TIME = 5;
 export const GRID_CELL_SIZE = 300;
 
