@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { colorblindMode, ColorblindConfig } from '../services/accessibility/ColorblindMode';
+import './ColorblindOverlay.css';
 
 interface ColorblindOverlayProps {
   enabled: boolean;
@@ -101,8 +102,7 @@ const ColorblindOverlay: React.FC<ColorblindOverlayProps> = ({
       {/* Pattern overlay canvas */}
       <canvas
         ref={canvasRef}
-        className="fixed inset-0 pointer-events-none z-40"
-        style={{ mixBlendMode: 'multiply' }}
+        className="fixed inset-0 pointer-events-none z-40 colorblind-overlay-canvas"
       />
       
       {/* Settings toggle button */}
