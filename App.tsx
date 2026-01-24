@@ -5,13 +5,11 @@ import { createInitialState, updateClientVisuals, updateGameState } from './serv
 import MainMenu from './components/MainMenu';
 import HUD from './components/HUD';
 import MobileControls from './components/MobileControls';
-import GameCanvas from './components/GameCanvas';
 import TattooPicker from './components/TattooPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import BootScreen from './components/screens/BootScreen';
 import LevelSelectScreen from './components/screens/LevelSelectScreen';
 import MatchmakingScreen from './components/screens/MatchmakingScreen';
-import TournamentLobbyScreen from './components/screens/TournamentLobbyScreen';
 import GameOverScreen from './components/screens/GameOverScreen';
 import PauseOverlay from './components/overlays/PauseOverlay';
 import SettingsOverlay from './components/overlays/SettingsOverlay';
@@ -48,7 +46,6 @@ import {
   enqueueTournament,
   markTournamentReady,
   resetTournamentQueue,
-  type TournamentParticipant,
   type TournamentQueueState,
 } from './services/meta/tournaments';
 
@@ -400,62 +397,36 @@ const App: React.FC = () => {
         {ui.screen === 'playing' && gameStateRef.current && (
           <>
             <Suspense fallback={<div className="text-white">Loading Renderer…</div>}>
-              {settings.usePixi ? (
-                <PixiGameCanvas gameStateRef={gameStateRef} inputEnabled={inputEnabled} />
-              ) : (
-                <GameCanvas
-                  gameStateRef={gameStateRef}
-                  width={viewport.w}
-                  height={viewport.h}
-                  enablePointerInput={inputEnabled}
-                  onMouseMove={(x, y) => {
-                    const state = gameStateRef.current;
-                    if (!state) return;
-                    state.player.targetPosition = {
-                      x: state.player.position.x + x,
-                      y: state.player.position.y + y,
-                    };
-                  }}
-                  onMouseDown={() => {
-                    const state = gameStateRef.current;
-                    if (!state) return;
-                    state.inputs.space = true;
-                  }}
-                  onMouseUp={() => {
-                    const state = gameStateRef.current;
-                    if (!state) return;
-                    state.inputs.space = false;
-                  }}
-                />
-              )}
+              <PixiGameCanvas gameStateRef={gameStateRef} inputEnabled={inputEnabled} />
             </Suspense>
-
-            <HUD gameStateRef={gameStateRef} isTouchInput={isTouch} />
-
-            {isTouch && inputEnabled && (
-              <MobileControls
-                onMove={(x, y) => {
-                  const state = gameStateRef.current;
-                  if (!state) return;
-                  state.player.targetPosition = {
-                    x: state.player.position.x + x * 240,
-                    y: state.player.position.y + y * 240,
-                  };
-                }}
-                onAction={(btn) => {
-                  const state = gameStateRef.current;
-                  if (!state) return;
-                  if (btn === 'skill') state.inputs.space = true;
-                  if (btn === 'eject') state.inputs.w = true;
-                }}
-                onActionEnd={(btn) => {
-                  const state = gameStateRef.current;
-                  if (!state) return;
-                  if (btn === 'skill') state.inputs.space = false;
-                  if (btn === 'eject') state.inputs.w = false;
-                }}
-              />
-            )}
+            <MobileControls
+              onMove={(dx, dy) => {
+                const state = gameStateRef.current;
+                if (!state || !inputEnabled) return;
+                state.player.targetPosition = {
+                  x: state.player.position.x + dx,
+                  y: state.player.position.y + dy,
+                };
+              }}
+              onAction={(btn) => {
+                const state = gameStateRef.current;
+                if (!state || !inputEnabled) return;
+                if (btn === 'skill') {
+                  state.inputs.space = true;
+                } else if (btn === 'eject') {
+                  state.inputs.w = true;
+                }
+              }}
+              onActionEnd={(btn) => {
+                const state = gameStateRef.current;
+                if (!state || !inputEnabled) return;
+                if (btn === 'skill') {
+                  state.inputs.space = false;
+                } else if (btn === 'eject') {
+                  state.inputs.w = false;
+                }
+              }}
+            />
           </>
         )}
 
