@@ -12,7 +12,6 @@ import { createParticle } from '../factories';
 import { applyGrowth } from './physics';
 import { TattooId } from '../../cjr/cjrTypes';
 import { mixPigment, calcMatchPercent, pigmentToHex, getSnapAlpha } from '../../cjr/colorMath';
-import { applyCandyVeinEffect } from '../../cjr/dynamicBounty';
 import { triggerEmotion } from '../../cjr/emotions';
 import { trackDamage } from '../../cjr/contribution';
 
@@ -49,7 +48,8 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
         const pigmentMatch = calcMatchPercent(food.pigment, e.targetPigment);
         let snappedRatio = pigmentMatch >= 0.8 ? getSnapAlpha(e.matchPercent, baseRatio) : baseRatio;
         if (e.tattoos?.includes(TattooId.FilterInk) && pigmentMatch < 0.6) {
-          snappedRatio *= 0.6;
+          const reduction = e.statusEffects.wrongPigmentReduction || 0.6;
+          snappedRatio *= reduction;
         }
         const boostMult = e.statusEffects.colorBoostMultiplier || 1;
         const ratio = Math.min(0.35, snappedRatio * boostMult);
@@ -62,7 +62,8 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
     case 'neutral':
       // Pure mass, no pigment change
       if (e.tattoos?.includes(TattooId.NeutralMastery)) {
-        growth *= 1.5;
+        const bonus = e.statusEffects.neutralMassBonus || 1.25;
+        growth *= bonus;
       }
       createFloatingText(e.position, '+Mass', '#888888', 16, state);
       break;
@@ -70,10 +71,18 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
     case 'solvent':
       // Pull pigment toward neutral (0.5, 0.5, 0.5)
       const neutral = { r: 0.5, g: 0.5, b: 0.5 };
-      const solventRatio = e.tattoos?.includes(TattooId.SolventExpert) ? 0.25 : 0.15;
+      const solventPower = e.statusEffects.solventPower || 1.0;
+      const solventRatio = e.tattoos?.includes(TattooId.SolventExpert) ? 0.25 * solventPower : 0.15;
       e.pigment = mixPigment(e.pigment, neutral, solventRatio);
       e.color = pigmentToHex(e.pigment);
       e.matchPercent = calcMatchPercent(e.pigment, e.targetPigment);
+      
+      // Solvent speed boost
+      if (e.tattoos?.includes(TattooId.SolventExpert) && e.statusEffects.solventSpeedBoost) {
+        e.statusEffects.tempSpeedBoost = Math.max(e.statusEffects.tempSpeedBoost || 1, e.statusEffects.solventSpeedBoost);
+        e.statusEffects.tempSpeedTimer = Math.max(e.statusEffects.tempSpeedTimer || 0, 2.0);
+      }
+      
       createFloatingText(e.position, 'Cleanse', '#aaaaff', 16, state);
       break;
 
@@ -91,19 +100,19 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
       e.statusEffects.commitShield = 3.0; // 3 seconds
       createFloatingText(e.position, 'Shield!', '#00ffff', 18, state);
       break;
-
-    case 'candy_vein':
-      // Special rubber-band pickup
-      applyCandyVeinEffect(e, food);
-      createFloatingText(e.position, 'CANDY VEIN!', '#ffd700', 24, state);
-      break;
   }
 
   applyGrowth(e, growth);
 
-  if (e.tattoos?.includes(TattooId.PerfectMatch) && e.matchPercent > 0.9) {
-    e.score += 5;
-    applyGrowth(e, 0.8);
+  // Perfect Match Bonus
+  if (e.tattoos?.includes(TattooId.PerfectMatch)) {
+    const threshold = e.statusEffects.perfectMatchThreshold || 0.85;
+    const bonus = e.statusEffects.perfectMatchBonus || 1.5;
+    if (e.matchPercent >= threshold) {
+      growth *= bonus;
+      e.score += Math.floor(5 * bonus);
+      createFloatingText(e.position, 'PERFECT!', '#ffff00', 20, state);
+    }
   }
 
   if (e.statusEffects.overdriveTimer && e.statusEffects.overdriveTimer > 0) {
@@ -194,10 +203,13 @@ export const reduceHealth = (
   if (attacker && 'tattoos' in attacker) {
     const att = attacker as Player;
     if (victim.tattoos?.includes(TattooId.PigmentBomb)) {
-      att.pigment = mixPigment(att.pigment, victim.pigment, 0.15);
-      att.color = pigmentToHex(att.pigment);
-      att.matchPercent = calcMatchPercent(att.pigment, att.targetPigment);
-      createFloatingText(att.position, 'INKED!', '#ff66cc', 18, state);
+      const chance = victim.statusEffects.pigmentBombChance || 0.3;
+      if (Math.random() < chance) {
+        att.pigment = mixPigment(att.pigment, victim.pigment, 0.15);
+        att.color = pigmentToHex(att.pigment);
+        att.matchPercent = calcMatchPercent(att.pigment, att.targetPigment);
+        createFloatingText(att.position, 'INKED!', '#ff66cc', 18, state);
+      }
     }
   }
 

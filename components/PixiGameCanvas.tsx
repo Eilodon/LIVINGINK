@@ -350,23 +350,55 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
     switch (emotion) {
       case Emotion.Happy:
       case Emotion.Win:
+      case Emotion.Victory:
+        // Big smile
         g.quadraticCurveTo(0, mouthY + e.radius * 0.3, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
+        break;
+      case Emotion.Yum:
+        // Open mouth (eating)
+        g.moveTo(-eyeOffset * 0.5, mouthY).lineTo(eyeOffset * 0.5, mouthY).stroke({ width: 2, color: '#000' });
+        g.arc(0, mouthY, eyeOffset * 0.5, 0, Math.PI).stroke({ width: 2, color: '#000' });
+        break;
+      case Emotion.Greed:
+        // Wide grin with dollar sign eyes
+        g.quadraticCurveTo(0, mouthY + e.radius * 0.4, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
+        // Dollar sign eyes using small circles
+        g.circle(-eyeOffset, -eyeOffset, eyeSize * 0.3).fill({ color: '#000' });
+        g.circle(eyeOffset, -eyeOffset, eyeSize * 0.3).fill({ color: '#000' });
         break;
       case Emotion.Sad:
       case Emotion.Despair:
       case Emotion.Ko:
+        // Frown
         g.quadraticCurveTo(0, mouthY - e.radius * 0.2, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
         break;
       case Emotion.Angry:
-      case Emotion.Focus:
-        // Eyebrows
+        // Angry eyebrows + frown
         g.moveTo(-eyeOffset - eyeSize, -eyeOffset - eyeSize).lineTo(-eyeOffset + eyeSize / 2, -eyeOffset * 0.5).stroke({ width: 2, color: '#000' });
         g.moveTo(eyeOffset + eyeSize, -eyeOffset - eyeSize).lineTo(eyeOffset - eyeSize / 2, -eyeOffset * 0.5).stroke({ width: 2, color: '#000' });
-        // Flat mouth
+        g.quadraticCurveTo(0, mouthY - e.radius * 0.1, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
+        break;
+      case Emotion.Focus:
+        // Concentrated eyebrows + neutral mouth
+        g.moveTo(-eyeOffset - eyeSize * 0.5, -eyeOffset - eyeSize * 0.5).lineTo(-eyeOffset + eyeSize / 2, -eyeOffset * 0.7).stroke({ width: 2, color: '#000' });
+        g.moveTo(eyeOffset + eyeSize * 0.5, -eyeOffset - eyeSize * 0.5).lineTo(eyeOffset - eyeSize / 2, -eyeOffset * 0.7).stroke({ width: 2, color: '#000' });
         g.moveTo(-eyeOffset, mouthY).lineTo(eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
+        break;
+      case Emotion.Panic:
+        // Wide eyes + open mouth
+        g.circle(-eyeOffset, -eyeOffset, eyeSize * 1.2).stroke({ width: 2, color: '#000' });
+        g.circle(eyeOffset, -eyeOffset, eyeSize * 1.2).stroke({ width: 2, color: '#000' });
+        g.moveTo(-eyeOffset * 0.7, mouthY + eyeSize).lineTo(eyeOffset * 0.7, mouthY + eyeSize).stroke({ width: 2, color: '#000' });
+        break;
+      case Emotion.Hungry:
+        // Droopy eyes + small open mouth
+        g.moveTo(-eyeOffset, -eyeOffset - eyeSize * 0.5).lineTo(-eyeOffset, -eyeOffset + eyeSize * 0.5).stroke({ width: 2, color: '#000' });
+        g.moveTo(eyeOffset, -eyeOffset - eyeSize * 0.5).lineTo(eyeOffset, -eyeOffset + eyeSize * 0.5).stroke({ width: 2, color: '#000' });
+        g.arc(0, mouthY, eyeSize * 0.3, 0, Math.PI).stroke({ width: 2, color: '#000' });
         break;
       case Emotion.Neutral:
       default:
+        // Simple line mouth
         g.lineTo(eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
         break;
     }

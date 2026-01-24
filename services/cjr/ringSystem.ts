@@ -1,13 +1,13 @@
-
 import {
     RING_RADII,
     COMMIT_BUFFS
 } from './cjrConstants';
-import { Player, Bot, RingId } from '../../types';
+import { Player, Bot, RingId, GameState } from '../../types';
 import { distance } from '../engine/math';
 import { LevelConfig } from './levels';
+import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 
-export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelConfig) => {
+export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelConfig, state?: GameState) => {
     const dist = distance(entity.position, { x: 0, y: 0 });
 
     // 1. Check current Ring based on position
@@ -43,7 +43,7 @@ export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelC
 
         if (allowed) {
             // Success! Commit to new ring
-            commitToRing(entity, physicalRing);
+            commitToRing(entity, physicalRing, state);
         } else {
             // Denied! Membrane Bounce
             applyMembraneBounce(entity, physicalRing, deniedReason);
@@ -90,13 +90,18 @@ export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelC
     }
 };
 
-const commitToRing = (entity: Player | Bot, ring: RingId) => {
+const commitToRing = (entity: Player | Bot, ring: RingId, state?: GameState) => {
     entity.ring = ring;
 
     // Apply Commit Buffs
     applyTempSpeedBoost(entity, COMMIT_BUFFS.SPEED_BOOST, COMMIT_BUFFS.SPEED_DURATION);
     entity.statusEffects.shielded = true;
     entity.statusEffects.commitShield = COMMIT_BUFFS.SHIELD_DURATION;
+
+    // Play VFX for ring commit (only for players with game state)
+    if (state && 'score' in entity) {
+        vfxIntegrationManager.handleRingCommit(entity as Player, ring, state);
+    }
 
     console.log(`[CJR] ${entity.name} committed to Ring ${ring}!`);
 };

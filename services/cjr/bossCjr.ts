@@ -1,8 +1,8 @@
 /**
- * CJR BOSS SYSTEM - Drama Style
+ * CJR BOSS SYSTEM - Simplified (1 Boss)
  * 
  * Features:
- * - Boss1 appears in Ring2, Boss2 in Ring3
+ * - Single Ring Guardian boss in Ring2
  * - Boss death triggers Rush Window
  * - Telegraph attack patterns with visual warnings
  * - Contribution tracking for tier rewards
@@ -19,13 +19,13 @@ import { createFloatingText } from '../engine/effects';
 import { LevelConfig } from './levels';
 
 // ============================================
-// BOSS CONFIGURATION
+// BOSS CONFIGURATION (SINGLE BOSS)
 // ============================================
 
 interface BossConfig {
-    id: 'boss1' | 'boss2';
+    id: 'ring_guardian';
     name: string;
-    guardsRing: 2 | 3;
+    guardsRing: 2;
     spawnTime: number;      // Game time to spawn
     health: number;
     radius: number;
@@ -35,50 +35,34 @@ interface BossConfig {
     telegraphDuration: number;
 }
 
-const BOSS_CONFIGS: Record<string, BossConfig> = {
-    boss1: {
-        id: 'boss1',
-        name: 'Ring Guardian I',
-        guardsRing: 2,
-        spawnTime: 45,
-        health: 500,
-        radius: 60,
-        leashRadius: RING_RADII.R2_BOUNDARY,
-        attackInterval: 3.0,
-        attackPattern: 'telegraph',
-        telegraphDuration: 1.0,
-    },
-    boss2: {
-        id: 'boss2',
-        name: 'Core Warden',
-        guardsRing: 3,
-        spawnTime: 120,
-        health: 800,
-        radius: 80,
-        leashRadius: RING_RADII.R3_BOUNDARY,
-        attackInterval: 2.0,
-        attackPattern: 'rapid',
-        telegraphDuration: 0.5,
-    },
+const BOSS_CONFIG: BossConfig = {
+    id: 'ring_guardian',
+    name: 'Ring Guardian',
+    guardsRing: 2,
+    spawnTime: 45,
+    health: 600,
+    radius: 65,
+    leashRadius: RING_RADII.R2_BOUNDARY,
+    attackInterval: 3.0,
+    attackPattern: 'telegraph',
+    telegraphDuration: 1.0,
 };
 
-// State tracking
+// State tracking (simplified)
 interface BossState {
-    boss1Defeated: boolean;
-    boss2Defeated: boolean;
+    bossDefeated: boolean;
     rushWindowTimer: number;
-    rushWindowRing: 2 | 3 | null;
-    currentBossId: 'boss1' | 'boss2' | null;
+    rushWindowRing: 2 | null;
+    currentBossActive: boolean;
     attackCharging: boolean;
     attackTarget: Vector2 | null;
 }
 
 let bossState: BossState = {
-    boss1Defeated: false,
-    boss2Defeated: false,
+    bossDefeated: false,
     rushWindowTimer: 0,
     rushWindowRing: null,
-    currentBossId: null,
+    currentBossActive: false,
     attackCharging: false,
     attackTarget: null,
 };
@@ -88,10 +72,10 @@ let bossState: BossState = {
  */
 export const isRingAccessible = (ring: 2 | 3): boolean => {
     if (ring === 2) {
-        return bossState.boss1Defeated;
+        return bossState.bossDefeated;
     }
     if (ring === 3) {
-        return bossState.boss2Defeated;
+        return true; // Ring 3 always accessible (no boss2)
     }
     return true;
 };
@@ -104,217 +88,154 @@ export const isRushWindowActive = (ring: 2 | 3): boolean => {
 };
 
 /**
- * Get reduced threshold during rush window
+ * Get remaining Rush Window time
  */
-export const getRushThreshold = (baseThreshold: number): number => {
-    // 20% easier during rush window
-    return baseThreshold * 0.8;
-};
-
-/**
- * Main update function
- */
-export const updateBossLogic = (state: GameState, dt: number) => {
-    const levelConfig = state.levelConfig;
-    const bossConfigs = getBossConfigs(levelConfig);
-
-    // Update rush window timer
-    if (bossState.rushWindowTimer > 0) {
-        bossState.rushWindowTimer -= dt;
-        if (bossState.rushWindowTimer <= 0) {
-            bossState.rushWindowRing = null;
-        }
-    }
-
-    if (bossState.rushWindowRing === 3 && bossState.rushWindowTimer > 0) {
-        applyCandyWind(state, dt);
-    }
-
-    // Check if current boss is dead
-    if (state.boss && state.boss.isDead) {
-        handleBossDefeat(state);
-        state.boss = null;
-        bossState.currentBossId = null;
-    }
-
-    // Spawn boss based on game time
-    if (!state.boss) {
-        if (levelConfig.boss.boss1Enabled && !bossState.boss1Defeated && state.gameTime >= bossConfigs.boss1.spawnTime) {
-            spawnBoss(state, 'boss1', bossConfigs.boss1);
-        } else if (levelConfig.boss.boss2Enabled && bossState.boss1Defeated && !bossState.boss2Defeated &&
-            state.gameTime >= bossConfigs.boss2.spawnTime) {
-            spawnBoss(state, 'boss2', bossConfigs.boss2);
-        }
-        return;
-    }
-
-    // Boss AI
-    updateBossAI(state, dt, bossConfigs);
-};
-
-/**
- * Spawn a boss
- */
-const spawnBoss = (state: GameState, bossId: 'boss1' | 'boss2', config: BossConfig) => {
-    const boss = createBoss();
-
-    boss.id = bossId;
-    boss.name = config.name;
-    boss.isBoss = true;
-    boss.maxHealth = config.health;
-    boss.currentHealth = config.health;
-    boss.radius = config.radius;
-
-    // Position based on guarded ring
-    const angle = Math.random() * Math.PI * 2;
-    const r = config.leashRadius * 0.5;
-    boss.position.x = Math.cos(angle) * r;
-    boss.position.y = Math.sin(angle) * r;
-
-    boss.bossAttackTimer = config.attackInterval;
-    boss.bossAttackCharge = 0;
-
-    state.boss = boss;
-    state.bots.push(boss);
-    bossState.currentBossId = bossId;
-
-    // Reset contribution tracking for this fight
-    resetContributionLog();
-
-    console.log(`[CJR] ${config.name} has appeared! Defeat to unlock Ring ${config.guardsRing}!`);
-    createFloatingText({ x: 0, y: -200 }, `${config.name} APPEARED!`, '#ff4444', 32, state);
-};
+export const getRushWindowTime = (): number => bossState.rushWindowTimer;
 
 /**
  * Handle boss defeat
  */
 const handleBossDefeat = (state: GameState) => {
-    const bossId = bossState.currentBossId;
-    if (!bossId) return;
-
-    const config = getBossConfigs(state.levelConfig)[bossId];
-
-    // Mark defeated
-    if (bossId === 'boss1') {
-        bossState.boss1Defeated = true;
-    } else {
-        bossState.boss2Defeated = true;
-    }
+    bossState.bossDefeated = true;
+    bossState.currentBossActive = false;
+    bossState.rushWindowTimer = 5.0; // 5 second rush window
+    bossState.rushWindowRing = 2;
 
     // Apply contribution rewards
-    const allPlayers = [state.player, ...state.bots.filter(b => !b.isBoss)] as Player[];
-    applyContributionBuffs(allPlayers);
-
-    applyFinisherHeadstart(state, config);
-
-    // Start Rush Window
-    bossState.rushWindowTimer = state.levelConfig.rushWindowDuration;
-    bossState.rushWindowRing = config.guardsRing;
-
-    console.log(`[CJR] ${config.name} DEFEATED! Ring ${config.guardsRing} unlocked! Rush Window active for ${state.levelConfig.rushWindowDuration}s!`);
-    createFloatingText({ x: 0, y: 0 }, `RING ${config.guardsRing} UNLOCKED!`, '#00ff00', 40, state);
-};
-
-/**
- * Boss AI Logic
- */
-const updateBossAI = (state: GameState, dt: number, bossConfigs: Record<'boss1' | 'boss2', BossConfig>) => {
-    const boss = state.boss;
-    if (!boss || boss.isDead) return;
-
-    const config = bossConfigs[bossState.currentBossId || 'boss1'];
-
-    // Leash to zone
-    const distToCenter = distance(boss.position, { x: 0, y: 0 });
-    if (distToCenter > config.leashRadius) {
-        const pullStrength = 0.5;
-        boss.velocity.x += (-boss.position.x * pullStrength * dt);
-        boss.velocity.y += (-boss.position.y * pullStrength * dt);
-    }
-
-    // Find target
-    const grid = getCurrentSpatialGrid();
-    const nearby = grid.getNearby(boss);
-
-    let closestTarget: Player | Bot | null = null;
-    let minDist = Infinity;
-
-    nearby.forEach(e => {
-        if (e === boss || e.isDead) return;
-        if ('score' in e && !('isBoss' in e && (e as Bot).isBoss)) {
-            const d = distance(boss.position, e.position);
-            if (d < minDist) {
-                minDist = d;
-                closestTarget = e as Player | Bot;
-            }
+    const rankings = getContributionRanking();
+    rankings.forEach((entry) => {
+        const entity = state.player.id === entry.id ? state.player : state.bots.find(b => b.id === entry.id);
+        if (entity) {
+            // Apply simple buff - speed boost
+            entity.statusEffects.tempSpeedBoost = 1.2;
+            entity.statusEffects.tempSpeedTimer = 5.0;
         }
     });
 
+    // Last hitter bonus
+    const lastHitter = getLastHitter('ring_guardian');
+    if (lastHitter) {
+        const entity = state.player.id === lastHitter ? state.player : state.bots.find(b => b.id === lastHitter);
+        if (entity) {
+            entity.statusEffects.tempSpeedBoost = 1.3;
+            entity.statusEffects.tempSpeedTimer = 3.0;
+        }
+    }
+
+    createFloatingText({ x: 0, y: 0 }, 'BOSS DEFEATED!', '#ff0000', 32, state);
+    resetContributionLog();
+};
+
+/**
+ * Update boss AI
+ */
+const updateBossAI = (boss: Bot, state: GameState, dt: number) => {
+    // Leash to Ring 2
+    const distFromCenter = distance(boss.position, { x: 0, y: 0 });
+    if (distFromCenter > BOSS_CONFIG.leashRadius) {
+        const pullBack = normalize({ x: -boss.position.x, y: -boss.position.y });
+        boss.velocity.x += pullBack.x * 200 * dt;
+        boss.velocity.y += pullBack.y * 200 * dt;
+    }
+
+    // Find target (closest player/bot)
+    let closestTarget: Player | Bot | null = null;
+    let closestDist = Infinity;
+    
+    [state.player, ...state.bots].forEach(entity => {
+        if (entity.isDead) return;
+        const dist = distance(boss.position, entity.position);
+        if (dist < closestDist) {
+            closestDist = dist;
+            closestTarget = entity;
+        }
+    });
+
+    if (!closestTarget) return;
+
     // Attack logic
-    if (!boss.bossAttackTimer) boss.bossAttackTimer = 0;
-    boss.bossAttackTimer -= dt;
+    boss.bossAttackTimer = (boss.bossAttackTimer || 0) + dt;
 
-    if (closestTarget && boss.bossAttackTimer <= 0) {
-        if (config.attackPattern === 'telegraph') {
-            // Start charging (visual telegraph)
-            if (!bossState.attackCharging) {
-                bossState.attackCharging = true;
-                bossState.attackTarget = { ...closestTarget.position };
-                boss.bossAttackCharge = config.telegraphDuration;
+    if (boss.bossAttackTimer >= BOSS_CONFIG.attackInterval) {
+        boss.bossAttackTimer = 0;
 
-                // Visual warning
-                createFloatingText(boss.position, '⚠️ CHARGING', '#ffff00', 24, state);
-            }
+        if (BOSS_CONFIG.attackPattern === 'telegraph') {
+            // Telegraph attack
+            bossState.attackCharging = true;
+            bossState.attackTarget = closestTarget.position;
+            setTimeout(() => {
+                executeAttack(boss, closestTarget!, state);
+                bossState.attackCharging = false;
+                bossState.attackTarget = null;
+            }, BOSS_CONFIG.telegraphDuration * 1000);
         } else {
-            // Rapid: immediate attack
-            executeAttack(state, closestTarget.position);
-            boss.bossAttackTimer = config.attackInterval;
+            // Rapid attack
+            executeAttack(boss, closestTarget, state);
         }
-    }
-
-    // Handle charge completion
-    if (bossState.attackCharging && boss.bossAttackCharge) {
-        boss.bossAttackCharge -= dt;
-        if (boss.bossAttackCharge <= 0) {
-            if (bossState.attackTarget) {
-                executeAttack(state, bossState.attackTarget);
-            }
-            bossState.attackCharging = false;
-            bossState.attackTarget = null;
-            boss.bossAttackTimer = config.attackInterval;
-        }
-    }
-
-    // Chase target slowly
-    if (closestTarget && !bossState.attackCharging) {
-        const dir = normalize({
-            x: closestTarget.position.x - boss.position.x,
-            y: closestTarget.position.y - boss.position.y,
-        });
-        const chaseSpeed = 50;
-        boss.velocity.x += dir.x * chaseSpeed * dt;
-        boss.velocity.y += dir.y * chaseSpeed * dt;
     }
 };
 
 /**
  * Execute boss attack
  */
-const executeAttack = (state: GameState, target: Vector2) => {
-    const boss = state.boss;
-    if (!boss) return;
-
-    const proj = createProjectile(
+const executeAttack = (boss: Bot, target: Player | Bot, state: GameState) => {
+    const projectile = createProjectile(
         boss.id,
         boss.position,
-        target,
-        50,     // damage
-        'ice',  // type
-        2.0     // duration
+        target.position,
+        15,
+        'web',
+        2.0
     );
-    state.projectiles.push(proj);
+    
+    state.projectiles.push(projectile);
+};
 
-    createFloatingText(boss.position, 'ATTACK!', '#ff0000', 20, state);
+/**
+ * Apply candy wind effect during Ring 3 rush window
+ */
+export const applyCandyWind = (entity: Player | Bot, dt: number) => {
+    if (bossState.rushWindowTimer > 0 && bossState.rushWindowRing === 2) {
+        const pullForce = 50 * dt;
+        entity.velocity.x += -entity.position.x * pullForce * 0.01;
+        entity.velocity.y += -entity.position.y * pullForce * 0.01;
+    }
+};
+
+/**
+ * Main boss logic update
+ */
+export const updateBossLogic = (state: GameState, dt: number) => {
+    // Update rush window timer
+    if (bossState.rushWindowTimer > 0) {
+        bossState.rushWindowTimer -= dt;
+    }
+
+    // Spawn boss
+    if (!bossState.bossDefeated && !bossState.currentBossActive && state.gameTime >= BOSS_CONFIG.spawnTime) {
+        const boss = createBoss(BOSS_CONFIG.spawnTime);
+        boss.position = { x: RING_RADII.R2_BOUNDARY * 0.7, y: 0 };
+        boss.radius = BOSS_CONFIG.radius;
+        boss.isBoss = true;
+        
+        state.boss = boss;
+        state.bots.push(boss);
+        bossState.currentBossActive = true;
+        
+        createFloatingText(boss.position, 'RING GUARDIAN APPEARED!', '#ff0000', 24, state);
+    }
+
+    // Update boss AI
+    if (state.boss && !state.boss.isDead) {
+        updateBossAI(state.boss, state, dt);
+        
+        // Check defeat
+        if (state.boss.currentHealth <= 0) {
+            handleBossDefeat(state);
+            state.boss.isDead = true;
+            state.boss = null;
+        }
+    }
 };
 
 /**
@@ -322,72 +243,30 @@ const executeAttack = (state: GameState, target: Vector2) => {
  */
 export const resetBossState = () => {
     bossState = {
-        boss1Defeated: false,
-        boss2Defeated: false,
+        bossDefeated: false,
         rushWindowTimer: 0,
         rushWindowRing: null,
-        currentBossId: null,
+        currentBossActive: false,
         attackCharging: false,
         attackTarget: null,
     };
 };
 
+/**
+ * Get boss state for rendering
+ */
+export const getBossState = () => bossState;
+
+/**
+ * Legacy exports for compatibility
+ */
 export const getRushWindowInfo = () => ({
+    active: bossState.rushWindowTimer > 0,
     ring: bossState.rushWindowRing,
-    timer: bossState.rushWindowTimer,
+    timeLeft: bossState.rushWindowTimer
 });
 
-export { bossState, BOSS_CONFIGS };
+export const getRushThreshold = () => 0.8; // Simplified
 
-const applyCandyWind = (state: GameState, dt: number) => {
-    const all = [state.player, ...state.bots.filter(b => !b.isDead)] as Player[];
-    all.forEach(p => {
-        if (p.ring !== 3) return;
-        const dir = normalize({ x: -p.position.x, y: -p.position.y });
-        const strength = 30;
-        p.velocity.x += dir.x * strength * dt;
-        p.velocity.y += dir.y * strength * dt;
-    });
-};
-
-const applyFinisherHeadstart = (state: GameState, config: BossConfig) => {
-    const ranking = getContributionRanking();
-    if (ranking.length === 0) return;
-
-    const lastHitterId = getLastHitter(config.id);
-    const topContributorId = ranking[0]?.id;
-    let winnerId = topContributorId;
-
-    if (lastHitterId) {
-        const dmg = getPlayerDamage(lastHitterId);
-        const rankIdx = ranking.findIndex(r => r.id === lastHitterId);
-        const isTop3 = rankIdx >= 0 && rankIdx < 3;
-        if (dmg >= config.health * 0.1 || isTop3) {
-            winnerId = lastHitterId;
-        }
-    }
-
-    const allPlayers = [state.player, ...state.bots.filter(b => !b.isBoss)] as Player[];
-    const winner = allPlayers.find(p => p.id === winnerId);
-    if (!winner) return;
-
-    winner.statusEffects.tempSpeedBoost = Math.max(winner.statusEffects.tempSpeedBoost || 1, 1.15);
-    winner.statusEffects.tempSpeedTimer = Math.max(winner.statusEffects.tempSpeedTimer || 0, 3.0);
-    winner.statusEffects.shielded = true;
-    winner.statusEffects.commitShield = 1.5;
-
-    createFloatingText(winner.position, 'FINISHER BOOST!', '#00ff99', 22, state);
-};
-
-const getBossConfigs = (levelConfig: LevelConfig): Record<'boss1' | 'boss2', BossConfig> => ({
-    boss1: {
-        ...BOSS_CONFIGS.boss1,
-        spawnTime: levelConfig.boss.boss1Time,
-        health: levelConfig.boss.boss1Health,
-    },
-    boss2: {
-        ...BOSS_CONFIGS.boss2,
-        spawnTime: levelConfig.boss.boss2Time,
-        health: levelConfig.boss.boss2Health,
-    },
-});
+// Export bossState for tests (read-only)
+export { bossState };

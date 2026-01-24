@@ -44,8 +44,7 @@ export type PickupKind =
     | 'neutral'
     | 'solvent'
     | 'catalyst'
-    | 'shield'
-    | 'candy_vein';
+    | 'shield';
 
 // 4 playable shapes (MVP)
 export const ShapeId = {

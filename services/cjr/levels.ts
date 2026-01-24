@@ -151,63 +151,63 @@ const level7Base: LevelConfig = {
     burstSizes: { ring1: 8, ring2: 6, ring3: 4 },
     spawnWeights: { pigment: 0.6, neutral: 0.25, special: 0.15 },
     botCount: 13,
-    boss: { boss1Enabled: true, boss2Enabled: true, boss1Time: 56, boss2Time: 112, boss1Health: 720, boss2Health: 980 },
+    boss: { boss1Enabled: true, boss2Enabled: false, boss1Time: 56, boss2Time: 112, boss1Health: 720, boss2Health: 980 },
     pity: { stuckThreshold: 12, duration: 4, multiplier: 1.42 },
     ring3Debuff: { enabled: true, threshold: 0.7, duration: 2, speedMultiplier: 0.96 },
     rushWindowDuration: 5,
 };
 
-const level20Target: LevelConfig = {
-    id: 20,
-    name: 'Legendary Run',
+const level10Target: LevelConfig = {
+    id: 10,
+    name: 'Master Run',
     thresholds: { ring2: 0.5, ring3: 0.7, win: 0.9 },
     winHoldSeconds: 1.5,
     timeLimit: 120,
     waveIntervals: { ring1: 8.6, ring2: 11.2, ring3: 14.2 },
     burstSizes: { ring1: 8, ring2: 6, ring3: 4 },
     spawnWeights: { pigment: 0.6, neutral: 0.25, special: 0.15 },
-    botCount: 18,
-    boss: { boss1Enabled: true, boss2Enabled: true, boss1Time: 45, boss2Time: 92, boss1Health: 900, boss2Health: 1400 },
+    botCount: 15,
+    boss: { boss1Enabled: true, boss2Enabled: false, boss1Time: 45, boss2Time: 92, boss1Health: 900, boss2Health: 1400 },
     pity: { stuckThreshold: 14, duration: 4, multiplier: 1.35 },
     ring3Debuff: { enabled: true, threshold: 0.7, duration: 2, speedMultiplier: 0.95 },
     rushWindowDuration: 5,
 };
 
-const generatedLevels: LevelConfig[] = Array.from({ length: 14 }, (_, i) => {
+const generatedLevels: LevelConfig[] = Array.from({ length: 3 }, (_, i) => {
     const id = 7 + i;
-    const t = i / 13;
+    const t = i / 2; // 0 to 1 over 3 levels
     return {
         id,
         name: `Rush ${id - 6}`,
         thresholds: level7Base.thresholds,
         winHoldSeconds: level7Base.winHoldSeconds,
-        timeLimit: lerp(level7Base.timeLimit, level20Target.timeLimit, t),
+        timeLimit: lerp(level7Base.timeLimit, level10Target.timeLimit, t),
         waveIntervals: {
-            ring1: lerp(level7Base.waveIntervals.ring1, level20Target.waveIntervals.ring1, t),
-            ring2: lerp(level7Base.waveIntervals.ring2, level20Target.waveIntervals.ring2, t),
-            ring3: lerp(level7Base.waveIntervals.ring3, level20Target.waveIntervals.ring3, t),
+            ring1: lerp(level7Base.waveIntervals.ring1, level10Target.waveIntervals.ring1, t),
+            ring2: lerp(level7Base.waveIntervals.ring2, level10Target.waveIntervals.ring2, t),
+            ring3: lerp(level7Base.waveIntervals.ring3, level10Target.waveIntervals.ring3, t),
         },
         burstSizes: level7Base.burstSizes,
         spawnWeights: level7Base.spawnWeights,
-        botCount: Math.round(lerp(level7Base.botCount, level20Target.botCount, t)),
+        botCount: Math.round(lerp(level7Base.botCount, level10Target.botCount, t)),
         boss: {
             boss1Enabled: true,
-            boss2Enabled: true,
-            boss1Time: lerp(level7Base.boss.boss1Time, level20Target.boss.boss1Time, t),
-            boss2Time: lerp(level7Base.boss.boss2Time, level20Target.boss.boss2Time, t),
-            boss1Health: Math.round(lerp(level7Base.boss.boss1Health, level20Target.boss.boss1Health, t)),
-            boss2Health: Math.round(lerp(level7Base.boss.boss2Health, level20Target.boss.boss2Health, t)),
-        },
+            boss2Enabled: false,
+            boss1Time: lerp(level7Base.boss.boss1Time, level10Target.boss.boss1Time, t),
+            boss2Time: lerp(level7Base.boss.boss2Time, level10Target.boss.boss2Time, t),
+            boss1Health: Math.round(lerp(level7Base.boss.boss1Health, level10Target.boss.boss1Health, t)),
+            boss2Health: Math.round(lerp(level7Base.boss.boss2Health, level10Target.boss.boss2Health, t)),
+        } as LevelConfig['boss'],
         pity: {
-            stuckThreshold: lerp(level7Base.pity.stuckThreshold, level20Target.pity.stuckThreshold, t),
+            stuckThreshold: lerp(level7Base.pity.stuckThreshold, level10Target.pity.stuckThreshold, t),
             duration: level7Base.pity.duration,
-            multiplier: lerp(level7Base.pity.multiplier, level20Target.pity.multiplier, t),
+            multiplier: lerp(level7Base.pity.multiplier, level10Target.pity.multiplier, t),
         },
         ring3Debuff: {
             enabled: true,
             threshold: 0.7,
             duration: 2,
-            speedMultiplier: lerp(level7Base.ring3Debuff.speedMultiplier, level20Target.ring3Debuff.speedMultiplier, t),
+            speedMultiplier: lerp(level7Base.ring3Debuff.speedMultiplier, level10Target.ring3Debuff.speedMultiplier, t),
         },
         rushWindowDuration: level7Base.rushWindowDuration,
     };
@@ -219,6 +219,6 @@ export const LEVELS: LevelConfig[] = [
 ];
 
 export const getLevelConfig = (level: number): LevelConfig => {
-    const clamped = Math.max(1, Math.min(20, Math.round(level)));
+    const clamped = Math.max(1, Math.min(10, Math.round(level)));
     return LEVELS[clamped - 1];
 };

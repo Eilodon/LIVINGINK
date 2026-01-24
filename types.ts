@@ -155,6 +155,46 @@ export interface Player extends Entity {
     colorBoostMultiplier?: number;
     overdriveTimer?: number;
     magnetTimer?: number;
+    // Tattoo Effects
+    wrongPigmentReduction?: number;
+    overdriveActive?: boolean;
+    coreShieldBonus?: boolean;
+    pigmentBombActive?: boolean;
+    pigmentBombChance?: number;
+    perfectMatchThreshold?: number;
+    perfectMatchBonus?: number;
+    catalystSenseRange?: number;
+    catalystSenseActive?: boolean;
+    neutralMassBonus?: number;
+    solventPower?: number;
+    solventSpeedBoost?: number;
+    
+    // Tattoo Synergy Effects - Phase 2 Gameplay Depth
+    neutralPurification?: boolean;
+    purificationRadius?: number;
+    overdriveExplosive?: boolean;
+    explosiveSpeed?: number;
+    explosionRadius?: number;
+    goldenAttraction?: boolean;
+    catalystAttractionRadius?: number;
+    goldenMagneticForce?: number;
+    elementalBalance?: boolean;
+    solventShieldPower?: number;
+    shieldSolventSynergy?: boolean;
+    colorImmunity?: boolean;
+    chromaticImmunityDuration?: number;
+    catalystMasteryRadius?: number;
+    catalystGuarantee?: boolean;
+    neutralGodMode?: boolean;
+    kineticExplosion?: boolean;
+    explosionDamage?: number;
+    shieldPiercing?: boolean;
+    absoluteMastery?: boolean;
+    colorControl?: number;
+    temporalDistortion?: boolean;
+    timeManipulation?: number;
+    speedAmplifier?: number;
+    explosionTimeDilation?: number;
   };
 }
 
@@ -208,6 +248,23 @@ export interface Particle extends Entity {
   lineLength?: number;
   lineWidth?: number;
   angle?: number;
+  
+  // Synergy pattern effects
+  isSynergyFusion?: boolean;
+  fusionColor?: string;
+  isSynergyExplosion?: boolean;
+  explosionColor?: string;
+  isSynergySpiral?: boolean;
+  spiralColor?: string;
+  isSynergyGeometric?: boolean;
+  geometricSides?: number;
+  geometricRadius?: number;
+  rotationSpeed?: number;
+  geometricColor?: string;
+  
+  // Additional synergy effects
+  isSynergyEffect?: boolean;
+  synergyColor?: string;
 }
 
 export interface FloatingText {

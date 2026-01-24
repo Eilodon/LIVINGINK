@@ -17,7 +17,7 @@ describe('CJR Boss Rush Mechanic', () => {
 
         // Default
         expect(isRushWindowActive(2)).toBe(false);
-        expect(getRushThreshold(THRESHOLDS.INTO_RING2)).toBe(THRESHOLDS.INTO_RING2 * 0.8);
+        expect(getRushThreshold()).toBe(0.8);
 
         // Simulate Rush
         bossState.rushWindowTimer = 5.0;

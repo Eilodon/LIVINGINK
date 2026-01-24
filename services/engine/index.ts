@@ -45,16 +45,17 @@ import { updateWaveSpawner, resetWaveTimers } from '../cjr/waveSpawner';
 import { updateWinCondition } from '../cjr/winCondition';
 import { updateBossLogic, resetBossState } from '../cjr/bossCjr';
 import { updateEmotion } from '../cjr/emotions';
-import { updateDynamicBounty, resetDynamicBounty } from '../cjr/dynamicBounty';
 import { getTattooChoices } from '../cjr/tattoos';
 import { TattooId } from '../cjr/cjrTypes';
 import { getLevelConfig } from '../cjr/levels';
+import { vfxIntegrationManager } from '../vfx/vfxIntegration';
+import { tattooSynergyManager } from '../cjr/tattooSynergies';
 
 // --- Main Game Loop ---
 export const updateGameState = (state: GameState, dt: number): GameState => {
   if (state.isPaused) return state;
 
-  // 1. Bind Engine Context
+  // 1. Bind Engine Context & Grid Setup
   bindEngine(state.engine);
   const grid = getCurrentSpatialGrid();
   grid.clear();
@@ -66,52 +67,44 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
     state.isPaused = true;
   }
 
-  // 3. Insert Entities into Grid
-  grid.insert(state.player);
-  state.bots.forEach(b => grid.insert(b));
-  state.food.forEach(f => grid.insert(f));
-  state.projectiles.forEach(p => grid.insert(p));
+  // 3. Batch Entity Insertion
+  const allEntities = [state.player, ...state.bots, ...state.food, ...state.projectiles];
+  allEntities.forEach(entity => grid.insert(entity));
 
-  // 4. Update Player
+  // 4. BATCHED ENTITY UPDATES (Player + Bots)
   updatePlayer(state.player, state, dt);
+  state.bots.forEach(bot => updateBot(bot, state, dt));
 
-  // 5. Update Bots
-  state.bots.forEach(bot => {
-    updateBot(bot, state, dt);
-  });
-
-  // 6. Update Projectiles
+  // 5. BATCHED PROJECTILE & PARTICLE UPDATES
   updateProjectiles(state, dt);
-
-  // 7. Update Particles
   updateParticles(state, dt);
 
-  // 8. Respawn Logic (Replaced by Wave Spawner)
-  // handleSpawning(state, dt); // Legacy
-  updateWaveSpawner(state, dt); // CJR
-
-  // 9. Camera Follow
-  updateCamera(state);
-
-  // 10. Ring Logic (Check every frame or slower?)
-  // Frame is fine for physics
-  updateRingLogic(state.player, dt, state.levelConfig);
-  state.bots.forEach(b => updateRingLogic(b, dt, state.levelConfig));
-
-  // 11. Win Condition
+  // 6. BATCHED CJR SYSTEMS (Wave + Ring + Boss + Win)
+  updateWaveSpawner(state, dt);
+  updateRingLogic(state.player, dt, state.levelConfig, state);
+  state.bots.forEach(b => updateRingLogic(b, dt, state.levelConfig, state));
+  updateBossLogic(state, dt);
   updateWinCondition(state, dt, state.levelConfig);
 
-  // 12. Boss Logic
-  updateBossLogic(state, dt);
-
-  // 13. Dynamic Bounty (Candy Vein rubber-band)
-  updateDynamicBounty(state, dt);
-
-  // 14. Emotions
+  // 7. BATCHED EMOTION UPDATES (merged with camera)
   if (state.player) updateEmotion(state.player, dt);
   state.bots.forEach(b => updateEmotion(b, dt));
+  updateCamera(state);
 
+  // 8. Tattoo Unlock Check (only when needed)
   checkTattooUnlock(state);
+
+  // 9. VFX System Updates (Premium Game Juice)
+  vfxIntegrationManager.update(state, dt);
+
+  // 10. Tattoo Synergy System Updates (Gameplay Depth)
+  tattooSynergyManager.checkSynergies(state.player, state);
+  tattooSynergyManager.updateSynergies(state, dt);
+
+  // 11. Apply screen shake to camera
+  const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
+  state.camera.x += shakeOffset.x;
+  state.camera.y += shakeOffset.y;
 
   return state;
 };
@@ -127,7 +120,7 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
   constrainToMap(player, MAP_RADIUS);
 
   // Interaction
-  const nearby = getCurrentSpatialGrid().getNearby(player);
+  const nearby = getCurrentSpatialGrid().getNearby(player, 300);
   checkCollisions(player, nearby, (other) => {
     handleCollision(player, other, state, dt);
   });
@@ -135,7 +128,8 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
   const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
   const magnetRadius = player.magneticFieldRadius || 0;
   if (magnetRadius > 0 || catalystSense) {
-    const radius = catalystSense ? 260 : magnetRadius;
+    const catalystRange = (player.statusEffects.catalystSenseRange || 2.0) * 130; // Base 130, scaled
+    const radius = catalystSense ? catalystRange : magnetRadius;
     state.food.forEach(f => {
       if (f.isDead) return;
       if (catalystSense && f.kind !== 'catalyst') return;
@@ -209,7 +203,7 @@ const updateBot = (bot: Bot, state: GameState, dt: number) => {
   constrainToMap(bot, MAP_RADIUS);
 
   // Interaction
-  const nearby = getCurrentSpatialGrid().getNearby(bot);
+  const nearby = getCurrentSpatialGrid().getNearby(bot, 250);
   checkCollisions(bot, nearby, (other) => {
     handleCollision(bot, other, state, dt);
   });
@@ -303,7 +297,7 @@ const updateProjectiles = (state: GameState, dt: number) => {
     p.position.y += p.velocity.y * dt;
 
     // Collision logic could be here or in generic collision
-    const nearby = getCurrentSpatialGrid().getNearby(p);
+    const nearby = getCurrentSpatialGrid().getNearby(p, 150);
     nearby.forEach(other => {
       if (other.id !== p.ownerId && ('score' in other)) { // Hit a unit
         const unit = other as Player | Bot;
@@ -378,7 +372,6 @@ export const createInitialState = (level: number = 1): GameState => {
 
   resetWaveTimers(levelConfig);
   resetBossState();
-  resetDynamicBounty();
 
   const initialFood = Math.max(30, levelConfig.burstSizes.ring1 * 5);
 

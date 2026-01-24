@@ -53,19 +53,31 @@ class SpatialGrid {
     bucket.push(entity);
   }
 
-  getNearby(entity: Entity): Entity[] {
+  getNearby(entity: Entity, maxDistance: number = 200): Entity[] {
     const cellX = Math.floor(entity.position.x / this.cellSize);
     const cellY = Math.floor(entity.position.y / this.cellSize);
 
     const nearby: Entity[] = [];
+    const maxDistanceSq = maxDistance * maxDistance;
+    
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const key = this.getKey(cellX + dx, cellY + dy); // INTEGER key!
         const bucket = this.grid.get(key);
         if (bucket && bucket.length > 0) {
-          // Fast array copy
+          // Fast array copy with distance culling
           for (let i = 0; i < bucket.length; i++) {
-            nearby.push(bucket[i]);
+            const other = bucket[i];
+            if (other === entity) continue;
+            
+            // Distance culling - skip if too far
+            const dx = other.position.x - entity.position.x;
+            const dy = other.position.y - entity.position.y;
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq <= maxDistanceSq) {
+              nearby.push(other);
+            }
           }
         }
       }
@@ -77,6 +89,7 @@ class SpatialGrid {
 // --- Optimization: Particle Pooling ---
 class ParticlePool {
   private pool: Particle[] = [];
+  private readonly MAX_POOL_SIZE = 100; // Prevent memory leaks
 
   get(x: number, y: number, color: string, speed: number): Particle {
     const p = this.pool.pop() || this.createNew();
@@ -97,7 +110,10 @@ class ParticlePool {
   }
 
   release(particle: Particle) {
-    this.pool.push(particle);
+    // Only keep particles in pool if under limit
+    if (this.pool.length < this.MAX_POOL_SIZE) {
+      this.pool.push(particle);
+    }
   }
 
   private createNew(): Particle {

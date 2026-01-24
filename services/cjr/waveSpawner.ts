@@ -37,14 +37,14 @@ export const updateWaveSpawner = (state: GameState, dt: number) => {
 
     waveTimers.ring2 -= dt;
     if (waveTimers.ring2 <= 0) {
-        const rushSpecial = rush.ring === 2 && rush.timer > 0;
+        const rushSpecial = rush.ring === 2 && rush.timeLeft > 0;
         spawnWaveBurst(state, 2, config.burstSizes.ring2 * scale, rushSpecial, config);
         waveTimers.ring2 = config.waveIntervals.ring2;
     }
 
     waveTimers.ring3 -= dt;
     if (waveTimers.ring3 <= 0) {
-        const rushSpecial = rush.ring === 3 && rush.timer > 0;
+        const rushSpecial = rush.ring === 2 && rush.timeLeft > 0; // Ring 3 uses Ring 2 rush window
         spawnWaveBurst(state, 3, config.burstSizes.ring3 * scale, rushSpecial, config);
         waveTimers.ring3 = config.waveIntervals.ring3;
     }

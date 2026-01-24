@@ -228,7 +228,7 @@ const App: React.FC = () => {
   const handleTattooSelect = useCallback((id: TattooId) => {
     const state = gameStateRef.current;
     if (!state) return;
-    applyTattoo(state.player, id);
+    applyTattoo(state.player, id, state);
     state.tattooChoices = null;
     state.isPaused = false;
     setUi((s) => popOverlay(s, 'tattooPick'));
