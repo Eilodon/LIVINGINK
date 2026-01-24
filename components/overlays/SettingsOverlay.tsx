@@ -17,20 +17,20 @@ const SettingsOverlay: React.FC<Props> = ({
 }) => {
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm text-white">
-      <div className="w-full max-w-md rounded-2xl bg-slate-950/80 border border-slate-700 p-6 shadow-2xl">
+      <div className="ritual-panel w-full max-w-md">
         <div className="flex items-center justify-between">
-          <div className="text-2xl font-black tracking-widest">SETTINGS</div>
-          <button onClick={onClose} className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 transition">X</button>
+          <div className="ritual-title text-xl">Settings</div>
+          <button onClick={onClose} className="ritual-button ritual-button-ghost text-[0.65rem] px-3 py-1">X</button>
         </div>
 
         <div className="mt-6 flex items-center justify-between">
           <div>
             <div className="font-bold">Graphics</div>
-            <div className="text-xs text-slate-400">Pixi = smoother VFX, Canvas = battery saver</div>
+            <div className="text-xs text-[color:var(--mist-400)]">Pixi = smoother VFX, Canvas = battery saver</div>
           </div>
           <button
             onClick={() => onTogglePixi(!usePixi)}
-            className={`px-3 py-2 rounded border text-xs font-bold tracking-widest ${usePixi ? 'bg-violet-600/30 border-violet-400/50 text-violet-200' : 'bg-slate-800 border-slate-600 text-slate-200'}`}
+            className={`px-3 py-2 rounded border text-xs font-bold tracking-widest uppercase ${usePixi ? 'border-[color:rgba(209,176,106,0.6)] text-[color:var(--bone-100)]' : 'border-[color:rgba(225,214,200,0.2)] text-[color:var(--mist-400)]'}`}
           >
             {usePixi ? 'PIXI' : 'CANVAS'}
           </button>
@@ -39,11 +39,11 @@ const SettingsOverlay: React.FC<Props> = ({
         <div className="mt-6 flex items-center justify-between">
           <div>
             <div className="font-bold">Network</div>
-            <div className="text-xs text-slate-400">Authoritative server + prediction</div>
+            <div className="text-xs text-[color:var(--mist-400)]">Authoritative server + interpolation</div>
           </div>
           <button
             onClick={() => onToggleMultiplayer(!useMultiplayer)}
-            className={`px-3 py-2 rounded border text-xs font-bold tracking-widest ${useMultiplayer ? 'bg-emerald-600/30 border-emerald-400/50 text-emerald-200' : 'bg-slate-800 border-slate-600 text-slate-200'}`}
+            className={`px-3 py-2 rounded border text-xs font-bold tracking-widest uppercase ${useMultiplayer ? 'border-[color:rgba(47,141,110,0.6)] text-emerald-200' : 'border-[color:rgba(225,214,200,0.2)] text-[color:var(--mist-400)]'}`}
           >
             {useMultiplayer ? 'ONLINE' : 'OFFLINE'}
           </button>

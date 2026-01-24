@@ -38,33 +38,33 @@ const TournamentLobbyScreen: React.FC<Props> = ({ queue, onQueue, onCancel, onBa
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 text-white">
-      <div className="w-full max-w-4xl rounded-2xl bg-slate-950/80 border border-slate-700 p-8 shadow-2xl mx-4">
+      <div className="ritual-panel w-full max-w-4xl mx-4">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-xs font-mono text-slate-400 tracking-widest">TOURNAMENT LOBBY</div>
-            <div className="text-3xl font-black mt-2">COMPETE FOR GLORY</div>
+            <div className="ritual-kicker text-xs">Tournament Lobby</div>
+            <div className="ritual-title text-2xl mt-2">Compete For Glory</div>
           </div>
-          <button onClick={onBack} className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 transition">
+          <button onClick={onBack} className="ritual-button ritual-button-ghost text-[0.65rem] px-3 py-2">
             BACK
           </button>
         </div>
 
         <div className="mt-6 flex items-center gap-3 text-sm">
-          <div className="text-slate-400">QUEUE STATUS</div>
+          <div className="text-[color:var(--mist-400)]">QUEUE STATUS</div>
           <div className={`font-bold ${statusColor}`}>{statusLabel}</div>
-          {queue.tournamentId && <div className="text-slate-500">· {queue.tournamentId}</div>}
+          {queue.tournamentId && <div className="text-[color:var(--mist-400)]">· {queue.tournamentId}</div>}
         </div>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           {TOURNAMENTS.map((tourney) => (
-            <div key={tourney.id} className="rounded-xl bg-slate-900/70 border border-slate-700 p-4">
-              <div className="text-xs text-slate-400 uppercase tracking-widest">{tourney.format}</div>
+            <div key={tourney.id} className="ritual-card">
+              <div className="text-xs text-[color:var(--mist-400)] uppercase tracking-widest">{tourney.format}</div>
               <div className="text-lg font-bold mt-2">{tourney.name}</div>
-              <div className="text-xs text-slate-500 mt-1">Starts in {tourney.startsIn}</div>
+              <div className="text-xs text-[color:var(--mist-400)] mt-1">Starts in {tourney.startsIn}</div>
               <div className="mt-4">
                 <button
                   onClick={() => onQueue(tourney.id)}
-                  className="w-full py-2 rounded bg-emerald-600/40 border border-emerald-400/40 text-emerald-100 text-xs font-bold tracking-widest hover:bg-emerald-500/50 transition"
+                  className="w-full py-2 rounded border border-[color:rgba(47,141,110,0.6)] text-emerald-200 text-xs font-bold tracking-widest hover:bg-[rgba(47,141,110,0.2)] transition"
                 >
                   QUEUE
                 </button>
@@ -74,20 +74,20 @@ const TournamentLobbyScreen: React.FC<Props> = ({ queue, onQueue, onCancel, onBa
         </div>
 
         {queue.status === 'queued' && (
-          <div className="mt-6 flex items-center justify-between rounded-xl bg-slate-900/60 border border-slate-700 p-4">
-            <div className="text-sm text-slate-300">Waiting for enough contenders…</div>
-            <button onClick={onCancel} className="px-4 py-2 rounded bg-rose-600/70 text-xs font-bold tracking-widest">
+          <div className="mt-6 flex items-center justify-between rounded-xl bg-[rgba(24,20,30,0.7)] border border-[color:rgba(225,214,200,0.16)] p-4">
+            <div className="text-sm text-[color:var(--bone-200)]">Waiting for enough contenders…</div>
+            <button onClick={onCancel} className="ritual-button ritual-button-primary text-xs px-4 py-2">
               LEAVE
             </button>
           </div>
         )}
 
         {queue.status === 'ready' && (
-          <div className="mt-6 rounded-xl bg-slate-900/60 border border-emerald-600/40 p-4">
+          <div className="mt-6 rounded-xl bg-[rgba(24,20,30,0.7)] border border-[color:rgba(47,141,110,0.5)] p-4">
             <div className="text-emerald-200 font-bold">Tournament ready. Assemble your bracket.</div>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-300">
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-[color:var(--bone-200)]">
               {(queue.participants || []).map((p: TournamentParticipant) => (
-                <div key={p.id} className="px-3 py-2 rounded bg-slate-900/80 border border-slate-700">
+                <div key={p.id} className="px-3 py-2 rounded bg-[rgba(20,16,24,0.8)] border border-[color:rgba(225,214,200,0.12)]">
                   {p.name} · {p.rating}
                 </div>
               ))}
@@ -96,7 +96,7 @@ const TournamentLobbyScreen: React.FC<Props> = ({ queue, onQueue, onCancel, onBa
         )}
 
         {queue.status === 'failed' && (
-          <div className="mt-6 rounded-xl bg-slate-900/60 border border-rose-600/40 p-4 text-rose-200">
+          <div className="mt-6 rounded-xl bg-[rgba(24,20,30,0.7)] border border-[color:rgba(176,74,74,0.5)] p-4 text-rose-200">
             Queue failed. Try another tournament.
           </div>
         )}

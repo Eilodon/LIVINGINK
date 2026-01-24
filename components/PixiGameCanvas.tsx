@@ -236,7 +236,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
           const label = new Text({
             text: e.name,
             style: {
-              fontFamily: 'Arial',
+              fontFamily: 'Sora',
               fontSize: 12,
               fill: 0xffffff,
               align: 'center',
@@ -509,7 +509,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
       let text = map.get(t.id);
       if (!text) {
         const style = new TextStyle({
-          fontFamily: 'Arial',
+          fontFamily: 'Sora',
           fontSize: t.size,
           fill: t.color,
           align: 'center',
@@ -546,7 +546,7 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
       let text = map.get(p.id);
       if (!text) {
         const style = new TextStyle({
-          fontFamily: 'serif',
+          fontFamily: 'Cinzel',
           fontSize: p.fontSize || 24,
           fill: p.iconColor || '#ffffff',
           align: 'center',

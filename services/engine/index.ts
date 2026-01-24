@@ -120,6 +120,18 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
   return state;
 };
 
+export const updateClientVisuals = (state: GameState, dt: number): void => {
+  bindEngine(state.engine);
+  updateParticles(state, dt);
+  updateFloatingTexts(state, dt);
+  vfxIntegrationManager.update(state, dt);
+  updateCamera(state);
+
+  const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
+  state.camera.x += shakeOffset.x;
+  state.camera.y += shakeOffset.y;
+};
+
 const updatePlayer = (player: Player, state: GameState, dt: number) => {
   if (player.isDead) return;
 

@@ -69,32 +69,32 @@ const MatchmakingScreen: React.FC<Props> = ({
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 text-white">
-      <div className="w-full max-w-3xl rounded-2xl bg-slate-950/80 border border-slate-700 p-8 shadow-2xl mx-4">
+      <div className="ritual-panel w-full max-w-3xl mx-4">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-xs font-mono text-slate-400 tracking-widest">MATCHMAKING</div>
-            <div className="text-3xl font-black mt-2">ENTER THE ARENA</div>
+            <div className="ritual-kicker text-xs">Matchmaking</div>
+            <div className="ritual-title text-2xl mt-2">Enter The Arena</div>
           </div>
-          <button onClick={onBack} className="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 transition">
+          <button onClick={onBack} className="ritual-button ritual-button-ghost text-[0.65rem] px-3 py-2">
             BACK
           </button>
         </div>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-4">
-            <div className="text-xs text-slate-400">PLAYER</div>
+          <div className="ritual-card">
+            <div className="text-xs text-[color:var(--mist-400)]">PLAYER</div>
             <div className="text-lg font-bold mt-2">{name || 'Anonymous'}</div>
-            <div className="text-xs text-slate-500 uppercase mt-1">Shape: {shape}</div>
+            <div className="text-xs text-[color:var(--mist-400)] uppercase mt-1">Shape: {shape}</div>
           </div>
 
-          <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-4">
-            <div className="text-xs text-slate-400">REGION</div>
+          <div className="ritual-card">
+            <div className="text-xs text-[color:var(--mist-400)]">REGION</div>
             <div className="mt-3 flex flex-wrap gap-2">
               {REGIONS.map((r) => (
                 <button
                   key={r}
                   onClick={() => onRegionChange(r)}
-                  className={`px-3 py-1 rounded border text-xs font-bold tracking-widest ${r === region ? 'bg-emerald-600/30 border-emerald-400/50 text-emerald-200' : 'bg-slate-800 border-slate-600 text-slate-300'}`}
+                  className={`px-3 py-1 rounded border text-xs font-bold tracking-widest ${r === region ? 'border-[color:rgba(47,141,110,0.6)] text-emerald-200 bg-[rgba(47,141,110,0.2)]' : 'border-[color:rgba(225,214,200,0.2)] text-[color:var(--mist-400)]'}`}
                 >
                   {r}
                 </button>
@@ -102,14 +102,14 @@ const MatchmakingScreen: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="rounded-xl bg-slate-900/70 border border-slate-700 p-4">
-            <div className="text-xs text-slate-400">STATUS</div>
+          <div className="ritual-card">
+            <div className="text-xs text-[color:var(--mist-400)]">STATUS</div>
             <div className={`text-lg font-bold mt-2 ${statusColor}`}>{statusText}</div>
-            <div className="text-xs text-slate-500 mt-1">NET <span className={networkColor}>{networkStatus.toUpperCase()}</span></div>
+            <div className="text-xs text-[color:var(--mist-400)] mt-1">NET <span className={networkColor}>{networkStatus.toUpperCase()}</span></div>
           </div>
         </div>
 
-        <div className="mt-6 rounded-xl bg-slate-900/60 border border-slate-700 p-4 text-sm text-slate-300">
+        <div className="mt-6 rounded-xl border border-[color:rgba(225,214,200,0.16)] bg-[rgba(24,20,30,0.7)] p-4 text-sm text-[color:var(--bone-200)]">
           {status === 'queuing' && <div>Searching in {region}… {queuedSeconds}s elapsed</div>}
           {status === 'matched' && <div className="text-emerald-200 font-bold">Match found. Ready to deploy.</div>}
           {status === 'failed' && <div className="text-rose-200 font-bold">Matchmaking failed. Try again.</div>}
@@ -121,7 +121,7 @@ const MatchmakingScreen: React.FC<Props> = ({
             <button
               onClick={onQueue}
               disabled={!canQueue}
-              className={`px-6 py-3 rounded-lg font-bold tracking-widest ${canQueue ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}
+              className={`ritual-button ${canQueue ? 'ritual-button-emerald' : 'ritual-button-muted opacity-60 cursor-not-allowed'}`}
             >
               QUEUE
             </button>
@@ -129,7 +129,7 @@ const MatchmakingScreen: React.FC<Props> = ({
           {status === 'queuing' && (
             <button
               onClick={onCancel}
-              className="px-6 py-3 rounded-lg font-bold tracking-widest bg-rose-600 hover:bg-rose-500"
+              className="ritual-button ritual-button-primary"
             >
               CANCEL
             </button>
@@ -137,7 +137,7 @@ const MatchmakingScreen: React.FC<Props> = ({
           {status === 'matched' && (
             <button
               onClick={onEnterMatch}
-              className="px-6 py-3 rounded-lg font-bold tracking-widest bg-emerald-600 hover:bg-emerald-500"
+              className="ritual-button ritual-button-emerald"
             >
               ENTER MATCH
             </button>
@@ -145,7 +145,7 @@ const MatchmakingScreen: React.FC<Props> = ({
           {status === 'failed' && (
             <button
               onClick={onQueue}
-              className="px-6 py-3 rounded-lg font-bold tracking-widest bg-amber-600 hover:bg-amber-500"
+              className="ritual-button ritual-button-primary"
             >
               RETRY
             </button>

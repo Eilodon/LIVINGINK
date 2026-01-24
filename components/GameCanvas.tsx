@@ -124,7 +124,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         const alpha = Math.max(0, Math.min(1, t.life));
         ctx.globalAlpha = alpha;
         ctx.fillStyle = t.color;
-        ctx.font = `${t.size}px Arial`;
+        ctx.font = `${t.size}px Sora`;
         ctx.textAlign = 'center';
         ctx.fillText(t.text, t.position.x, t.position.y);
         ctx.globalAlpha = 1;
@@ -159,7 +159,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       // Name
       if ('name' in e) {
         ctx.fillStyle = '#fff';
-        ctx.font = '12px Arial';
+        ctx.font = '12px Sora';
         ctx.textAlign = 'center';
         ctx.fillText((e as Player).name, 0, -e.radius - 5);
       }

@@ -60,87 +60,80 @@ const MainMenu: React.FC<MainMenuProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white">
-      <h1 className="text-6xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-500">
+    <div className="menu-shell">
+      <div className="flex flex-col items-center justify-center">
+        <h1 className="ritual-title ritual-title-gradient text-5xl sm:text-6xl mb-6">
         COLOR JELLY RUSH
-      </h1>
-      <div className="text-slate-400 mb-6 tracking-widest">
+        </h1>
+        <div className="ritual-kicker text-xs sm:text-sm mb-6">
         LEVEL {level} · UNLOCKED {unlockedLevel}
-        <span className={`ml-3 text-xs font-bold ${statusColor()}`}>NET {statusLabel()}</span>
-      </div>
-
-      <div className="bg-slate-800 p-8 rounded-xl shadow-2xl w-96">
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2 text-slate-400">YOUR NAME</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            className="w-full bg-slate-700 border border-slate-600 rounded p-3 text-white focus:outline-none focus:border-pink-500"
-            placeholder="Enter name..."
-          />
+          <span className={`ritual-pill ml-3 ${statusColor()}`}>Net {statusLabel()}</span>
         </div>
 
-        <div className="mb-8">
-          <label className="block text-sm font-medium mb-2 text-slate-400">CHOOSE SHAPE</label>
-          <div className="flex gap-2">
-            {(['circle', 'square', 'triangle', 'hex'] as ShapeId[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => onShapeChange(s)}
-                className={`flex-1 p-3 rounded border capitalize ${shape === s
-                    ? 'bg-pink-600 border-pink-400 text-white'
-                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
-                  }`}
-              >
-                {s}
-              </button>
-            ))}
+        <div className="ritual-panel w-[22rem] sm:w-[26rem]">
+          <div className="mb-6">
+            <label className="block text-xs uppercase tracking-[0.3em] text-[color:var(--mist-400)] mb-2">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              className="ritual-input"
+              placeholder="Enter name..."
+            />
           </div>
-        </div>
 
-        <div className="mb-6 flex items-center justify-between">
-          <div className="text-sm text-slate-400">GRAPHICS</div>
-          <button
-            onClick={() => onTogglePixi(!usePixi)}
-            className={`px-3 py-1 rounded border text-xs font-bold tracking-widest ${usePixi ? 'bg-violet-600/30 border-violet-400/50 text-violet-200' : 'bg-slate-700 border-slate-600 text-slate-300'}`}
-          >
-            {usePixi ? 'PIXI (FULL)' : 'CANVAS (LITE)'}
-          </button>
-        </div>
+          <div className="mb-8">
+            <label className="block text-xs uppercase tracking-[0.3em] text-[color:var(--mist-400)] mb-2">Shape Sigil</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['circle', 'square', 'triangle', 'hex'] as ShapeId[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => onShapeChange(s)}
+                  className={`p-3 uppercase tracking-[0.25em] text-xs ${shape === s ? 'ritual-chip ritual-chip-active' : 'ritual-chip'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={handleStart}
-            disabled={!name.trim()}
-            className={`w-full py-4 rounded-lg font-bold text-sm tracking-widest transition-all ${name.trim()
-                ? 'bg-gradient-to-r from-pink-500 to-violet-600 hover:scale-105 shadow-glow'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}
-          >
-            PLAY SOLO
-          </button>
-          <button
-            onClick={onOpenMatchmaking}
-            disabled={!name.trim()}
-            className={`w-full py-4 rounded-lg font-bold text-sm tracking-widest transition-all ${name.trim()
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:scale-105 shadow-glow'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}
-          >
-            ONLINE QUEUE
-          </button>
-        </div>
-        <div className="mt-2 text-xs text-slate-500">
-          {useMultiplayer ? 'Online uses authoritative netcode.' : 'Queue to start online matchmaking.'}
-        </div>
+          <div className="mb-6 flex items-center justify-between">
+            <div className="text-xs uppercase tracking-[0.3em] text-[color:var(--mist-400)]">Renderer</div>
+            <button
+              onClick={() => onTogglePixi(!usePixi)}
+              className={`px-3 py-2 rounded border text-[0.65rem] font-bold tracking-[0.3em] uppercase ${usePixi ? 'border-[color:rgba(209,176,106,0.6)] text-[color:var(--bone-100)]' : 'border-[color:rgba(225,214,200,0.2)] text-[color:var(--mist-400)]'}`}
+            >
+              {usePixi ? 'Pixi' : 'Canvas'}
+            </button>
+          </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <button onClick={onOpenLevels} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">LEVELS</button>
-          <button onClick={onOpenTutorial} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">HOW</button>
-          <button onClick={onOpenSettings} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">SET</button>
-          <button onClick={onOpenMatchmaking} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">QUEUE</button>
-          <button onClick={onOpenTournament} className="py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm transition">TOURNEY</button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleStart}
+              disabled={!name.trim()}
+              className={`ritual-button ${name.trim() ? 'ritual-button-primary' : 'ritual-button-muted opacity-60 cursor-not-allowed'}`}
+            >
+              Play Solo
+            </button>
+            <button
+              onClick={onOpenMatchmaking}
+              disabled={!name.trim()}
+              className={`ritual-button ${name.trim() ? 'ritual-button-emerald' : 'ritual-button-muted opacity-60 cursor-not-allowed'}`}
+            >
+              Queue
+            </button>
+          </div>
+          <div className="mt-3 text-xs text-[color:var(--mist-400)]">
+            {useMultiplayer ? 'Online runs authoritative simulation.' : 'Queue to summon a live match.'}
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 text-[0.65rem] uppercase tracking-[0.25em]">
+            <button onClick={onOpenLevels} className="ritual-button ritual-button-ghost py-2">Levels</button>
+            <button onClick={onOpenTutorial} className="ritual-button ritual-button-ghost py-2">Lore</button>
+            <button onClick={onOpenSettings} className="ritual-button ritual-button-ghost py-2">Set</button>
+            <button onClick={onOpenMatchmaking} className="ritual-button ritual-button-ghost py-2">Queue</button>
+            <button onClick={onOpenTournament} className="ritual-button ritual-button-ghost py-2">Tourney</button>
+          </div>
         </div>
       </div>
     </div>

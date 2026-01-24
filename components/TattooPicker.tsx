@@ -41,19 +41,18 @@ const TattooPicker: React.FC<TattooPickerProps> = ({ choices, onSelect }) => {
     return (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
             <div className="w-full max-w-5xl px-6">
-                <h2 className="text-center text-4xl font-black text-white mb-2 tracking-widest uppercase"
-                    style={{ textShadow: '0 0 20px rgba(255,255,255,0.5)' }}>
+                <h2 className="ritual-title ritual-title-gradient text-center text-3xl sm:text-4xl mb-2">
                     INK YOUR DESTINY
                 </h2>
-                <p className="text-center text-slate-400 mb-8 font-mono">Choose the mutation that defines your run</p>
+                <p className="text-center text-[color:var(--mist-400)] mb-8 uppercase tracking-[0.3em] text-xs">Choose the mutation that defines your run</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {choices.map((choice) => (
                         <button
                             key={choice.id}
                             onClick={() => onSelect(choice.id)}
-                            className={`group relative p-6 rounded-2xl bg-gradient-to-br from-slate-950/80 via-slate-900/70 to-slate-950/90 border-2 text-left 
-                hover:scale-[1.03] transition-all duration-300 shadow-xl overflow-hidden
+                            className={`group relative p-6 rounded-2xl border-2 text-left hover:scale-[1.03] transition-all duration-300 shadow-xl overflow-hidden
+                bg-[linear-gradient(140deg,rgba(29,22,33,0.95),rgba(13,10,16,0.95))] border-[color:rgba(225,214,200,0.12)]
                 ${tierColor(choice.tier)}`}
                         >
                             {/* Glow Effect */}
@@ -73,18 +72,18 @@ const TattooPicker: React.FC<TattooPickerProps> = ({ choices, onSelect }) => {
                                     {choice.name}
                                 </div>
 
-                                <div className="text-sm text-slate-300 font-medium leading-relaxed">
+                                <div className="text-sm text-[color:var(--bone-200)] font-medium leading-relaxed">
                                     {choice.description}
                                 </div>
 
-                                <div className="mt-5 text-xs uppercase tracking-widest text-slate-500 group-hover:text-current transition-colors">
+                                <div className="mt-5 text-xs uppercase tracking-widest text-[color:var(--mist-400)] group-hover:text-current transition-colors">
                                     Select
                                 </div>
                             </div>
                         </button>
                     ))}
                 </div>
-                <div className="text-center text-xs text-slate-500 mt-8 animate-pulse">
+                <div className="text-center text-xs text-[color:var(--mist-400)] mt-8 animate-pulse">
                     TAP TO SELECT
                 </div>
             </div>

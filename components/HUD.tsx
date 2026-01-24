@@ -69,7 +69,7 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef }) => {
   const progressOffset = circumference - (matchPercent * circumference);
 
   return (
-    <div className="absolute inset-0 pointer-events-none">
+    <div className="absolute inset-0 pointer-events-none font-ui">
       {/* Top Center: Circular Match Progress */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
         {/* SVG Circular Progress */}
@@ -114,31 +114,31 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef }) => {
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-white font-bold text-2xl">{percent}%</div>
-            <div className="text-gray-300 text-xs">Ring {currentRing}</div>
+            <div className="text-[color:var(--bone-100)] font-display text-2xl">{percent}%</div>
+            <div className="text-[color:var(--mist-400)] text-xs uppercase tracking-[0.2em]">Ring {currentRing}</div>
           </div>
         </div>
 
         {/* Color Hint */}
-        <div className="mt-2 text-yellow-300 font-semibold text-sm drop-shadow-md">
+        <div className="mt-2 text-[color:var(--gold-400)] font-semibold text-sm drop-shadow-md">
           {colorHint}
         </div>
 
         {/* Target */}
-        <div className="text-white text-xs opacity-70 mt-1">
+        <div className="text-[color:var(--bone-200)] text-xs opacity-80 mt-1 uppercase tracking-[0.15em]">
           {goalLabel} ≥ {reqPercent}%
         </div>
       </div>
 
       {/* Score */}
-      <div className="absolute top-4 left-4 text-white font-bold text-2xl drop-shadow-md">
+      <div className="absolute top-4 left-4 text-[color:var(--bone-100)] font-display text-2xl drop-shadow-md">
         SCORE: {score}
       </div>
-      <div className="absolute top-4 right-4 text-white font-bold text-lg drop-shadow-md text-right">
+      <div className="absolute top-4 right-4 text-[color:var(--bone-100)] font-display text-lg drop-shadow-md text-right">
         <div>LEVEL {level}</div>
-        <div className="text-xs text-slate-300">TIME {timeLeft}s</div>
+        <div className="text-xs text-[color:var(--mist-400)]">TIME {timeLeft}s</div>
         {rushTimer > 0 && (
-          <div className="text-xs text-amber-300 mt-1">
+          <div className="text-xs text-[color:var(--gold-400)] mt-1">
             RUSH R{rushRing} · {Math.ceil(rushTimer)}s
           </div>
         )}
@@ -147,11 +147,11 @@ const HUD: React.FC<HUDProps> = ({ gameStateRef }) => {
       {/* Win Channeling Alert */}
       {winTimer > 0 && (
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 flex flex-col items-center animate-pulse">
-          <div className="text-yellow-400 font-black text-4xl stroke-black">
+          <div className="text-[color:var(--gold-400)] font-display text-3xl sm:text-4xl">
             SECURING VICTORY
           </div>
-          <div className="w-40 h-4 bg-gray-900 mt-2 rounded">
-            <div className="h-full bg-yellow-400" style={{ width: `${Math.min(100, (winTimer / Math.max(0.1, winHoldSeconds)) * 100)}%` }} />
+          <div className="w-40 h-4 bg-[color:var(--ink-900)] mt-2 rounded">
+            <div className="h-full bg-[color:var(--gold-400)]" style={{ width: `${Math.min(100, (winTimer / Math.max(0.1, winHoldSeconds)) * 100)}%` }} />
           </div>
         </div>
       )}

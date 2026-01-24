@@ -58,32 +58,32 @@ const TutorialOverlay: React.FC<Props> = ({ step, onNext, onPrev, onClose }) => 
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm text-white">
-      <div className="w-full max-w-2xl rounded-2xl bg-slate-950/80 border border-slate-700 p-6 shadow-2xl mx-4">
+      <div className="ritual-panel w-full max-w-2xl mx-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs font-mono text-slate-400 tracking-widest">
+            <div className="ritual-kicker text-xs">
               TUTORIAL {idx + 1}/{STEPS.length}
             </div>
-            <div className="text-3xl font-black tracking-wide mt-1">{data.title}</div>
+            <div className="ritual-title text-2xl mt-1">{data.title}</div>
           </div>
           <button
             onClick={() => onClose(false)}
-            className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
+            className="ritual-button ritual-button-ghost text-[0.65rem] px-3 py-1"
           >
             SKIP
           </button>
         </div>
 
-        <div className="mt-5 text-slate-200 leading-relaxed">{data.body}</div>
-        {data.tip && <div className="mt-3 text-sm text-yellow-200/90">Tip: {data.tip}</div>}
+        <div className="mt-5 text-[color:var(--bone-200)] leading-relaxed">{data.body}</div>
+        {data.tip && <div className="mt-3 text-sm text-[color:var(--gold-400)]">Tip: {data.tip}</div>}
 
         <div className="mt-6 flex items-center justify-between">
           <button
             onClick={onPrev}
             disabled={idx === 0}
             className={[
-              'px-4 py-2 rounded-lg border font-bold transition',
-              idx === 0 ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-900 border-slate-700 hover:bg-slate-800',
+              'ritual-button text-xs px-4 py-2',
+              idx === 0 ? 'ritual-button-muted cursor-not-allowed' : 'ritual-button-ghost',
             ].join(' ')}
           >
             BACK
@@ -93,7 +93,7 @@ const TutorialOverlay: React.FC<Props> = ({ step, onNext, onPrev, onClose }) => 
             {!isLast && (
               <button
                 onClick={onNext}
-                className="px-5 py-2 rounded-lg font-bold bg-violet-600 hover:bg-violet-500 transition"
+                className="ritual-button ritual-button-primary text-xs px-5 py-2"
               >
                 NEXT
               </button>
@@ -101,7 +101,7 @@ const TutorialOverlay: React.FC<Props> = ({ step, onNext, onPrev, onClose }) => 
             {isLast && (
               <button
                 onClick={() => onClose(true)}
-                className="px-5 py-2 rounded-lg font-bold bg-gradient-to-r from-pink-500 to-violet-600 hover:scale-[1.02] transition"
+                className="ritual-button ritual-button-emerald text-xs px-5 py-2"
               >
                 LET’S PLAY
               </button>

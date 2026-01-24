@@ -26,6 +26,7 @@ import { updateGameState, createInitialState } from '../../../services/engine/in
 import { createPlayer } from '../../../services/engine/factories';
 import { GameRuntimeState } from '../../../types';
 import { getLevelConfig } from '../../../services/cjr/levels';
+import { vfxIntegrationManager } from '../../../services/vfx/vfxIntegration';
 
 export class GameRoom extends Room<GameRoomState> {
   maxClients = 50;
@@ -37,6 +38,7 @@ export class GameRoom extends Room<GameRoomState> {
   onCreate(options: any) {
     console.log('GameRoom created!', options);
     this.setState(new GameRoomState());
+    vfxIntegrationManager.setVFXEnabled(false);
 
     // Initialize World
     this.state.worldWidth = WORLD_WIDTH;

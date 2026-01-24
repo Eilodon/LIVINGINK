@@ -1,7 +1,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GameState, TattooId } from './types';
 import { ShapeId } from './services/cjr/cjrTypes';
-import { createInitialState, updateGameState } from './services/engine';
+import { createInitialState, updateClientVisuals, updateGameState } from './services/engine';
 import MainMenu from './components/MainMenu';
 import HUD from './components/HUD';
 import MobileControls from './components/MobileControls';
@@ -198,7 +198,15 @@ const App: React.FC = () => {
     lastTimeRef.current = time;
 
     const safeDt = Math.min(dt, 0.1);
-    if (!state.isPaused) updateGameState(state, safeDt);
+    const isNetworked = settings.useMultiplayer && networkStatus === 'online';
+
+    if (isNetworked) {
+      networkClient.interpolateState(state, time);
+      updateClientVisuals(state, safeDt);
+    } else if (!state.isPaused) {
+      updateGameState(state, safeDt);
+    }
+
     if (settings.useMultiplayer && networkStatus === 'online') {
       networkClient.sendInput(state.player.targetPosition, state.inputs);
     }
@@ -314,7 +322,7 @@ const App: React.FC = () => {
   const top = useMemo(() => topOverlay(ui), [ui]);
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black select-none font-sans">
+    <div className="app-shell select-none">
       <ErrorBoundary>
         {ui.screen === 'boot' && <BootScreen />}
 
@@ -400,6 +408,24 @@ const App: React.FC = () => {
                   width={viewport.w}
                   height={viewport.h}
                   enablePointerInput={inputEnabled}
+                  onMouseMove={(x, y) => {
+                    const state = gameStateRef.current;
+                    if (!state) return;
+                    state.player.targetPosition = {
+                      x: state.player.position.x + x,
+                      y: state.player.position.y + y,
+                    };
+                  }}
+                  onMouseDown={() => {
+                    const state = gameStateRef.current;
+                    if (!state) return;
+                    state.inputs.space = true;
+                  }}
+                  onMouseUp={() => {
+                    const state = gameStateRef.current;
+                    if (!state) return;
+                    state.inputs.space = false;
+                  }}
                 />
               )}
             </Suspense>

@@ -16,6 +16,21 @@ const DEFAULT_CONFIG: NetworkConfig = {
 
 export type NetworkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting' | 'error';
 
+type EntitySnapshot = {
+  x: number;
+  y: number;
+  vx?: number;
+  vy?: number;
+  radius?: number;
+};
+
+type NetworkSnapshot = {
+  time: number;
+  players: Map<string, EntitySnapshot>;
+  bots: Map<string, EntitySnapshot>;
+  food: Map<string, EntitySnapshot>;
+};
+
 export class NetworkClient {
   private config: NetworkConfig;
   private room: Room | null = null;
@@ -30,6 +45,8 @@ export class NetworkClient {
   private lastCredentials?: { name: string; shape: ShapeId };
   private isConnecting = false;
   private autoReconnect = true;
+  private snapshots: NetworkSnapshot[] = [];
+  private interpolationDelayMs = 100;
 
   constructor(config: Partial<NetworkConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -50,6 +67,10 @@ export class NetworkClient {
 
   private emitStatus(status: NetworkStatus) {
     if (this.statusListener) this.statusListener(status);
+  }
+
+  private nowMs() {
+    return typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
   async connectWithRetry(playerName: string, shape: ShapeId): Promise<boolean> {
@@ -80,6 +101,7 @@ export class NetworkClient {
         name: playerName,
         shape: shape
       });
+      this.snapshots = [];
       console.log('Connected to CJR Server', this.room.sessionId);
 
       this.setupRoomListeners();
@@ -95,6 +117,7 @@ export class NetworkClient {
       await this.room.leave();
       this.room = null;
     }
+    this.snapshots = [];
     this.emitStatus('offline');
   }
 
@@ -127,6 +150,8 @@ export class NetworkClient {
       // We need to map MapSchema to our Array
       this.syncBots(state.bots); // Bots
       this.syncFood(state.food); // Food
+      this.localState.gameTime = state.gameTime ?? this.localState.gameTime;
+      this.pushSnapshot(state);
     });
   }
 
@@ -212,23 +237,13 @@ export class NetworkClient {
       localPlayer.ring = sPlayer.ring;
       localPlayer.emotion = sPlayer.emotion as Emotion;
       localPlayer.isDead = sPlayer.isDead;
+      localPlayer.radius = sPlayer.radius;
 
       if (sessionId === this.room?.sessionId) {
-        const dx = sPlayer.position.x - localPlayer.position.x;
-        const dy = sPlayer.position.y - localPlayer.position.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > this.reconcileThreshold) {
-          localPlayer.position.x = sPlayer.position.x;
-          localPlayer.position.y = sPlayer.position.y;
-          localPlayer.velocity.x = sPlayer.velocity.x;
-          localPlayer.velocity.y = sPlayer.velocity.y;
-        }
         const lastProcessed = sPlayer.lastProcessedInput || 0;
         this.pendingInputs = this.pendingInputs.filter(input => input.seq > lastProcessed);
         this.localState!.player = localPlayer;
       } else {
-        localPlayer.position.x = sPlayer.position.x;
-        localPlayer.position.y = sPlayer.position.y;
         localPlayer.velocity.x = sPlayer.velocity.x;
         localPlayer.velocity.y = sPlayer.velocity.y;
       }
@@ -283,14 +298,13 @@ export class NetworkClient {
       }
 
       // Update properties
-      localBot.position.x = sBot.position.x;
-      localBot.position.y = sBot.position.y;
       localBot.velocity.x = sBot.velocity.x;
       localBot.velocity.y = sBot.velocity.y;
       localBot.currentHealth = sBot.currentHealth;
       localBot.isDead = sBot.isDead;
       localBot.pigment = sBot.pigment;
       localBot.emotion = sBot.emotion;
+      localBot.radius = sBot.radius;
       // ... more props
     });
 
@@ -324,12 +338,145 @@ export class NetworkClient {
       }
 
       if (sFood.isDead) localFood.isDead = true;
+      localFood.radius = sFood.radius;
+      localFood.kind = sFood.kind as PickupKind;
+      localFood.pigment = { r: sFood.pigment.r, g: sFood.pigment.g, b: sFood.pigment.b };
     });
 
     // Cleanup
     this.localState.food = this.localState.food.filter(f => seenIds.has(f.id));
   }
 
+  private pushSnapshot(state: any) {
+    const players = new Map<string, EntitySnapshot>();
+    state.players.forEach((p: any, id: string) => {
+      players.set(id, {
+        x: p.position.x,
+        y: p.position.y,
+        vx: p.velocity.x,
+        vy: p.velocity.y,
+        radius: p.radius,
+      });
+    });
+
+    const bots = new Map<string, EntitySnapshot>();
+    state.bots.forEach((b: any, id: string) => {
+      bots.set(id, {
+        x: b.position.x,
+        y: b.position.y,
+        vx: b.velocity.x,
+        vy: b.velocity.y,
+        radius: b.radius,
+      });
+    });
+
+    const food = new Map<string, EntitySnapshot>();
+    state.food.forEach((f: any, id: string) => {
+      food.set(id, {
+        x: f.x,
+        y: f.y,
+        radius: f.radius,
+      });
+    });
+
+    this.snapshots.push({ time: this.nowMs(), players, bots, food });
+    if (this.snapshots.length > 10) this.snapshots.shift();
+  }
+
+  interpolateState(state: GameState, now: number = this.nowMs()) {
+    if (this.snapshots.length === 0) return;
+
+    const renderTime = now - this.interpolationDelayMs;
+    while (this.snapshots.length >= 2 && this.snapshots[1].time <= renderTime) {
+      this.snapshots.shift();
+    }
+
+    if (this.snapshots.length >= 2) {
+      const [older, newer] = this.snapshots;
+      const span = newer.time - older.time;
+      const t = span > 0 ? Math.min(1, Math.max(0, (renderTime - older.time) / span)) : 1;
+      this.applyInterpolatedSnapshot(state, older, newer, t);
+    } else {
+      this.applySnapshot(state, this.snapshots[0]);
+    }
+  }
+
+  private applyInterpolatedSnapshot(
+    state: GameState,
+    older: NetworkSnapshot,
+    newer: NetworkSnapshot,
+    t: number
+  ) {
+    this.applyEntityInterpolation(state.players, older.players, newer.players, t);
+    this.applyEntityInterpolation(state.bots, older.bots, newer.bots, t);
+    this.applyFoodInterpolation(state.food, older.food, newer.food, t);
+  }
+
+  private applySnapshot(state: GameState, snapshot: NetworkSnapshot) {
+    this.applyEntitySnapshot(state.players, snapshot.players);
+    this.applyEntitySnapshot(state.bots, snapshot.bots);
+    this.applyFoodSnapshot(state.food, snapshot.food);
+  }
+
+  private applyEntitySnapshot(entities: Array<Player | Bot>, snapshot: Map<string, EntitySnapshot>) {
+    const byId = new Map<string, Player | Bot>(entities.map(e => [e.id, e]));
+    snapshot.forEach((data, id) => {
+      const entity = byId.get(id);
+      if (!entity) return;
+      entity.position.x = data.x;
+      entity.position.y = data.y;
+      if (data.vx !== undefined) entity.velocity.x = data.vx;
+      if (data.vy !== undefined) entity.velocity.y = data.vy;
+    });
+  }
+
+  private applyFoodSnapshot(foods: Food[], snapshot: Map<string, EntitySnapshot>) {
+    const byId = new Map<string, Food>(foods.map(f => [f.id, f]));
+    snapshot.forEach((data, id) => {
+      const food = byId.get(id);
+      if (!food) return;
+      food.position.x = data.x;
+      food.position.y = data.y;
+    });
+  }
+
+  private applyEntityInterpolation(
+    entities: Array<Player | Bot>,
+    older: Map<string, EntitySnapshot>,
+    newer: Map<string, EntitySnapshot>,
+    t: number
+  ) {
+    const byId = new Map<string, Player | Bot>(entities.map(e => [e.id, e]));
+    newer.forEach((next, id) => {
+      const entity = byId.get(id);
+      if (!entity) return;
+      const prev = older.get(id) || next;
+      entity.position.x = prev.x + (next.x - prev.x) * t;
+      entity.position.y = prev.y + (next.y - prev.y) * t;
+      if (next.vx !== undefined && prev.vx !== undefined) {
+        entity.velocity.x = prev.vx + (next.vx - prev.vx) * t;
+      }
+      if (next.vy !== undefined && prev.vy !== undefined) {
+        entity.velocity.y = prev.vy + (next.vy - prev.vy) * t;
+      }
+    });
+  }
+
+  private applyFoodInterpolation(
+    foods: Food[],
+    older: Map<string, EntitySnapshot>,
+    newer: Map<string, EntitySnapshot>,
+    t: number
+  ) {
+    const byId = new Map<string, Food>(foods.map(f => [f.id, f]));
+    newer.forEach((next, id) => {
+      const food = byId.get(id);
+      if (!food) return;
+      const prev = older.get(id) || next;
+      food.position.x = prev.x + (next.x - prev.x) * t;
+      food.position.y = prev.y + (next.y - prev.y) * t;
+    });
+  }
 
   sendInput(target: Vector2, inputs: { space: boolean; w: boolean }) {
     if (!this.room) return;
