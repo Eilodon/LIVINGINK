@@ -5,6 +5,7 @@
 
 import { GameState, Player, TattooId } from '../../types';
 import { createInitialState, updateGameState } from '../../services/engine';
+import { createPlayer, createBot, createFood } from '../../services/engine/factories';
 import { applyTattoo } from '../../services/cjr/tattoos';
 import { calcMatchPercent } from '../../services/cjr/colorMath';
 import { colorMixingSystem } from '../../server/src/systems/ColorMixingSystem';
@@ -43,12 +44,12 @@ export class GameFlowTest {
     summary: string;
   }> {
     console.log('🧪 Starting Game Flow Test Suite...');
-    
+
     this.testResults = [];
-    
+
     // Initialize game state
     await this.initializeGameState();
-    
+
     // Run all test suites
     const testSuites: GameFlowTestSuite[] = [
       this.getCoreGameplayTests(),
@@ -62,7 +63,7 @@ export class GameFlowTest {
 
     for (const suite of testSuites) {
       console.log(`\n📋 Running ${suite.name}...`);
-      
+
       for (const test of suite.tests) {
         const result = await this.runSingleTest(test.name, test.test, test.timeout);
         this.testResults.push(result);
@@ -84,7 +85,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
     `;
 
     console.log(summary);
-    
+
     return {
       passed,
       totalTests,
@@ -100,11 +101,12 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
    */
   private static async initializeGameState(): Promise<void> {
     this.gameState = createInitialState();
-    
+
     // Setup test player
+    const defaultPlayer = createPlayer('TestPlayer');
     this.gameState.player = {
+      ...defaultPlayer,
       id: 'test-player',
-      name: 'TestPlayer',
       position: { x: 0, y: 0 },
       velocity: { x: 0, y: 0 },
       targetPosition: { x: 100, y: 100 },
@@ -112,101 +114,27 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
       pigment: { r: 0.5, g: 0.5, b: 0.5 },
       targetPigment: { r: 0.8, g: 0.2, b: 0.2 },
       score: 0,
-      currentHealth: 100,
+
       maxHealth: 100,
-      kills: 0,
-      deaths: 0,
-      matchPercent: 0,
-      ring: 0,
-      emotion: 'neutral',
-      isDead: false,
-      inputs: { space: false, w: false },
-      tattoos: [],
-      skillCooldown: 0,
-      inputSeq: 0,
-      level: 1,
-      experience: 0,
-      shape: 'circle' as any,
-      statusEffects: {
-        speedBoost: 1,
-        tempSpeedBoost: 1,
-        slowMultiplier: 1,
-        invulnerable: false,
-        frozen: false,
-        poisoned: false,
-        burning: false,
-        regeneration: false,
-      },
-      mutationCooldowns: {
-        speedSurge: 0,
-        invulnerable: 0,
-        rewind: 0,
-        lightning: 0,
-        chaos: 0,
-        kingForm: 0
-      },
-      rewindHistory: [],
-      stationaryTime: 0,
-      defense: 1,
-      damageMultiplier: 1,
-      critChance: 0,
-      critMultiplier: 1,
-      lifesteal: 0,
-      armorPen: 0,
-      reflectDamage: 0,
-      visionMultiplier: 1,
-      sizePenaltyMultiplier: 1,
-      skillCooldownMultiplier: 1,
-      skillPowerMultiplier: 1,
-      skillDashMultiplier: 1,
-      killGrowthMultiplier: 1,
-      poisonOnHit: false,
-      doubleCast: false,
-      reviveAvailable: false,
-      magneticFieldRadius: 0,
+      currentHealth: 100, // Ensuring it overrides
     };
 
     // Add test entities
-    this.gameState.bots = [
-      {
-        id: 'test-bot-1',
-        name: 'TestBot1',
-        position: { x: 200, y: 200 },
-        velocity: { x: 1, y: 1 },
-        radius: 25,
-        pigment: { r: 0.3, g: 0.7, b: 0.2 },
-        targetPigment: { r: 0.1, g: 0.9, b: 0.1 },
-        score: 0,
-        currentHealth: 80,
-        maxHealth: 80,
-        kills: 0,
-        deaths: 0,
-        isDead: false,
-        isBoss: false,
-        shape: 'triangle' as any,
-        level: 1,
-        experience: 0,
-      }
-    ];
+    const bot = createBot('test-bot-1');
+    bot.position = { x: 200, y: 200 };
+    bot.currentHealth = 80;
+    bot.maxHealth = 80;
+    this.gameState.bots = [bot];
 
-    this.gameState.food = [
-      {
-        id: 'test-food-1',
-        x: 150,
-        y: 150,
-        radius: 10,
-        pigment: { r: 0.9, g: 0.1, b: 0.1 },
-        isDead: false,
-      },
-      {
-        id: 'test-food-2',
-        x: 250,
-        y: 250,
-        radius: 12,
-        pigment: { r: 0.1, g: 0.9, b: 0.1 },
-        isDead: false,
-      }
-    ];
+    const food1 = createFood({ x: 150, y: 150 });
+    food1.id = 'test-food-1';
+    food1.pigment = { r: 0.9, g: 0.1, b: 0.1 };
+
+    const food2 = createFood({ x: 250, y: 250 });
+    food2.id = 'test-food-2';
+    food2.pigment = { r: 0.1, g: 0.9, b: 0.1 };
+
+    this.gameState.food = [food1, food2];
 
     console.log('✅ Game state initialized for testing');
   }
@@ -224,14 +152,14 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
           test: async () => {
             const initialPos = { ...this.gameState!.player.position };
             this.gameState!.player.targetPosition = { x: 50, y: 50 };
-            
+
             // Simulate game update
-            updateGameState(this.gameState!, 1/60);
-            
+            updateGameState(this.gameState!, 1 / 60);
+
             // Check if player moved
             const moved = Math.abs(this.gameState!.player.position.x - initialPos.x) > 0 ||
-                         Math.abs(this.gameState!.player.position.y - initialPos.y) > 0;
-            
+              Math.abs(this.gameState!.player.position.y - initialPos.y) > 0;
+
             return moved;
           },
           timeout: 1000
@@ -241,16 +169,16 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
           test: async () => {
             const initialScore = this.gameState!.player.score;
             const initialPigment = { ...this.gameState!.player.pigment };
-            
+
             // Simulate eating food
             const food = this.gameState!.food[0];
-            this.gameState!.player.position = { x: food.x, y: food.y };
-            updateGameState(this.gameState!, 1/60);
-            
+            this.gameState!.player.position = { x: food.position.x, y: food.position.y };
+            updateGameState(this.gameState!, 1 / 60);
+
             // Check if score increased and pigment changed
             const scoreIncreased = this.gameState!.player.score > initialScore;
             const pigmentChanged = JSON.stringify(this.gameState!.player.pigment) !== JSON.stringify(initialPigment);
-            
+
             return scoreIncreased && pigmentChanged;
           },
           timeout: 1000
@@ -261,9 +189,9 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
             // Set player pigment close to target
             this.gameState!.player.pigment = { r: 0.75, g: 0.25, b: 0.25 };
             this.gameState!.player.targetPigment = { r: 0.8, g: 0.2, b: 0.2 };
-            
-            updateGameState(this.gameState!, 1/60);
-            
+
+            updateGameState(this.gameState!, 1 / 60);
+
             const matchPercent = calcMatchPercent(this.gameState!.player.pigment, this.gameState!.player.targetPigment);
             return matchPercent > 0.8; // Should be > 80% match
           },
@@ -279,7 +207,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
               this.gameState!.player.targetPigment,
               0.8
             );
-            
+
             return result.canEnter === (calcMatchPercent(this.gameState!.player.pigment, this.gameState!.player.targetPigment) >= 0.8);
           },
           timeout: 1000
@@ -289,9 +217,9 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
           test: async () => {
             const initialStats = { ...this.gameState!.player };
             const tattoo = { id: 'speed_boost' as TattooId, name: 'Speed Boost', tier: 1 };
-            
-            applyTattoo(this.gameState!.player, tattoo);
-            
+
+            applyTattoo(this.gameState!.player, tattoo.id);
+
             // Check if tattoo was applied
             return this.gameState!.player.tattoos.includes(tattoo.id);
           },
@@ -302,16 +230,16 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
           test: async () => {
             // Activate skill
             this.gameState!.player.inputs.space = true;
-            updateGameState(this.gameState!, 1/60);
-            
+            updateGameState(this.gameState!, 1 / 60);
+
             const cooldownSet = this.gameState!.player.skillCooldown > 0;
-            
+
             // Wait for cooldown
             this.gameState!.player.skillCooldown = 0;
-            updateGameState(this.gameState!, 1/60);
-            
+            updateGameState(this.gameState!, 1 / 60);
+
             const skillReady = this.gameState!.player.skillCooldown === 0;
-            
+
             return cooldownSet && skillReady;
           },
           timeout: 2000
@@ -335,17 +263,17 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
             const button = document.createElement('button');
             button.textContent = 'Test Button';
             document.body.appendChild(button);
-            
+
             let clicked = false;
             button.addEventListener('click', () => {
               clicked = true;
             });
-            
+
             button.click();
-            
+
             // Wait for event processing
             await new Promise(resolve => setTimeout(resolve, 100));
-            
+
             document.body.removeChild(button);
             return clicked;
           },
@@ -357,7 +285,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
             // Test touch support
             const hasTouchSupport = 'ontouchstart' in window;
             const hasPointerSupport = 'onpointerdown' in window;
-            
+
             return hasTouchSupport || hasPointerSupport;
           },
           timeout: 500
@@ -377,7 +305,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
             // Test responsive breakpoints
             const width = window.innerWidth;
             const height = window.innerHeight;
-            
+
             // Check if reasonable dimensions
             return width > 300 && height > 400;
           },
@@ -495,20 +423,20 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
           test: async () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
+
             if (!ctx) return false;
-            
+
             const startTime = performance.now();
-            
+
             // Simple performance test
             for (let i = 0; i < 1000; i++) {
               ctx.fillStyle = `hsl(${i}, 70%, 50%)`;
               ctx.fillRect(i % 100, Math.floor(i / 100), 10, 10);
             }
-            
+
             const endTime = performance.now();
             const duration = endTime - startTime;
-            
+
             return duration < 100; // Should complete in < 100ms
           },
           timeout: 2000
@@ -591,7 +519,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
               style: 'currency',
               currency: 'USD'
             });
-            
+
             const formatted = formatter.format(9.99);
             return formatted.includes('$') && formatted.includes('9.99');
           },
@@ -611,17 +539,17 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
   ): Promise<TestResult> {
     const startTime = performance.now();
     const errors: string[] = [];
-    
+
     try {
       const result = await Promise.race([
         testFunction(),
-        new Promise<boolean>((_, reject) => 
+        new Promise<boolean>((_, reject) =>
           setTimeout(() => reject(new Error('Test timeout')), timeout)
         )
       ]);
-      
+
       const duration = performance.now() - startTime;
-      
+
       return {
         testName,
         passed: result,
@@ -632,7 +560,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
     } catch (error) {
       const duration = performance.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       return {
         testName,
         passed: false,
@@ -661,7 +589,7 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
 
     const passedTests = this.testResults.filter(r => r.passed);
     const failedTests = this.testResults.filter(r => !r.passed);
-    
+
     const summary = `
 🎮 GAME FLOW TEST REPORT
 ====================
@@ -674,29 +602,29 @@ Success Rate: ${((passedTests.length / this.testResults.length) * 100).toFixed(1
     const details = `
 DETAILED RESULTS:
 ====================
-${this.testResults.map(result => 
-  `${result.passed ? '✅' : '❌'} ${result.testName} (${result.duration.toFixed(2)}ms)
+${this.testResults.map(result =>
+      `${result.passed ? '✅' : '❌'} ${result.testName} (${result.duration.toFixed(2)}ms)
    ${result.details}`
-).join('\n')}
+    ).join('\n')}
     `;
 
     const recommendations: string[] = [];
-    
+
     if (failedTests.length > 0) {
       recommendations.push('Fix failed tests before production deployment');
       recommendations.push('Review error messages for debugging');
     }
-    
+
     if (passedTests.length === this.testResults.length) {
       recommendations.push('All tests passed - ready for production');
       recommendations.push('Consider adding more edge case tests');
     }
-    
+
     const slowTests = this.testResults.filter(r => r.duration > 1000);
     if (slowTests.length > 0) {
       recommendations.push('Optimize slow tests for better performance');
     }
-    
+
     return {
       summary,
       details,

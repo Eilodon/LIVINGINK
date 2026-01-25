@@ -1,7 +1,5 @@
 
-import {
-    CONTRIBUTION_TIERS
-} from './cjrConstants';
+
 import { GameState, Player, Bot } from '../../types';
 import { createFloatingText } from '../engine/effects';
 

@@ -14,16 +14,16 @@ beforeAll(() => {
       <div id="test-button">Test Button</div>
     </div>
   `;
-  
+
   // Setup canvas for visual tests
   const canvas = document.getElementById('test-canvas') as HTMLCanvasElement;
   const ctx = canvas.getContext('2d');
-  
+
   if (ctx) {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, 100, 100);
   }
-  
+
   // Setup mock AudioContext
   Object.defineProperty(window, 'AudioContext', {
     value: class MockAudioContext {
@@ -59,18 +59,18 @@ beforeAll(() => {
       statusText: 'OK',
       headers: new Headers(),
       redirected: false,
-      type: 'basic',
+      type: 'basic' as ResponseType,
       url: 'http://localhost',
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
       blob: () => Promise.resolve(new Blob()),
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
       formData: () => Promise.resolve(new FormData()),
-      clone: () => Promise.resolve({}),
+      clone: () => Promise.resolve({} as Response),
       body: null,
       bodyUsed: false,
       bytes: () => Promise.resolve(new Uint8Array())
-    })
+    } as unknown as Response)
   );
 
   // Mock performance API
@@ -85,25 +85,44 @@ beforeAll(() => {
     eventCounts: new Map(),
     navigation: {
       redirectCount: 0,
-      type: 'navigate',
+      type: 0, // TYPE_NAVIGATE
       toJSON: () => ({})
     },
     onresourcetimingbufferfull: null,
     timeOrigin: 0
-  };
+  } as any;
 
   // Mock WebSocket
-  global.WebSocket = vi.fn(() => ({
+  const MockWebSocket = vi.fn(() => ({
     close: vi.fn(() => Promise.resolve()),
     send: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-    readyState: WebSocket.CONNECTING,
+    readyState: 0,
+    CONNECTING: 0,
+    OPEN: 1,
+    CLOSING: 2,
+    CLOSED: 3,
+    binaryType: 'blob',
+    bufferedAmount: 0,
+    extensions: '',
+    protocol: '',
+    url: '',
+    onclose: null,
+    onerror: null,
+    onmessage: null,
+    onopen: null,
+    dispatchEvent: vi.fn()
+  }));
+
+  Object.assign(MockWebSocket, {
     CONNECTING: 0,
     OPEN: 1,
     CLOSING: 2,
     CLOSED: 3
-  }));
+  });
+
+  global.WebSocket = MockWebSocket as any;
 
   // Mock localStorage
   const localStorage = {
@@ -170,8 +189,7 @@ export const testUtils = {
   simulateTouch: (element: HTMLElement) => {
     const touch = new TouchEvent('touch', {
       bubbles: true,
-      cancelable: true,
-      target: element
+      cancelable: true
     });
     element.dispatchEvent(touch);
   }

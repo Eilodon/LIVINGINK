@@ -36,7 +36,7 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
   e.lastEatTime = 0;
 
   // Trigger eat emotion
-  triggerEmotion(e, 'eat');
+  triggerEmotion(e, 'yum');
   spawnPickupPop(state, e.position.x, e.position.y, e.color);
 
   // Handle by pickup kind
@@ -76,13 +76,13 @@ export const consumePickup = (e: Player | Bot, food: Food, state: GameState) => 
       e.pigment = mixPigment(e.pigment, neutral, solventRatio);
       e.color = pigmentToHex(e.pigment);
       e.matchPercent = calcMatchPercent(e.pigment, e.targetPigment);
-      
+
       // Solvent speed boost
       if (e.tattoos?.includes(TattooId.SolventExpert) && e.statusEffects.solventSpeedBoost) {
         e.statusEffects.tempSpeedBoost = Math.max(e.statusEffects.tempSpeedBoost || 1, e.statusEffects.solventSpeedBoost);
         e.statusEffects.tempSpeedTimer = Math.max(e.statusEffects.tempSpeedTimer || 0, 2.0);
       }
-      
+
       createFloatingText(e.position, 'Cleanse', '#aaaaff', 16, state);
       break;
 
@@ -143,13 +143,28 @@ export const consume = (
   // 3. Score
   predator.score += 100 + prey.score * 0.5;
   predator.kills++;
-
-  // 4. Pigment Mix (Predator takes some of Prey's color?)
   const ratio = 0.2; // Stronger mix for kills
   predator.pigment = mixPigment(predator.pigment, prey.pigment, ratio);
   predator.color = pigmentToHex(predator.pigment);
   predator.matchPercent = calcMatchPercent(predator.pigment, predator.targetPigment);
   predator.lastEatTime = 0;
+
+  // 4b. Kill Streak Logic
+  predator.killStreak = (predator.killStreak || 0) + 1;
+  predator.streakTimer = 5.0; // 5s to keep streak alive
+
+  // Trigger VFX based on streak
+  if (predator.killStreak === 2) {
+    createFloatingText(predator.position, 'DOUBLE TAP!', '#ff0', 24, state);
+    // vfxSystem reference not available here directly without import or hook
+    // We can assume vfxIntegrationManager handles it or just floating text for now
+  } else if (predator.killStreak === 3) {
+    createFloatingText(predator.position, 'RAMPAGE!', '#ff4500', 32, state);
+  } else if (predator.killStreak >= 5) {
+    createFloatingText(predator.position, 'UNSTOPPABLE!', '#f00', 40, state);
+    state.shakeIntensity += 5;
+  }
+
 
   // 5. Effects
   createDeathExplosion(prey.position, prey.color, prey.radius);
@@ -249,8 +264,16 @@ export const reduceHealth = (
     }
   }
   state.shakeIntensity += actualDamage * 0.05;
+
+  // Near Death Check
+  if (victim.currentHealth / victim.maxHealth < 0.2 && victim.currentHealth > 0) {
+    // Trigger Vignette / Heartbeat (handled by client visual system usually)
+    // For now, simple text or emotion is enough
+    triggerEmotion(victim, 'panic');
+  }
+
   victim.lastHitTime = 0;
-  triggerEmotion(victim, 'hit');
+  triggerEmotion(victim, 'panic');
   spawnHitSplash(state, victim.position.x, victim.position.y, victim.color);
 
   if (attacker && 'score' in attacker && 'isBoss' in victim && (victim as Bot).isBoss) {

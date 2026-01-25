@@ -132,7 +132,9 @@ export const createServerGameState = (serverState: GameRoomState, runtime: GameR
         prismGuardThreshold: 0.8,
         prismGuardReduction: 0.8,
         grimHarvestDropCount: 0
-      }
+      },
+      killStreak: 0,
+      streakTimer: 0
     };
     players.push(player);
   });

@@ -1,11 +1,36 @@
-// Color as 0..1 RGB vector for smooth mixing
-export interface PigmentVec3 {
-    r: number;
-    g: number;
-    b: number;
-}
+export type PigmentVec3 = {
+    r: number; // 0..1
+    g: number; // 0..1
+    b: number; // 0..1
+};
 
-// Curated 12 Tattoos for CJR
+export type RingId = 0 | 1 | 2 | 3; // 0=Global/Spawn, 1=Outer, 2=Middle, 3=Inner/Core
+
+export type Emotion =
+    | 'happy'
+    | 'hungry'
+    | 'yum'
+    | 'greed'
+    | 'focus'
+    | 'panic'
+    | 'despair'
+    | 'victory'
+    | 'ko';
+
+export type PickupKind =
+    | 'pigment'
+    | 'neutral'
+    | 'solvent'
+    | 'catalyst'
+    | 'shield'
+    | 'candy_vein';
+
+export type ShapeId =
+    | 'circle'   // Runner
+    | 'square'   // Tank
+    | 'triangle' // Assassin
+    | 'hex';     // Magnet
+
 export enum TattooId {
     FilterInk = 'filter_ink',
     Overdrive = 'overdrive',
@@ -18,46 +43,15 @@ export enum TattooId {
     CatalystEcho = 'catalyst_echo',
     PrismGuard = 'prism_guard',
     InkLeech = 'ink_leech',
-    GrimHarvest = 'grim_harvest',
+    GrimHarvest = 'grim_harvest'
 }
 
-// Ring progression (1 → 2 → 3)
-export type RingId = 1 | 2 | 3;
-
-// Jelly emotions - Core visual feedback
-export const Emotion = {
-    Happy: 'happy',
-    Hungry: 'hungry',
-    Yum: 'yum',
-    Greed: 'greed',
-    Focus: 'focus',
-    Panic: 'panic',
-    Sad: 'sad',
-    Angry: 'angry',
-    Despair: 'despair',
-    Victory: 'victory',
-    Win: 'victory', // Alias
-    Ko: 'ko',
-    Neutral: 'neutral'
-} as const;
-export type Emotion = typeof Emotion[keyof typeof Emotion];
-
-// Pickup types (formerly Food kind)
-export type PickupKind =
-    | 'pigment'
-    | 'neutral'
-    | 'solvent'
-    | 'catalyst'
-    | 'shield';
-
-// 4 playable shapes (MVP)
-export const ShapeId = {
-    Circle: 'circle',
-    Square: 'square',
-    Triangle: 'triangle',
-    Hex: 'hex'
-} as const;
-export type ShapeId = typeof ShapeId[keyof typeof ShapeId];
-
-// Alias for cleaner code, future-proof if we diverge from MutationId
-// (Removed invalid alias)
+export interface CJRPlayerState {
+    pigment: PigmentVec3;
+    targetPigment: PigmentVec3; // The goal color for the current level/ring
+    matchPercent: number; // 0..1, similarity to targetPigment
+    ring: RingId;
+    emotion: Emotion;
+    shape: ShapeId;
+    tattoos: TattooId[];
+}

@@ -216,7 +216,7 @@ const tricksterBehavior: PersonalityBehavior = {
     description: 'Circles ring boundaries to lure fights near wave spawns',
 
     update(bot, state, dt) {
-        const ringRadius = bot.ring === 1 ? RING_RADII.R2_BOUNDARY : bot.ring === 2 ? RING_RADII.R3_BOUNDARY : RING_RADII.CENTER * 1.5;
+        const ringRadius = bot.ring === 1 ? RING_RADII.R2 : bot.ring === 2 ? RING_RADII.R3 : RING_RADII.CENTER * 1.5;
         const angle = Math.atan2(bot.position.y, bot.position.x);
         const targetAngle = angle + 0.8;
         const target = {

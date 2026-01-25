@@ -42,7 +42,7 @@ const BOSS_CONFIG: BossConfig = {
     spawnTime: 45,
     health: 600,
     radius: 65,
-    leashRadius: RING_RADII.R2_BOUNDARY,
+    leashRadius: RING_RADII.R2,
     attackInterval: 3.0,
     attackPattern: 'telegraph',
     telegraphDuration: 1.0,
@@ -121,7 +121,7 @@ const updateBossAI = (boss: Bot, state: GameState, dt: number) => {
     // Find target (closest player/bot)
     let closestTarget: Player | Bot | null = null;
     let closestDist = Infinity;
-    
+
     const players = state.players?.length ? state.players : [state.player];
     [...players, ...state.bots].forEach(entity => {
         if (entity.isDead) return;
@@ -357,16 +357,16 @@ export const updateBossLogic = (state: GameState, dt: number) => {
     // Spawn boss
     if (!bossState.bossDefeated && !bossState.currentBossActive && state.gameTime >= BOSS_CONFIG.spawnTime) {
         const boss = createBoss(BOSS_CONFIG.spawnTime);
-        boss.position = { x: RING_RADII.R2_BOUNDARY * 0.7, y: 0 };
+        boss.position = { x: RING_RADII.R2 * 0.7, y: 0 };
         boss.radius = BOSS_CONFIG.radius;
         boss.isBoss = true;
         boss.maxHealth = BOSS_CONFIG.health;
         boss.currentHealth = BOSS_CONFIG.health;
-        
+
         state.boss = boss;
         state.bots.push(boss);
         bossState.currentBossActive = true;
-        
+
         createFloatingText(boss.position, 'RING GUARDIAN APPEARED!', '#ff0000', 24, state);
     }
 
@@ -383,7 +383,7 @@ export const updateBossLogic = (state: GameState, dt: number) => {
                 bossState.attackChargeTimer = 0;
             }
         }
-        
+
         // Check defeat
         if (state.boss.currentHealth <= 0) {
             handleBossDefeat(state);

@@ -1,13 +1,13 @@
 
 import { describe, it, expect } from 'vitest';
-import { THRESHOLDS } from '../services/cjr/cjrConstants';
+import { RING_THRESHOLDS as THRESHOLDS } from '../services/cjr/cjrConstants';
 import { createInitialState } from '../services/engine';
 import { getRushThreshold, isRushWindowActive, resetBossState } from '../services/cjr/bossCjr';
 
 describe('CJR Ring System', () => {
     it('should define strict thresholds', () => {
-        expect(THRESHOLDS.INTO_RING2).toBe(0.50);
-        expect(THRESHOLDS.INTO_RING3).toBe(0.70);
+        expect(THRESHOLDS.ENTER_R2).toBe(0.50);
+        expect(THRESHOLDS.ENTER_R3).toBe(0.70);
         expect(THRESHOLDS.WIN_HOLD).toBe(0.90);
     });
 });

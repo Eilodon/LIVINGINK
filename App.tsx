@@ -47,7 +47,10 @@ import {
   markTournamentReady,
   resetTournamentQueue,
   type TournamentQueueState,
+  type TournamentParticipant,
 } from './services/meta/tournaments';
+import TournamentLobbyScreen from './components/screens/TournamentLobbyScreen';
+import { updateProfileStats, unlockBadge } from './services/profile';
 
 const PixiGameCanvas = React.lazy(() => import('./components/PixiGameCanvas'));
 
@@ -154,16 +157,20 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setUi(s => ({ ...s, screen: 'menu' })), 250);
-    return () => window.clearTimeout(t);
-  }, []);
-
   const startGame = useCallback((name: string, shape: ShapeId, nextLevel: number, useMultiplayerOverride?: boolean) => {
+    console.log('🚀 startGame called:', { name, shape, nextLevel, useMultiplayerOverride });
+
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
     requestRef.current = 0;
 
     const state = createInitialState(nextLevel);
+    console.log('🎮 Initial state created:', {
+      player: !!state.player,
+      bots: state.bots.length,
+      food: state.food.length,
+      playerRadius: state.player.radius
+    });
+
     state.player.name = name;
     state.player.shape = shape;
 
@@ -173,6 +180,7 @@ const App: React.FC = () => {
     lastStartRef.current = { name, shape };
     setSelectedLevel(nextLevel);
 
+    console.log('🎮 Setting UI to playing state');
     setUi(() => ({ screen: 'playing', overlays: [] }));
 
     const useMultiplayer = useMultiplayerOverride ?? settings.useMultiplayer;
@@ -182,10 +190,28 @@ const App: React.FC = () => {
     }
 
     if (!progression.tutorialSeen && nextLevel <= 3) {
-      state.isPaused = true;
-      setUi((s) => pushOverlay(s, { type: 'tutorial', step: 0 }));
+      console.log('🎮 Tutorial overlay would show, but skipping for testing');
+      // state.isPaused = true;
+      // setUi((s) => pushOverlay(s, { type: 'tutorial', step: 0 }));
     }
   }, [progression.tutorialSeen, settings.useMultiplayer]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setUi(s => ({ ...s, screen: 'menu' }));
+      console.log('🎮 Game UI State: Menu screen activated');
+
+      // AUTO START FOR TESTING - FORCE IMMEDIATE
+      const autoStartTimer = window.setTimeout(() => {
+        console.log('🚀 AUTO STARTING GAME FOR TESTING');
+        console.log('🎮 Current UI State:', ui);
+        startGame('TestPlayer', 'circle', 1, false);
+      }, 500); // REDUCED TO 500MS
+
+      return () => window.clearTimeout(autoStartTimer);
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [startGame]);
 
   const gameLoop = useCallback((time: number) => {
     const state = gameStateRef.current;
@@ -225,7 +251,17 @@ const App: React.FC = () => {
           ...p,
           unlockedLevel: Math.max(p.unlockedLevel, clampLevel((state.level ?? selectedLevel) + 1)),
         }));
+        // Metagame Unlocks
+        if (state.level === 5) unlockBadge('badge_survivor');
+        if (state.level === 10) unlockBadge('badge_warrior');
+        if (state.level === 20) unlockBadge('badge_champion');
       }
+
+      // Save Stats
+      updateProfileStats({
+        kills: state.player.kills,
+        score: state.player.score
+      });
 
       setUi(() => ({ screen: 'gameOver', overlays: [] }));
       return;

@@ -1,71 +1,52 @@
+import { RING_THRESHOLDS, WIN_HOLD_DURATION } from './cjrConstants';
 
-import {
-    RING_RADII
-} from './cjrConstants';
-import { GameState } from '../../types';
-import { TattooId } from './cjrTypes';
-import { distance } from '../engine/math';
-import { LevelConfig } from './levels';
-
-export const updateWinCondition = (state: GameState, dt: number, config: LevelConfig) => {
-    if (state.isPaused || !state.player || state.player.isDead || state.result) return;
-
-    const p = state.player;
-
-    // 1. Check Condition: In Center Ring (Ring 3) AND Match >= 90%
-    // Ring 3 is physically center? No, Center is separate zone radius.
-    // cjrConstants: CENTER = 150
-
-    const dist = distance(p.position, { x: 0, y: 0 });
-    const inCenter = dist < RING_RADII.CENTER;
-    const matchReady = p.matchPercent >= config.thresholds.win;
-
-    if (inCenter && matchReady) {
-        if (!p.stationaryTime) p.stationaryTime = 0;
-
-        // Reset hold if recently hit
-        if (p.lastHitTime < 0.5) {
-            p.stationaryTime = 0;
-            return;
-        }
-
-        if (p.tattoos?.includes(TattooId.DepositShield)) {
-            p.statusEffects.shielded = true;
-            p.statusEffects.commitShield = Math.max(p.statusEffects.commitShield || 0, 1.0);
-        }
-
-        p.stationaryTime += dt;
-
-        // Visual: Pulse/Heartbeat
-        state.shakeIntensity = Math.min(5, p.stationaryTime * 2);
-
-        // WIN CHECK
-        if (p.stationaryTime >= config.winHoldSeconds) {
-            triggerWin(state);
-        }
-    } else {
-        p.stationaryTime = 0;
-    }
+export type WinState = {
+    isHolding: boolean;
+    holdTimer: number; // 0 -> WIN_HOLD_DURATION
+    winnerId: string | null;
+    pulseScale: number; // 0..1 for rendering heartbeat
 };
 
-const triggerWin = (state: GameState) => {
-    // Game Over - Victory
-    console.log("VICTORY!");
-    state.player.emotion = 'victory';
-    // Set Phase?
-    // We typically don't have GamePhase in GameState (it's in App.tsx).
-    // But we can signal via state flag or event.
-    // For MVP: Floating Text + Console
-    state.floatingTexts.push({
-        id: Math.random().toString(),
-        position: { x: 0, y: 0 },
-        text: "VICTORY!",
-        color: '#ffd700',
-        size: 60,
-        life: 5.0,
-        velocity: { x: 0, y: -10 }
+import { GameState, Player, RingId } from '../../types';
+
+export function updateWinCondition(
+    state: GameState,
+    dt: number,
+    config: any
+) {
+    if (state.result) return;
+
+    state.players.forEach(p => {
+        if (p.isDead) return;
+
+        // Check if eligible (Center Ring + High Match)
+        // Center Ring is Radius < 150 (approx) or just RingId.Inner
+        const dist = Math.hypot(p.position.x, p.position.y);
+        const inCenter = dist < 200 && p.ring === 3;
+        const hasMatch = p.matchPercent >= 0.90; // Win Hold Threshold
+
+        if (inCenter && hasMatch) {
+            p.stationaryTime = (p.stationaryTime || 0) + dt;
+
+            // WIN CONDITION MET
+            if (p.stationaryTime >= (config.winHoldSeconds || 1.5)) {
+                state.result = 'win';
+                state.kingId = p.id;
+                state.isPaused = true;
+                // Add bonus score
+                p.score += 5000;
+            }
+        } else {
+            // Decay
+            if (p.stationaryTime > 0) {
+                p.stationaryTime = Math.max(0, p.stationaryTime - dt * 2);
+            }
+        }
     });
 
-    state.result = 'win';
-    state.isPaused = true;
-};
+    // Also check time limit
+    if (state.gameTime >= config.timeLimit && !state.result) {
+        state.result = 'lose';
+        state.isPaused = true;
+    }
+}

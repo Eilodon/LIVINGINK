@@ -35,6 +35,7 @@ import {
   createPlayer,
   createProjectile,
 } from './factories';
+import { createFloatingText } from './effects';
 import { distance, normalize, randomRange } from './math';
 import { updateAI } from './systems/ai';
 import { applyProjectileEffect, resolveCombat, consumePickup } from './systems/combat';
@@ -178,6 +179,15 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
 
   if (player.skillCooldown > 0) {
     player.skillCooldown = Math.max(0, player.skillCooldown - dt * player.skillCooldownMultiplier);
+  }
+
+  // Decay Streak
+  if (player.streakTimer && player.streakTimer > 0) {
+    player.streakTimer -= dt;
+    if (player.streakTimer <= 0) {
+      player.killStreak = 0;
+      createFloatingText(player.position, 'Streak Lost', '#ccc', 16, state);
+    }
   }
 
   // Decay status effect timers
@@ -480,12 +490,12 @@ export const createInitialState = (level: number = 1): GameState => {
   resetContributionLog(runtime);
   tattooSynergyManager.reset();
 
-  const initialFood = Math.max(30, levelConfig.burstSizes.ring1 * 5);
+  const initialFood = Math.max(50, levelConfig.burstSizes.ring1 * 8); // INCREASED FOR TESTING
 
   return {
     player,
     players: [player],
-    bots: Array.from({ length: levelConfig.botCount }, (_, i) => createBot(`${i}`)),
+    bots: Array.from({ length: Math.max(levelConfig.botCount, 10) }, (_, i) => createBot(`${i}`)), // MINIMUM 10 BOTS
     creeps: [], // Deprecated
     boss: null,
     food: Array.from({ length: initialFood }, () => createFood()),

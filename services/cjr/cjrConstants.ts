@@ -1,42 +1,51 @@
-
-// Ring Radii
+// Ring System
 export const RING_RADII = {
-    R1_OUTER: 1600,
-    R2_BOUNDARY: 1000,
-    R3_BOUNDARY: 500,
-    CENTER: 150,
+    R1: 2000, // Outer Ring Boundary
+    R2: 1200, // Middle Ring Boundary
+    R3: 500,  // Inner Ring Boundary (Death Zone start)
+    CENTER: 0,
 };
 
-// Match Thresholds (to enter next ring)
-export const THRESHOLDS = {
-    INTO_RING2: 0.50, // 50% Match
-    INTO_RING3: 0.70, // 70% Match
-    WIN_HOLD: 0.90,   // 90% Match to channel win
+export const RING_THRESHOLDS = {
+    ENTER_R2: 0.50, // Match % required to enter Ring 2
+    ENTER_R3: 0.70, // Match % required to enter Ring 3
+    WIN_HOLD: 0.90, // Match % required to start holding center
 };
 
-// Wave Mechanics
-export const WAVE_INTERVALS = {
-    RING1: 8,
-    RING2: 10,
-    RING3: 13,
-};
-
-// Spawn Ratios per Ring (Pigment / Neutral / Special)
-export const SPAWN_WEIGHTS = {
-    RING1: { pigment: 0.6, neutral: 0.25, special: 0.15 },
-    RING2: { pigment: 0.6, neutral: 0.25, special: 0.15 },
-    RING3: { pigment: 0.6, neutral: 0.25, special: 0.15 },
-};
-
-// Commit Buffs (Momentum for entering new ring)
+// Commit Buffs (when entering a new ring)
 export const COMMIT_BUFFS = {
-    SPEED_DURATION: 2.0,
-    SPEED_BOOST: 1.1,
-    SHIELD_DURATION: 2.0,
+    SHIELD_DURATION: 2000, // ms
+    SPEED_BOOST_PERCENT: 0.10,
+    SPEED_BOOST_DURATION: 2000, // ms
 };
 
-export const CONTRIBUTION_TIERS = [
-    { rank: 1, speedBoost: 1.2, shieldDuration: 5 },
-    { rank: 2, speedBoost: 1.1, shieldDuration: 3 },
-    { rank: 3, speedBoost: 1.05, shieldDuration: 0 }
-];
+// Wave Spawning
+export const WAVE_INTERVALS = {
+    R1: 8000, // ms
+    R2: 10000, // ms
+    R3: 12000, // ms
+};
+
+export const SPAWN_RATIOS = {
+    PIGMENT: 0.60,
+    NEUTRAL: 0.25,
+    SPECIAL: 0.15,
+};
+
+// Candy Vein (Dynamic Bounty)
+export const CANDY_VEIN = {
+    TRIGGER_RATIO: 0.30, // Trigger if alive/total in R3 <= 30%
+    LIFETIME: 10000, // ms
+    SPAWN_RADIUS_MIN: 100,
+    SPAWN_RADIUS_MAX: 400,
+};
+
+// Color Math
+export const COLOR_LERP = {
+    BASE_ALPHA: 0.1, // Default blending speed
+    HEAVY_MASS_PENALTY: 0.05, // Reduction in blending speed as mass grows
+};
+
+// Win Condition
+export const WIN_HOLD_DURATION = 1500; // ms to win in center
+export const PULSE_INTERVAL = 500; // ms between heartbeat pulses

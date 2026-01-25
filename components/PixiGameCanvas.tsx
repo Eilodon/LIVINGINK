@@ -1,8 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { Application, Graphics, Container, Text, TextStyle } from 'pixi.js';
-import { GameState, Player, Bot, Entity, Food } from '../types';
-import { MAP_RADIUS, COLOR_PALETTE, RING_RADII } from '../constants';
-import { ShapeId, Emotion } from '../services/cjr/cjrTypes';
+import { Application, Graphics, Container, Text, TextStyle, Mesh, Geometry, Shader, Texture } from 'pixi.js';
+import { GameState } from '../types';
+import { MAP_RADIUS, COLOR_PALETTE } from '../constants';
+import { RING_RADII } from '../services/cjr/cjrConstants';
+import { ShapeId, Emotion, PigmentVec3 } from '../services/cjr/cjrTypes';
+import { getEmotionDuration } from '../services/cjr/emotions';
+import { pigmentToHex } from '../services/cjr/colorMath';
+import { JELLY_VERTEX } from '../services/cjr/shaders';
+
+// Constants for Grid/Map
+const GRID_SIZE = 100;
 
 interface PixiGameCanvasProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -12,32 +19,20 @@ interface PixiGameCanvasProps {
 const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnabled }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
+
+  // Entity Containers
   const entitiesRef = useRef<Map<string, Container>>(new Map());
-  const inputEnabledRef = useRef(inputEnabled);
-  const entitiesLayerRef = useRef<Container | null>(null);
-  const particlesGraphicsRef = useRef<Graphics | null>(null);
-  const floatingTextLayerRef = useRef<Container | null>(null);
-  const floatingTextMapRef = useRef<Map<string, Text>>(new Map());
-  const iconTextMapRef = useRef<Map<string, Text>>(new Map());
-  useEffect(() => {
-    inputEnabledRef.current = inputEnabled;
-  }, [inputEnabled]);
-
-  const membranesRef = useRef<{
-    layer: Container;
-    r2: Graphics;
-    r3Stroke: Graphics;
-    r3Fill: Graphics;
-    center: Graphics;
-  } | null>(null);
-
-  // PERFORMANCE FIX: Metadata map for entity rendering state
   const entityMetaRef = useRef<Map<string, {
     body: Graphics;
     face: Graphics | null;
-    lastEmotion: any;
+    lastEmotion: Emotion | null;
     lastRadius: number;
+    lastColor: string;
   }>>(new Map());
+
+  // Input State
+  const inputEnabledRef = useRef(inputEnabled);
+  useEffect(() => { inputEnabledRef.current = inputEnabled; }, [inputEnabled]);
 
   // Init Pixi
   useEffect(() => {
@@ -45,108 +40,111 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
 
     const app = new Application();
 
-    // Init async
     app.init({
       background: COLOR_PALETTE.background,
       resizeTo: window,
       antialias: true,
       resolution: window.devicePixelRatio || 1,
     }).then(() => {
-      containerRef.current?.appendChild(app.canvas);
+      if (!containerRef.current) return;
+      containerRef.current.appendChild(app.canvas);
       appRef.current = app;
 
-      // Setup World Container
+      // --- LAYERS ---
+      // 1. World (Everything scales/moves here)
       const world = new Container();
       world.label = 'World';
       world.x = app.screen.width / 2;
       world.y = app.screen.height / 2;
       app.stage.addChild(world);
 
-      // Input Handling (Mouse/Pointer)
+      // 2. Map Layer (Grid + Rings)
+      const mapLayer = new Container();
+      world.addChild(mapLayer);
+      drawStaticMap(mapLayer);
+
+      // 3. Membrane Layer (Animated Rings)
+      const membraneLayer = new Container();
+      world.addChild(membraneLayer);
+
+      // 4. Entities Layer (Players, Food)
+      const entitiesLayer = new Container();
+      world.addChild(entitiesLayer);
+
+      // 5. VFX/Particles Layer
+      const vfxLayer = new Container();
+      world.addChild(vfxLayer);
+
+      // 6. Floating UI Layer (Damage numbers, Emotes)
+      const uiLayer = new Container();
+      world.addChild(uiLayer);
+
+      // --- EVENTS ---
       app.stage.eventMode = 'static';
       app.stage.hitArea = app.screen;
+
       app.stage.on('pointermove', (e) => {
         if (!inputEnabledRef.current) return;
         const state = gameStateRef.current;
         if (state && state.player) {
-          // Convert screen to world space
-          // Camera is at center of screen (screen.width/2, height/2)
-          // Player is at camera.x, camera.y
-          // Mouse relative to center: e.global.x - width/2
-          const screenCenterX = app.screen.width / 2;
-          const screenCenterY = app.screen.height / 2;
-          const dx = e.global.x - screenCenterX;
-          const dy = e.global.y - screenCenterY;
+          // Camera is at center of screen, offset by world position
+          // Mouse Screen Pos -> World Pos
+          // World.position = ScreenCenter - CameraPos
+          // MouseWorld = (MouseScreen - ScreenCenter) + CameraPos
+          const centerX = app.screen.width / 2;
+          const centerY = app.screen.height / 2;
+          const dx = e.global.x - centerX;
+          const dy = e.global.y - centerY;
 
           state.player.targetPosition = {
-            x: state.player.position.x + dx,
-            y: state.player.position.y + dy
+            x: state.camera.x + dx,
+            y: state.camera.y + dy
           };
         }
       });
-      // Click implies skill trigger or generic action
+
       app.stage.on('pointerdown', () => {
-        if (!inputEnabledRef.current) return;
-        const state = gameStateRef.current;
-        if (state) state.inputs.space = true;
+        if (inputEnabledRef.current && gameStateRef.current) {
+          gameStateRef.current.inputs.space = true;
+        }
       });
+
       app.stage.on('pointerup', () => {
-        const state = gameStateRef.current;
-        if (state) state.inputs.space = false;
+        if (gameStateRef.current) {
+          gameStateRef.current.inputs.space = false;
+        }
       });
 
-      // Setup Map Graphics
-      const map = new Graphics();
-      map.label = 'Map';
-      world.addChild(map);
+      // --- TICKER ---
+      app.ticker.add((ticker) => {
+        const state = gameStateRef.current;
+        if (!state || !state.player) return;
 
-      // Draw Map Static
-      drawMap(map);
+        const dt = ticker.deltaTime; // Scalar (1 = 60fps)
+        const time = state.gameTime;
 
-      // Entities + VFX layers
-      const entitiesLayer = new Container();
-      entitiesLayer.label = 'Entities';
-      world.addChild(entitiesLayer);
-      entitiesLayerRef.current = entitiesLayer;
+        // 1. Camera Follow (Lerp)
+        const targetX = -state.camera.x + app.screen.width / 2;
+        const targetY = -state.camera.y + app.screen.height / 2;
 
-      const particlesGraphics = new Graphics();
-      particlesGraphics.label = 'Particles';
-      world.addChild(particlesGraphics);
-      particlesGraphicsRef.current = particlesGraphics;
-
-      const floatingTextLayer = new Container();
-      floatingTextLayer.label = 'FloatingText';
-      world.addChild(floatingTextLayer);
-      floatingTextLayerRef.current = floatingTextLayer;
-
-      // Render Loop
-      app.ticker.add(() => {
-        const currentGameState = gameStateRef.current;
-        if (!currentGameState || !currentGameState.player) return;
-
-        // Camera Follow (Smooth Lerp?)
-        const targetX = app.screen.width / 2 - currentGameState.camera.x;
-        const targetY = app.screen.height / 2 - currentGameState.camera.y;
-
-        // Simple lerp for smoothness
-        world.x += (targetX - world.x) * 0.1;
-        world.y += (targetY - world.y) * 0.1;
-
-        // VFX POLISH: Update membrane pulse
-        updateMembranes(world, currentGameState.gameTime);
-
-        // VFX: Draw particles + floating texts
-        if (particlesGraphicsRef.current) {
-          drawParticles(particlesGraphicsRef.current, currentGameState);
-        }
-        if (floatingTextLayerRef.current) {
-          syncFloatingTexts(floatingTextLayerRef.current, currentGameState);
-          syncIconParticles(floatingTextLayerRef.current, currentGameState);
+        // Snap if too far (teleport), else lerp
+        const dist = Math.hypot(world.x - targetX, world.y - targetY);
+        if (dist > 500) {
+          world.x = targetX;
+          world.y = targetY;
+        } else {
+          world.x += (targetX - world.x) * 0.1;
+          world.y += (targetY - world.y) * 0.1;
         }
 
-        // Sync Entities
-        const entityLayer = entitiesLayerRef.current || world;
-        syncEntities(entityLayer, currentGameState);
+        // 2. Membrane Animation
+        updateMembranes(membraneLayer, time);
+
+        // 3. Sync Entities
+        syncEntities(entitiesLayer, state, time);
+
+        // 4. VFX (Particles)
+        syncParticles(vfxLayer, uiLayer, state, dt);
       });
     });
 
@@ -156,461 +154,370 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
     };
   }, []);
 
-  const drawMap = (g: Graphics) => {
-    g.clear();
-    // Background Grid
-    g.rect(-MAP_RADIUS, -MAP_RADIUS, MAP_RADIUS * 2, MAP_RADIUS * 2).stroke({ width: 4, color: COLOR_PALETTE.grid, alpha: 0.1 });
+  // --- PARTICLE SYSTEM ---
+  const particlesRef = useRef<Map<string, Container>>(new Map());
 
-    // Outer Boundary (Dead Zone)
-    g.circle(0, 0, MAP_RADIUS).stroke({ width: 8, color: '#ffffff', alpha: 0.2 });
+  const syncParticles = (vfxContainer: Container, uiContainer: Container, state: GameState, dt: number) => {
+    const activeIds = new Set<string>();
 
-    // NOTE: Ring membranes will be animated separately in render loop
-  };
+    // Process Particles
+    state.particles.forEach(p => {
+      activeIds.add(p.id);
 
-  // VFX POLISH: Membrane living pulse animation
-  const updateMembranes = (world: Container, gameTime: number) => {
-    if (!membranesRef.current) {
-      const layer = new Container();
-      layer.label = 'Membranes';
-      world.addChildAt(layer, 0);
+      let pContainer = particlesRef.current.get(p.id);
+      if (!pContainer) {
+        pContainer = new Container();
+        pContainer.label = `P_${p.id}`;
 
-      const r2 = new Graphics();
-      r2.circle(0, 0, RING_RADII.R2_BOUNDARY).stroke({ width: 6, color: '#3b82f6', alpha: 1 });
+        // Initial Draw
+        const g = new Graphics();
+        pContainer.addChild(g);
 
-      const r3Stroke = new Graphics();
-      r3Stroke.circle(0, 0, RING_RADII.R3_BOUNDARY).stroke({ width: 8, color: '#ef4444', alpha: 1 });
-
-      const r3Fill = new Graphics();
-      r3Fill.circle(0, 0, RING_RADII.R3_BOUNDARY).fill({ color: '#ef4444', alpha: 1 });
-
-      const center = new Graphics();
-      center.circle(0, 0, RING_RADII.CENTER).fill({ color: '#ffd700', alpha: 1 });
-
-      layer.addChild(r2, r3Fill, r3Stroke, center);
-      membranesRef.current = { layer, r2, r3Stroke, r3Fill, center };
-    }
-
-    const { r2, r3Stroke, r3Fill, center } = membranesRef.current;
-
-    const pulseSpeed = 2.0;
-    const pulsePhase = gameTime * pulseSpeed * Math.PI * 2;
-    const pulseAlpha = 0.3 + Math.sin(pulsePhase) * 0.2;
-
-    r2.alpha = pulseAlpha;
-    r3Stroke.alpha = pulseAlpha * 1.3;
-    r3Fill.alpha = 0.05;
-    center.alpha = pulseAlpha * 0.3;
-  };
-
-  const syncEntities = (world: Container, state: GameState) => {
-    const currentIds = new Set<string>();
-    const allEntities = [
-      state.player,
-      ...state.bots,
-      ...state.food,
-      ...state.projectiles
-    ];
-
-    allEntities.forEach((e: any) => {
-      if (e.isDead) return;
-      currentIds.add(e.id);
-
-      let container = entitiesRef.current.get(e.id);
-      if (!container) {
-        container = new Container();
-
-        // Body Graphics
-        const body = new Graphics();
-        body.label = 'Body';
-        container.addChild(body);
-
-        // Emotion/Face Graphics (only for players/bots)
-        if (e.shape || e.targetPigment) {
-          const face = new Graphics();
-          face.label = 'Face';
-          container.addChild(face);
-        }
-
-        // Name Label
-        if (e.name) {
-          const label = new Text({
-            text: e.name,
-            style: {
-              fontFamily: 'Sora',
-              fontSize: 12,
-              fill: 0xffffff,
-              align: 'center',
-            }
+        // Text Handling
+        if ((p as any).isText) {
+          const style = new TextStyle({
+            fontFamily: 'Sora',
+            fontSize: (p as any).fontSize || 20,
+            fill: (p as any).textColor || '#ffffff',
+            stroke: { width: 4, color: '#000000' },
+            fontWeight: 'bold',
+            dropShadow: {
+              color: '#000000',
+              blur: 2,
+              distance: 2,
+              alpha: 0.5
+            },
           });
-          label.anchor.set(0.5, 1.5); // Position above
-          label.y = -e.radius;
-          container.addChild(label);
+          const text = new Text({ text: (p as any).textContent || '', style });
+          text.anchor.set(0.5);
+          pContainer.addChild(text);
+          // Hide graphics for text particles usually, or use it for background?
+          g.visible = false;
         }
 
-        // PERFORMANCE FIX: Store direct references in metadata map (O(1) access)
-        // Instead of using find() every frame (O(N) per entity)
-        entityMetaRef.current.set(e.id, {
-          body,
-          face: container.children.find(c => c.label === 'Face') as Graphics || null,
-          lastEmotion: null,
-          lastRadius: 0,
-        });
-
-        world.addChild(container);
-        entitiesRef.current.set(e.id, container);
+        if ((p as any).isText) {
+          uiContainer.addChild(pContainer);
+        } else {
+          vfxContainer.addChild(pContainer);
+        }
+        particlesRef.current.set(p.id, pContainer);
       }
 
       // Update Position
-      container.x = e.position.x;
-      container.y = e.position.y;
-      container.rotation = e.rotation || 0;
+      pContainer.x = p.position.x;
+      pContainer.y = p.position.y;
+      pContainer.rotation = (p.angle || 0);
 
-      if (!e.kind) {
-        const speed = Math.hypot(e.velocity?.x || 0, e.velocity?.y || 0);
-        const stretch = Math.min(0.15, speed / 400);
-        const wobble = Math.sin(state.gameTime * 6 + e.position.x * 0.01) * 0.03;
-        container.scale.set(1 + stretch + wobble, 1 - stretch + wobble);
-      } else {
-        container.scale.set(1, 1);
-      }
+      // Visuals Update (Redraw if needed or just scale/fade)
+      const g = pContainer.children[0] as Graphics;
+      const alpha = Math.min(1, p.life / (p.maxLife * 0.2)); // Fade out last 20%
+      pContainer.alpha = (p as any).fadeOut ? Math.min(alpha, 1) : 1;
 
-      // PERFORMANCE FIX: Direct access from metadata map instead of find()
-      const meta = entityMetaRef.current.get(e.id);
-      if (!meta) return;
+      const scale = (p as any).scale ?? 1;
+      pContainer.scale.set(scale);
 
-      const body = meta.body;
-      const face = meta.face;
-
-      // Only update visuals if needed
-      if (body) {
-        // Always update body (color/size can change)
-        updateBodyVisuals(body, e);
-      }
-
-      if (face) {
-        // Only update face if emotion or size changed
-        const emotionChanged = e.emotion !== meta.lastEmotion;
-        const sizeChanged = Math.abs(e.radius - meta.lastRadius) > 5;
-
-        if (emotionChanged || sizeChanged) {
-          updateFaceVisuals(face, e);
-          meta.lastEmotion = e.emotion;
-          meta.lastRadius = e.radius;
-        }
+      // Dynamic Redraws for specialized particles
+      if ((p as any).isRipple) {
+        g.clear();
+        g.circle(0, 0, (p as any).rippleRadius || 0);
+        g.stroke({ width: 4, color: (p as any).rippleColor || '#ffffff', alpha: 0.5 });
+      } else if ((p as any).isPulse) {
+        g.clear();
+        g.circle(0, 0, (p as any).pulseRadius || 0);
+        g.fill({ color: (p as any).pulseColor || '#ffffff', alpha: (p as any).glowIntensity || 0.5 });
+      } else if ((p as any).isShockwave) {
+        g.clear();
+        g.circle(0, 0, (p as any).shockwaveRadius || 0);
+        g.stroke({ width: 8, color: (p as any).shockwaveColor || '#ffffff', alpha: 0.8 });
+      } else if ((p as any).isLightRay) {
+        g.clear();
+        const len = (p as any).rayLength || 100;
+        const width = (p as any).rayWidth || 2;
+        g.rect(0, -width / 2, len, width);
+        g.fill({ color: p.color || '#fff' });
+      } else if (!(p as any).isText) {
+        // Standard Particle
+        // Only draw once if static shape? For now redraw to be safe or optimize later.
+        // If radius changes?
+        g.clear();
+        g.circle(0, 0, p.radius || 3);
+        g.fill(p.color || '#fff');
       }
     });
 
     // Cleanup
-    for (const [id, container] of entitiesRef.current) {
-      if (!currentIds.has(id)) {
-        world.removeChild(container);
-        container.destroy({ children: true });
+    for (const [id, c] of particlesRef.current) {
+      if (!activeIds.has(id)) {
+        c.parent.removeChild(c);
+        c.destroy({ children: true });
+        particlesRef.current.delete(id);
+      }
+    }
+
+    // Also sync Floating Texts into UI Layer (if separate list)
+    // state.floatingTexts is separate list
+    syncFloatingTexts(uiContainer, state);
+  };
+
+  const textsRef = useRef<Map<string, Text>>(new Map());
+  const syncFloatingTexts = (container: Container, state: GameState) => {
+    const activeIds = new Set<string>();
+    state.floatingTexts.forEach(t => {
+      activeIds.add(t.id);
+      let textObj = textsRef.current.get(t.id);
+      if (!textObj) {
+        const style = new TextStyle({
+          fontFamily: 'Sora',
+          fontSize: t.size,
+          fill: t.color,
+          stroke: { width: 3, color: '#000000' },
+          fontWeight: 'bold',
+        });
+        textObj = new Text({ text: t.text, style });
+        textObj.anchor.set(0.5);
+        container.addChild(textObj);
+        textsRef.current.set(t.id, textObj);
+      }
+      textObj.x = t.position.x;
+      textObj.y = t.position.y;
+      textObj.alpha = Math.min(1, t.life * 2);
+      textObj.scale.set(1 + (1 - t.life) * 0.5); // Pop effect
+    });
+
+    for (const [id, t] of textsRef.current) {
+      if (!activeIds.has(id)) {
+        container.removeChild(t);
+        t.destroy();
+        textsRef.current.delete(id);
+      }
+    }
+  };
+
+
+  // --- HELPERS ---
+
+  const drawStaticMap = (container: Container) => {
+    const g = new Graphics();
+
+    // Background Grid
+    g.beginPath();
+    g.strokeStyle = { width: 1, color: COLOR_PALETTE.grid, alpha: 0.1 };
+
+    // Simple large grid for performance
+    const steps = Math.floor(MAP_RADIUS / GRID_SIZE);
+    for (let i = -steps; i <= steps; i++) {
+      const p = i * GRID_SIZE;
+      g.moveTo(p, -MAP_RADIUS);
+      g.lineTo(p, MAP_RADIUS);
+      g.moveTo(-MAP_RADIUS, p);
+      g.lineTo(MAP_RADIUS, p);
+    }
+    g.stroke();
+
+    // Map Boundary
+    g.beginPath();
+    g.circle(0, 0, MAP_RADIUS);
+    g.stroke({ width: 8, color: '#ffffff', alpha: 0.2 });
+
+    container.addChild(g);
+  };
+
+  const updateMembranes = (container: Container, time: number) => {
+    // Lazy Init
+    if (container.children.length === 0) {
+      const g = new Graphics();
+      g.label = 'MembranesGraphics';
+      container.addChild(g);
+    }
+
+    const g = container.children[0] as Graphics;
+    g.clear();
+
+    const pulse = Math.sin(time * 2) * 20;
+
+    // R3 (Death Zone)
+    g.circle(0, 0, RING_RADII.R3 + pulse * 0.5);
+    g.fill({ color: '#ef4444', alpha: 0.1 });
+    g.stroke({ width: 4, color: '#ef4444', alpha: 0.5 });
+
+    // R2 (Mid)
+    g.circle(0, 0, RING_RADII.R2 + pulse);
+    g.stroke({ width: 2, color: '#3b82f6', alpha: 0.3 });
+  };
+
+  const syncEntities = (container: Container, state: GameState, time: number) => {
+    const activeIds = new Set<string>();
+
+    // Gather all entities
+    const entities = [state.player, ...state.bots, ...state.food];
+
+    entities.forEach(e => {
+      if (e.isDead) return;
+      activeIds.add(e.id);
+
+      // Get or Create Container
+      let eContainer = entitiesRef.current.get(e.id);
+      if (!eContainer) {
+        eContainer = new Container();
+        eContainer.label = e.id;
+
+        const body = new Graphics();
+        body.label = 'Body';
+        eContainer.addChild(body);
+
+        // Setup Face for non-food
+        let face: Graphics | null = null;
+        if ('emotion' in e) {
+          face = new Graphics();
+          face.label = 'Face';
+          eContainer.addChild(face);
+
+          // Name Tag
+          const text = new Text({ text: (e as any).name, style: { fontSize: 12, fill: 0xffffff, fontFamily: 'Sora' } });
+          text.resolution = 2; // Sharp text
+          text.anchor.set(0.5, 1.5);
+          text.y = -20;
+          eContainer.addChild(text);
+        }
+
+        container.addChild(eContainer);
+        entitiesRef.current.set(e.id, eContainer);
+        entityMetaRef.current.set(e.id, {
+          body,
+          face,
+          lastEmotion: null,
+          lastRadius: 0,
+          lastColor: ''
+        });
+      }
+
+      // Update Position
+      eContainer.x = e.position.x;
+      eContainer.y = e.position.y;
+
+      // Visual Jiggle (Jelly Effect Lite)
+      if ('emotion' in e) {
+        const speed = Math.hypot(e.velocity.x, e.velocity.y);
+        const stretch = Math.min(0.2, speed / 500);
+        const wobble = Math.sin(time * 10 + e.position.x * 0.01) * 0.05;
+        eContainer.scale.set(1 + stretch - wobble, 1 - stretch + wobble);
+        eContainer.rotation = Math.atan2(e.velocity.y, e.velocity.x) * 0.1; // Slight tilt
+      }
+
+      // Update Graphics if changed
+      const meta = entityMetaRef.current.get(e.id)!;
+      const color = e.color || '#fff'; // Assuming e.color is updated from pigment elsewhere or we compute it
+      // TODO: Use pigmentToHex if color is not pre-computed or if we want exact pigment rendering
+
+      const radius = e.radius;
+      const emotion = (e as any).emotion as Emotion;
+
+      if (meta.lastRadius !== radius || meta.lastColor !== color) {
+        meta.body.clear();
+
+        if ('kind' in e) {
+          // Pickup
+          drawPickup(meta.body, e as any, radius, color);
+        } else {
+          // Player/Bot
+          // TODO: Shape support
+          meta.body.circle(0, 0, radius);
+          meta.body.fill({ color });
+          meta.body.stroke({ width: 2, color: '#000000', alpha: 0.2 });
+        }
+
+        meta.lastRadius = radius;
+        meta.lastColor = color;
+      }
+
+      if (meta.face && emotion !== meta.lastEmotion) {
+        drawFace(meta.face, emotion, radius);
+        meta.lastEmotion = emotion;
+      }
+    });
+
+    // Cleanup Dead
+    for (const [id, c] of entitiesRef.current) {
+      if (!activeIds.has(id)) {
+        container.removeChild(c);
+        c.destroy({ children: true });
         entitiesRef.current.delete(id);
         entityMetaRef.current.delete(id);
       }
     }
   };
 
-  const updateBodyVisuals = (g: Graphics, e: any) => {
-    g.clear();
-    const color = e.color || '#ffffff';
-    const r = e.radius || 10;
-
-    // Check if food
-    if (e.kind) { // Food
-      if (e.kind === 'pigment') {
-        g.circle(0, 0, r).fill({ color });
-      } else if (e.kind === 'neutral') {
-        g.circle(0, 0, r * 0.9).fill({ color: '#9ca3af' });
-      } else if (e.kind === 'solvent') {
-        g.rect(-r * 0.7, -r * 0.7, r * 1.4, r * 1.4).fill({ color: '#a5b4fc' });
-      } else if (e.kind === 'catalyst') {
-        g.poly(getPolygonPoints(6, r)).fill({ color: '#d946ef' });
-      } else if (e.kind === 'shield') {
-        g.poly(getPolygonPoints(3, r)).fill({ color: '#fbbf24' }); // Triangle
-      } else {
-        g.circle(0, 0, r * 0.8).fill({ color: '#888' }); // Dot
-      }
-      return;
+  const drawPickup = (g: Graphics, e: any, r: number, c: string) => {
+    const kind = e.kind;
+    if (kind === 'pigment') {
+      g.circle(0, 0, r).fill(c);
+    } else if (kind === 'neutral') {
+      g.rect(-r / 2, -r / 2, r, r).fill('#9ca3af').stroke({ width: 1, color: '#fff' });
+    } else if (kind === 'solvent') {
+      g.star(0, 0, 4, r, r / 2).fill('#a5b4fc');
+    } else if (kind === 'candy_vein') {
+      g.star(0, 0, 5, r * 1.5, r).fill('#fbbf24').stroke({ width: 2, color: '#fff' });
+    } else {
+      g.circle(0, 0, r).fill('#555');
     }
-
-    // Player/Bot Shape
-    const shape = e.shape as ShapeId || ShapeId.Circle;
-
-    switch (shape) {
-      case ShapeId.Square:
-        g.rect(-r, -r, r * 2, r * 2).fill({ color });
-        break;
-      case ShapeId.Triangle:
-        g.poly(getPolygonPoints(3, r)).fill({ color });
-        break;
-      case ShapeId.Hex:
-        g.poly(getPolygonPoints(6, r)).fill({ color });
-        break;
-      case ShapeId.Circle:
-      default:
-        g.circle(0, 0, r).fill({ color });
-        break;
-    }
-
-    // Stroke for contrast
-    g.stroke({ width: 2, color: '#000000', alpha: 0.3 });
   };
 
-  const updateFaceVisuals = (g: Graphics, e: any) => {
+  const drawFace = (g: Graphics, emotion: Emotion, r: number) => {
     g.clear();
-    // Only draw face if radius is big enough
-    if (e.radius < 15) return;
+    // Simple Face drawing logic based on emotion
+    const eyeOff = r * 0.35;
+    const eyeSize = r * 0.15;
 
-    const emotion = e.emotion as Emotion || Emotion.Neutral;
-    const eyeOffset = e.radius * 0.4;
-    const eyeSize = e.radius * 0.15;
-    const mouthY = e.radius * 0.3;
+    g.fillStyle = 0x000000;
 
     // Eyes
-    g.circle(-eyeOffset, -eyeOffset * 0.5, eyeSize).fill({ color: '#000' });
-    g.circle(eyeOffset, -eyeOffset * 0.5, eyeSize).fill({ color: '#000' });
+    if (emotion === 'panic' || emotion === 'ko') {
+      // X eyes for KO? or Big O for panic
+      g.circle(-eyeOff, -eyeOff / 2, eyeSize * 1.2).fill();
+      g.circle(eyeOff, -eyeOff / 2, eyeSize * 1.2).fill();
+    } else if (emotion === 'focus') {
+      // Narrow eyes
+      g.rect(-eyeOff - eyeSize, -eyeOff / 2, eyeSize * 2, eyeSize / 2).fill();
+      g.rect(eyeOff - eyeSize, -eyeOff / 2, eyeSize * 2, eyeSize / 2).fill();
+    } else {
+      g.circle(-eyeOff, -eyeOff / 2, eyeSize).fill();
+      g.circle(eyeOff, -eyeOff / 2, eyeSize).fill();
+    }
 
-    // Highlights
-    g.circle(-eyeOffset - eyeSize * 0.3, -eyeOffset * 0.5 - eyeSize * 0.3, eyeSize * 0.4).fill({ color: '#fff' });
-    g.circle(eyeOffset - eyeSize * 0.3, -eyeOffset * 0.5 - eyeSize * 0.3, eyeSize * 0.4).fill({ color: '#fff' });
-
-    // Mouth based on Emotion
-    g.moveTo(-eyeOffset, mouthY);
-
-    switch (emotion) {
-      case Emotion.Happy:
-      case Emotion.Win:
-      case Emotion.Victory:
-        // Big smile
-        g.quadraticCurveTo(0, mouthY + e.radius * 0.3, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Yum:
-        // Open mouth (eating)
-        g.moveTo(-eyeOffset * 0.5, mouthY).lineTo(eyeOffset * 0.5, mouthY).stroke({ width: 2, color: '#000' });
-        g.arc(0, mouthY, eyeOffset * 0.5, 0, Math.PI).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Greed:
-        // Wide grin with dollar sign eyes
-        g.quadraticCurveTo(0, mouthY + e.radius * 0.4, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        // Dollar sign eyes using small circles
-        g.circle(-eyeOffset, -eyeOffset, eyeSize * 0.3).fill({ color: '#000' });
-        g.circle(eyeOffset, -eyeOffset, eyeSize * 0.3).fill({ color: '#000' });
-        break;
-      case Emotion.Sad:
-      case Emotion.Despair:
-      case Emotion.Ko:
-        // Frown
-        g.quadraticCurveTo(0, mouthY - e.radius * 0.2, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Angry:
-        // Angry eyebrows + frown
-        g.moveTo(-eyeOffset - eyeSize, -eyeOffset - eyeSize).lineTo(-eyeOffset + eyeSize / 2, -eyeOffset * 0.5).stroke({ width: 2, color: '#000' });
-        g.moveTo(eyeOffset + eyeSize, -eyeOffset - eyeSize).lineTo(eyeOffset - eyeSize / 2, -eyeOffset * 0.5).stroke({ width: 2, color: '#000' });
-        g.quadraticCurveTo(0, mouthY - e.radius * 0.1, eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Focus:
-        // Concentrated eyebrows + neutral mouth
-        g.moveTo(-eyeOffset - eyeSize * 0.5, -eyeOffset - eyeSize * 0.5).lineTo(-eyeOffset + eyeSize / 2, -eyeOffset * 0.7).stroke({ width: 2, color: '#000' });
-        g.moveTo(eyeOffset + eyeSize * 0.5, -eyeOffset - eyeSize * 0.5).lineTo(eyeOffset - eyeSize / 2, -eyeOffset * 0.7).stroke({ width: 2, color: '#000' });
-        g.moveTo(-eyeOffset, mouthY).lineTo(eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Panic:
-        // Wide eyes + open mouth
-        g.circle(-eyeOffset, -eyeOffset, eyeSize * 1.2).stroke({ width: 2, color: '#000' });
-        g.circle(eyeOffset, -eyeOffset, eyeSize * 1.2).stroke({ width: 2, color: '#000' });
-        g.moveTo(-eyeOffset * 0.7, mouthY + eyeSize).lineTo(eyeOffset * 0.7, mouthY + eyeSize).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Hungry:
-        // Droopy eyes + small open mouth
-        g.moveTo(-eyeOffset, -eyeOffset - eyeSize * 0.5).lineTo(-eyeOffset, -eyeOffset + eyeSize * 0.5).stroke({ width: 2, color: '#000' });
-        g.moveTo(eyeOffset, -eyeOffset - eyeSize * 0.5).lineTo(eyeOffset, -eyeOffset + eyeSize * 0.5).stroke({ width: 2, color: '#000' });
-        g.arc(0, mouthY, eyeSize * 0.3, 0, Math.PI).stroke({ width: 2, color: '#000' });
-        break;
-      case Emotion.Neutral:
-      default:
-        // Simple line mouth
-        g.lineTo(eyeOffset, mouthY).stroke({ width: 2, color: '#000' });
-        break;
+    // Mouth
+    g.beginPath();
+    if (emotion === 'happy') {
+      g.arc(0, 0, r * 0.3, 0.2, Math.PI - 0.2);
+      g.stroke({ width: 2, color: 0x000000 });
+    } else if (emotion === 'hungry') {
+      g.arc(0, r * 0.2, r * 0.1, 0, Math.PI * 2);
+      g.fill();
+    } else if (emotion === 'yum') {
+      g.moveTo(-r * 0.2, r * 0.2);
+      g.quadraticCurveTo(0, r * 0.4, r * 0.2, r * 0.2);
+      g.stroke({ width: 2, color: 0x000000 });
+      // Tongue
+      g.fillStyle = 0xffaaaa;
+      g.arc(r * 0.1, r * 0.3, r * 0.1, 0, Math.PI);
+      g.fill();
+    } else {
+      // Neutral line
+      g.moveTo(-r * 0.2, r * 0.2);
+      g.lineTo(r * 0.2, r * 0.2);
+      g.stroke({ width: 2, color: 0x000000 });
     }
   };
 
-  const drawParticles = (g: Graphics, state: GameState) => {
-    g.clear();
-
-    state.particles.forEach((p: any) => {
-      if (p.isDead || p.isIcon) return;
-
-      const baseAlpha = p.fadeOut ? (p.life / p.maxLife) : 1;
-      const opacity = p.bubbleOpacity ?? p.waveOpacity ?? p.auraIntensity ?? 1;
-      const alpha = Math.max(0, Math.min(1, baseAlpha * opacity));
-      const color = toPixiColor(
-        p.color ||
-          p.rippleColor ||
-          p.pulseColor ||
-          p.shockwaveColor ||
-          p.waveColor ||
-          p.auraColor ||
-          p.bubbleColor ||
-          p.shieldColor ||
-          p.fieldColor ||
-          p.orbColor
-      );
-
-      if (p.style === 'line') {
-        const len = p.lineLength || p.radius * 2;
-        const angle = p.angle || 0;
-        g.moveTo(p.position.x, p.position.y);
-        g.lineTo(
-          p.position.x + Math.cos(angle) * len,
-          p.position.y + Math.sin(angle) * len
-        );
-        g.stroke({ width: p.lineWidth || 2, color, alpha });
-        return;
-      }
-
-      const ringRadius =
-        p.rippleRadius ||
-        p.pulseRadius ||
-        p.shockwaveRadius ||
-        (p.isCleansingWave ? p.radius : 0);
-
-      if (p.style === 'ring' || p.isRipple || p.isPulse || p.isShockwave || p.isCleansingWave) {
-        g.circle(p.position.x, p.position.y, ringRadius || p.radius).stroke({
-          width: p.lineWidth || 2,
-          color,
-          alpha
-        });
-        return;
-      }
-
-      const sides = p.geometricSides || (p.isHexagonShield ? 6 : 0);
-      if (p.isGeometric || p.isHexagonShield || sides > 0) {
-        const radius = p.geometricRadius || p.radius;
-        const points = getPolygonPointsAt(sides, radius, p.position.x, p.position.y, p.angle || 0);
-        if (p.isHexagonShield) {
-          g.poly(points).stroke({ width: 2, color, alpha });
-        } else {
-          g.poly(points).fill({ color, alpha });
-        }
-        return;
-      }
-
-      g.circle(p.position.x, p.position.y, p.radius).fill({ color, alpha });
-    });
-  };
-
-  const syncFloatingTexts = (layer: Container, state: GameState) => {
-    const map = floatingTextMapRef.current;
-    const alive = new Set<string>();
-
-    state.floatingTexts.forEach((t) => {
-      alive.add(t.id);
-      let text = map.get(t.id);
-      if (!text) {
-        const style = new TextStyle({
-          fontFamily: 'Sora',
-          fontSize: t.size,
-          fill: t.color,
-          align: 'center',
-        });
-        text = new Text({ text: t.text, style });
-        text.anchor.set(0.5);
-        layer.addChild(text);
-        map.set(t.id, text);
-      }
-      text.text = t.text;
-      text.style.fill = t.color;
-      text.style.fontSize = t.size;
-      text.x = t.position.x;
-      text.y = t.position.y;
-      text.alpha = Math.max(0, Math.min(1, t.life));
-    });
-
-    for (const [id, text] of map.entries()) {
-      if (!alive.has(id)) {
-        layer.removeChild(text);
-        text.destroy();
-        map.delete(id);
-      }
-    }
-  };
-
-  const syncIconParticles = (layer: Container, state: GameState) => {
-    const map = iconTextMapRef.current;
-    const alive = new Set<string>();
-
-    state.particles.forEach((p: any) => {
-      if (!p.isIcon || !p.iconSymbol) return;
-      alive.add(p.id);
-      let text = map.get(p.id);
-      if (!text) {
-        const style = new TextStyle({
-          fontFamily: 'Cinzel',
-          fontSize: p.fontSize || 24,
-          fill: p.iconColor || '#ffffff',
-          align: 'center',
-        });
-        text = new Text({ text: p.iconSymbol, style });
-        text.anchor.set(0.5);
-        layer.addChild(text);
-        map.set(p.id, text);
-      }
-      text.text = p.iconSymbol;
-      text.style.fill = p.iconColor || '#ffffff';
-      text.style.fontSize = p.fontSize || 24;
-      text.x = p.position.x;
-      text.y = p.position.y;
-      const baseAlpha = p.fadeOut ? (p.life / p.maxLife) : 1;
-      text.alpha = Math.max(0, Math.min(1, baseAlpha));
-    });
-
-    for (const [id, text] of map.entries()) {
-      if (!alive.has(id)) {
-        layer.removeChild(text);
-        text.destroy();
-        map.delete(id);
-      }
-    }
-  };
-
-  const toPixiColor = (color?: string): number => {
-    if (!color) return 0xffffff;
-    if (color.startsWith('#')) {
-      const hex = color.slice(1);
-      return Number.parseInt(hex.length === 3
-        ? hex.split('').map(c => c + c).join('')
-        : hex, 16);
-    }
-    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (match) {
-      const r = Number.parseInt(match[1], 10);
-      const g = Number.parseInt(match[2], 10);
-      const b = Number.parseInt(match[3], 10);
-      return (r << 16) + (g << 8) + b;
-    }
-    return 0xffffff;
-  };
-
-  const getPolygonPointsAt = (sides: number, radius: number, cx: number, cy: number, rotation: number = 0): number[] => {
-    const points = [];
-    for (let i = 0; i < sides; i++) {
-      const angle = (i / sides) * Math.PI * 2 - Math.PI / 2 + rotation;
-      points.push(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    }
-    return points;
-  };
-
-  const getPolygonPoints = (sides: number, radius: number): number[] => {
-    const points = [];
-    for (let i = 0; i < sides; i++) {
-      const angle = (i / sides) * Math.PI * 2 - Math.PI / 2; // Start at top
-      points.push(Math.cos(angle) * radius, Math.sin(angle) * radius);
-    }
-    return points;
-  };
-
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return <div ref={containerRef} className="absolute inset-0 overflow-hidden">
+    {/* DEBUG INFO OVERLAY */}
+    <div className="absolute top-4 left-4 bg-black/80 text-white p-2 rounded text-xs font-mono z-50">
+      <div>🎮 Game Debug Info (CJR)</div>
+      <div>Player: {gameStateRef.current?.player?.name || 'N/A'}</div>
+      <div>Counts: {gameStateRef.current?.bots?.length || 0} bots / {gameStateRef.current?.food?.length || 0} food</div>
+      <div>Time: {gameStateRef.current?.gameTime?.toFixed(1) || '0.0'}</div>
+      <div className="mt-2 text-yellow-400">PixiJS v8</div>
+    </div>
+  </div>;
 };
 
 export default PixiGameCanvas;

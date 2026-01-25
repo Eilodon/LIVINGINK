@@ -42,7 +42,7 @@ interface RingCommitVFX extends VFXConfig {
 }
 
 // Premium VFX configurations for each ring
-const RING_COMMIT_VFX_CONFIGS: Record<RingId, RingCommitVFX> = {
+const RING_COMMIT_VFX_CONFIGS: Record<Exclude<RingId, 0>, RingCommitVFX> = {
   1: {
     ringId: 1,
     particleCount: 30,
@@ -121,14 +121,16 @@ const RING_COMMIT_VFX_CONFIGS: Record<RingId, RingCommitVFX> = {
 // PREMIUM VFX IMPLEMENTATION
 // ============================================
 
+import { audioEngine } from '../audio/AudioEngine';
+
+// ... (other imports)
+
 export class VFXSystem {
   private activeEffects: Map<string, VFXEffect> = new Map();
   private screenShake: ScreenShakeController;
-  private audioController: AudioController;
 
   constructor() {
     this.screenShake = new ScreenShakeController();
-    this.audioController = new AudioController();
   }
 
   /**
@@ -154,7 +156,10 @@ export class VFXSystem {
     this.screenShake.applyShake(config.screenShake);
 
     // 6. Play sound effect
-    this.audioController.playSound(config.soundEffect);
+    audioEngine.play(config.soundEffect.id, {
+      volume: config.soundEffect.volume,
+      pitch: config.soundEffect.pitch
+    });
 
     // 7. Create floating text
     this.createFloatingText(player.position, `RING ${ringId} COMMITTED!`, config.color, state);
@@ -184,7 +189,7 @@ export class VFXSystem {
           config.membraneColor,
           0
         );
-        
+
         // Custom ripple behavior
         ripple.radius = 10;
         ripple.maxLife = config.duration;
@@ -194,7 +199,7 @@ export class VFXSystem {
         ripple.rippleSpeed = 300;
         ripple.rippleColor = config.membraneColor;
         ripple.isRipple = true;
-        
+
         state.particles.push(ripple);
       }, i * 100);
     }
@@ -207,14 +212,14 @@ export class VFXSystem {
     for (let i = 0; i < config.particleCount; i++) {
       const angle = (i / config.particleCount) * config.spread;
       const speed = config.speed * (0.5 + Math.random() * 0.5);
-      
+
       const particle = createParticle(
         position.x,
         position.y,
         config.color,
         speed
       );
-      
+
       // Set particle velocity in burst pattern
       particle.velocity.x = Math.cos(angle) * speed;
       particle.velocity.y = Math.sin(angle) * speed;
@@ -222,7 +227,7 @@ export class VFXSystem {
       particle.maxLife = config.duration;
       particle.scale = config.scale;
       particle.fadeOut = config.fadeOut;
-      
+
       state.particles.push(particle);
     }
   }
@@ -233,7 +238,7 @@ export class VFXSystem {
   private createPulseEffect(position: Vector2, config: RingCommitVFX, state: GameState): void {
     // Create central pulse that expands outward
     const pulse = createParticle(position.x, position.y, config.pulseColor, 0);
-    
+
     pulse.radius = 5;
     pulse.maxLife = config.duration * 0.5;
     pulse.life = pulse.maxLife;
@@ -243,7 +248,7 @@ export class VFXSystem {
     pulse.pulseColor = config.pulseColor;
     pulse.isPulse = true;
     pulse.glowIntensity = config.intensity;
-    
+
     state.particles.push(pulse);
   }
 
@@ -253,7 +258,7 @@ export class VFXSystem {
   private createShockwave(position: Vector2, config: RingCommitVFX, state: GameState): void {
     // Create shockwave ring
     const shockwave = createParticle(position.x, position.y, config.shockwaveColor, 0);
-    
+
     shockwave.radius = 1;
     shockwave.maxLife = config.duration * 0.7;
     shockwave.life = shockwave.maxLife;
@@ -263,7 +268,7 @@ export class VFXSystem {
     shockwave.shockwaveColor = config.shockwaveColor;
     shockwave.isShockwave = true;
     shockwave.intensity = config.intensity;
-    
+
     state.particles.push(shockwave);
   }
 
@@ -282,7 +287,7 @@ export class VFXSystem {
     textParticle.textColor = color;
     textParticle.fontSize = 24;
     textParticle.fadeOut = true;
-    
+
     state.particles.push(textParticle);
   }
 
@@ -291,7 +296,7 @@ export class VFXSystem {
    */
   updateEffects(state: GameState, dt: number): void {
     const now = Date.now();
-    
+
     // Clean up expired effects
     for (const [id, effect] of this.activeEffects.entries()) {
       if (now - effect.startTime > effect.duration) {
@@ -351,69 +356,7 @@ class ScreenShakeController {
   }
 }
 
-class AudioController {
-  private audioContext: AudioContext | null = null;
-  private soundCache: Map<string, AudioBuffer> = new Map();
-
-  constructor() {
-    // Initialize audio context on user interaction
-    this.initAudioContext();
-  }
-
-  private initAudioContext(): void {
-    if (typeof window !== 'undefined' && !this.audioContext) {
-      // Check if we're in test environment
-      if (typeof global !== 'undefined' && (global as any).vitest) {
-        // In test environment, create a mock AudioContext
-        this.audioContext = {
-          createGainNode: () => ({} as GainNode),
-          createOscillator: () => ({} as OscillatorNode),
-          createAnalyser: () => ({} as AnalyserNode),
-          createBiquadFilter: () => ({} as BiquadFilterNode),
-          createChannelMerger: () => ({} as ChannelMergerNode),
-          createDelayNode: () => ({} as DelayNode),
-          createConvolver: () => ({} as ConvolverNode),
-          createScriptProcessorNode: () => ({} as ScriptProcessorNode),
-          createWaveShaper: () => ({} as WaveShaperNode),
-          createPanner: () => ({} as PannerNode),
-          createPeriodicWave: () => ({} as PeriodicWave),
-          createStereoPanner: () => ({} as StereoPannerNode),
-          createDynamicsCompressor: () => ({} as DynamicsCompressorNode),
-          close: () => Promise.resolve(),
-          resume: () => Promise.resolve(),
-          suspend: () => Promise.resolve(),
-          createMediaStream: () => ({} as MediaStream),
-          currentTime: 0,
-          outputTimestamp: 0,
-          sampleRate: 48000,
-          state: 'suspended',
-          destination: null
-        } as any;
-      } else {
-        // In production environment, create real AudioContext
-        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-    }
-  }
-
-  playSound(config: { id: string; volume: number; pitch: number }): void {
-    if (!this.audioContext) return;
-
-    // For now, create a simple tone
-    // In production, this would load actual sound files
-    const oscillator = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
-
-    oscillator.frequency.value = 440 * config.pitch;
-    gainNode.gain.value = config.volume;
-
-    oscillator.start();
-    oscillator.stop(this.audioContext.currentTime + 0.2);
-  }
-}
+// AudioController removed in favor of services/audio/AudioEngine.ts
 
 // ============================================
 // TYPE DEFINITIONS
@@ -432,31 +375,31 @@ interface VFXEffect {
 declare module '../../types' {
   interface Particle {
     intensity?: number;
-    
+
     rippleRadius?: number;
     rippleMaxRadius?: number;
     rippleSpeed?: number;
     rippleColor?: string;
     isRipple?: boolean;
-    
+
     pulseRadius?: number;
     pulseMaxRadius?: number;
     pulseSpeed?: number;
     pulseColor?: string;
     isPulse?: boolean;
     glowIntensity?: number;
-    
+
     shockwaveRadius?: number;
     shockwaveMaxRadius?: number;
     shockwaveSpeed?: number;
     shockwaveColor?: string;
     isShockwave?: boolean;
-    
+
     isText?: boolean;
     textContent?: string;
     textColor?: string;
     fontSize?: number;
-    
+
     scale?: number;
     fadeOut?: boolean;
   }

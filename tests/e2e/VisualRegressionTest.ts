@@ -39,12 +39,12 @@ export class VisualRegressionTest {
     summary: string;
   }> {
     console.log('📸 Starting Visual Regression Test Suite...');
-    
+
     this.testResults = [];
-    
+
     // Create directories
     await this.ensureDirectories();
-    
+
     // Run visual tests
     const visualTests = [
       this.testMainMenu(),
@@ -77,7 +77,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     `;
 
     console.log(summary);
-    
+
     return {
       passed,
       totalTests,
@@ -103,16 +103,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Navigate to main menu
       await this.navigateToMainMenu();
-      
+
       // Wait for render
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Main Menu Visual',
         passed: result.passed,
@@ -126,6 +126,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Main Menu Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -146,16 +147,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Start game
       await this.startGame();
-      
+
       // Wait for game render
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Game Canvas Visual',
         passed: result.passed,
@@ -169,6 +170,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Game Canvas Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -190,13 +192,13 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       // Start game and wait for HUD
       await this.startGame();
       await this.wait(1000);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'HUD Visual',
         passed: result.passed,
@@ -210,6 +212,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'HUD Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -230,16 +233,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Enable colorblind mode
       await this.enableColorblindMode();
-      
+
       // Wait for overlay
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Colorblind Mode Visual',
         passed: result.passed,
@@ -253,6 +256,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Colorblind Mode Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -273,17 +277,17 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Set mobile viewport
       await this.setViewport(config.viewport.width, config.viewport.height);
-      
+
       // Start game
       await this.startGame();
       await this.wait(1000);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Mobile Controls Visual',
         passed: result.passed,
@@ -297,6 +301,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Mobile Controls Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -317,16 +322,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Open tattoo picker
       await this.openTattooPicker();
-      
+
       // Wait for render
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Tattoo Picker Visual',
         passed: result.passed,
@@ -340,6 +345,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Tattoo Picker Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -360,16 +366,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
     try {
       // Simulate game over
       await this.simulateGameOver();
-      
+
       // Wait for render
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Game Over Screen Visual',
         passed: result.passed,
@@ -383,6 +389,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Game Over Screen Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -405,16 +412,16 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       await this.startGame();
       await this.wait(1000);
       await this.pauseGame();
-      
+
       // Wait for overlay
       await this.wait(config.waitTime);
-      
+
       // Take screenshot
       const screenshot = await this.takeScreenshot(config);
-      
+
       // Compare with baseline
       const result = await this.compareWithBaseline(config, screenshot);
-      
+
       return {
         testName: 'Pause Overlay Visual',
         passed: result.passed,
@@ -428,6 +435,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
       return {
         testName: 'Pause Overlay Visual',
         passed: false,
+        difference: 1,
         details: `Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
@@ -488,21 +496,21 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
   private static async takeScreenshot(config: VisualTestConfig): Promise<{ path: string; data: string }> {
     // In a real implementation, this would use a headless browser
     // For demo purposes, we'll simulate screenshot capture
-    
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
+
     canvas.width = config.viewport.width * config.pixelRatio;
     canvas.height = config.viewport.height * config.pixelRatio;
-    
+
     // Capture current page
     // In real implementation: html2canvas or puppeteer
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     const data = canvas.toDataURL('image/png');
     const path = `${this.currentDir}/${config.screenshotPath}-${Date.now()}.png`;
-    
+
     return { path, data };
   }
 
@@ -517,14 +525,14 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
   }> {
     // In a real implementation, this would compare pixels
     // For demo purposes, we'll simulate comparison
-    
+
     const baselinePath = `${this.baselineDir}/${config.screenshotPath}.png`;
     const diffPath = `${this.diffDir}/${config.screenshotPath}-diff.png`;
-    
+
     // Simulate pixel comparison
     const difference = Math.random() * 0.1; // Random difference for demo
     const passed = difference < config.tolerance;
-    
+
     return {
       passed,
       baselinePath,
@@ -552,7 +560,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
   /**
    * Generate visual test report
    */
-  static generateVisualReport(): {
+  static generateVisualReport(): { summary: string; details: string; recommendations: string[] } {
     if (this.testResults.length === 0) {
       return {
         summary: 'No visual tests run',
@@ -563,7 +571,7 @@ ${passed ? '🎉 ALL VISUAL TESTS PASSED!' : '⚠️  Visual differences detecte
 
     const passedTests = this.testResults.filter(r => r.passed);
     const failedTests = this.testResults.filter(r => !r.passed);
-    
+
     const summary = `
 📸 VISUAL REGRESSION TEST REPORT
 ====================
@@ -576,27 +584,27 @@ Success Rate: ${((passedTests.length / this.testResults.length) * 100).toFixed(1
     const details = `
 VISUAL TEST RESULTS:
 ====================
-${this.testResults.map(result => 
-  `${result.passed ? '✅' : '❌'} ${result.testName}
+${this.testResults.map(result =>
+      `${result.passed ? '✅' : '❌'} ${result.testName}
    ${result.details}
    ${result.screenshotPath ? `Screenshot: ${result.screenshotPath}` : ''}
    ${result.diffPath ? `Diff: ${result.diffPath}` : ''}
    Difference: ${(result.difference * 100).toFixed(2)}%`
-).join('\n')}
+    ).join('\n')}
     `;
 
     const recommendations: string[] = [];
-    
+
     if (failedTests.length > 0) {
       recommendations.push('Review visual differences and update baselines if needed');
       recommendations.push('Check UI changes that may affect visual appearance');
     }
-    
+
     if (passedTests.length === this.testResults.length) {
       recommendations.push('All visual tests passed - UI is stable');
       recommendations.push('Consider adding more visual test cases');
     }
-    
+
     return {
       summary,
       details,

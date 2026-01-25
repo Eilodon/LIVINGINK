@@ -104,16 +104,16 @@ export class AutomatedTestRunner {
 
     // Generate final report
     const report = this.generateCompleteReport(testSuites);
-    
+
     console.log('\n' + report.summary);
-    
+
     return report;
   }
 
   /**
    * Run performance tests
    */
-  async runPerformanceTests(): Promise<{
+  static async runPerformanceTests(): Promise<{
     passed: boolean;
     totalTests: number;
     passedTests: number;
@@ -123,7 +123,7 @@ export class AutomatedTestRunner {
   }> {
     const startTime = performance.now();
     const results: any[] = [];
-    
+
     const performanceTests = [
       {
         name: 'FPS Performance',
@@ -157,11 +157,11 @@ export class AutomatedTestRunner {
         console.log(`  ⚡ ${test.name}...`);
         const result = await Promise.race([
           test.test(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Test timeout')), test.timeout)
           )
         ]);
-        
+
         results.push({
           name: test.name,
           passed: result,
@@ -196,7 +196,7 @@ export class AutomatedTestRunner {
   /**
    * Run unit tests
    */
-  private static async runUnitTests(): Promise<{
+  public static async runUnitTests(): Promise<{
     passed: boolean;
     totalTests: number;
     passedTests: number;
@@ -206,7 +206,7 @@ export class AutomatedTestRunner {
   }> {
     const startTime = performance.now();
     const results: any[] = [];
-    
+
     const unitTests = [
       {
         name: 'Color Math Functions',
@@ -240,11 +240,11 @@ export class AutomatedTestRunner {
         console.log(`  🔬 ${test.name}...`);
         const result = await Promise.race([
           test.test(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Test timeout')), test.timeout)
           )
         ]);
-        
+
         results.push({
           name: test.name,
           passed: result,
@@ -282,21 +282,21 @@ export class AutomatedTestRunner {
   private static async testFPSPerformance(): Promise<boolean> {
     let frames = 0;
     let lastTime = performance.now();
-    
+
     return new Promise((resolve) => {
       const measureFrame = () => {
         frames++;
         const currentTime = performance.now();
-        
+
         if (currentTime - lastTime >= 1000) {
           const fps = frames;
           resolve(fps >= 50); // Target 50 FPS minimum
           return;
         }
-        
+
         requestAnimationFrame(measureFrame);
       };
-      
+
       requestAnimationFrame(measureFrame);
     });
   }
@@ -305,22 +305,22 @@ export class AutomatedTestRunner {
     if (!(performance as any).memory) {
       return true; // Memory API not available, consider as passed
     }
-    
+
     const memory = (performance as any).memory;
     const usage = memory.usedJSHeapSize / memory.jsHeapSizeLimit;
-    
+
     return usage < 0.8; // Should be under 80% usage
   }
 
   private static async testNetworkLatency(): Promise<boolean> {
     try {
       const startTime = performance.now();
-      const response = await fetch('https://httpbin.org/delay/1', { 
+      const response = await fetch('https://httpbin.org/delay/1', {
         method: 'GET',
         signal: AbortSignal.timeout(5000)
       });
       const endTime = performance.now();
-      
+
       return endTime - startTime < 2000; // Should be under 2 seconds
     } catch (error) {
       return false;
@@ -330,123 +330,123 @@ export class AutomatedTestRunner {
   private static async testRenderPerformance(): Promise<boolean> {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
+
     if (!ctx) return false;
-    
+
     const startTime = performance.now();
-    
+
     // Render test
     for (let i = 0; i < 1000; i++) {
       ctx.fillStyle = `hsl(${i}, 70%, 50%)`;
       ctx.fillRect(i % 100, Math.floor(i / 100), 10, 10);
     }
-    
+
     const endTime = performance.now();
     const duration = endTime - startTime;
-    
+
     return duration < 100; // Should complete in <100ms
   }
 
   private static async testInputResponsiveness(): Promise<boolean> {
     let clicks = 0;
     const startTime = performance.now();
-    
+
     const button = document.createElement('button');
     button.style.position = 'absolute';
     button.style.left = '-9999px';
     button.style.top = '-9999px';
     document.body.appendChild(button);
-    
+
     button.addEventListener('click', () => {
       clicks++;
     });
-    
+
     // Simulate rapid clicks
     for (let i = 0; i < 10; i++) {
       button.click();
     }
-    
+
     const endTime = performance.now();
     const duration = endTime - startTime;
-    
+
     document.body.removeChild(button);
-    
+
     return clicks === 10 && duration < 100; // All clicks processed quickly
   }
 
   /**
    * Individual unit tests
    */
-  private static testColorMathFunctions(): Promise<boolean> {
+  private static async testColorMathFunctions(): Promise<boolean> {
     // Test color mixing
     const color1 = { r: 0.5, g: 0.5, b: 0.5 };
     const color2 = { r: 0.8, g: 0.2, b: 0.2 };
-    
+
     // Test mixPigment function
     const mixed = {
       r: color1.r * 0.5 + color2.r * 0.5,
       g: color1.g * 0.5 + color2.g * 0.5,
       b: color1.b * 0.5 + color2.b * 0.5
     };
-    
+
     // Test calcMatchPercent
     const matchPercent = Math.sqrt(
       Math.pow(mixed.r - color2.r, 2) +
       Math.pow(mixed.g - color2.g, 2) +
       Math.pow(mixed.b - color2.b, 2)
     ) / Math.sqrt(3);
-    
+
     return matchPercent > 0.7; // Should be > 70% match
   }
 
-  private static testTattooSystem(): Promise<boolean> {
+  private static async testTattooSystem(): Promise<boolean> {
     // Test tattoo application
     const testPlayer = {
       id: 'test',
       tattoos: []
     };
-    
+
     // Simulate applying tattoo
     testPlayer.tattoos.push('test-tattoo');
-    
+
     return testPlayer.tattoos.length === 1;
   }
 
-  private static testPhysicsCalculations(): Promise<boolean> {
+  private static async testPhysicsCalculations(): Promise<boolean> {
     // Test basic physics calculations
     const position = { x: 0, y: 0 };
     const velocity = { x: 1, y: 1 };
-    const deltaTime = 1/60;
-    
+    const deltaTime = 1 / 60;
+
     // Simple physics update
     const newPosition = {
       x: position.x + velocity.x * deltaTime,
       y: position.y + velocity.y * deltaTime
     };
-    
-    return newPosition.x === 1/60 && newPosition.y === 1/60;
+
+    return newPosition.x === 1 / 60 && newPosition.y === 1 / 60;
   }
 
-  private static testRingSystemLogic(): Promise<boolean> {
+  private static async testRingSystemLogic(): Promise<boolean> {
     // Test ring progression
     const currentRing = 1;
     const targetRing = 2;
     const matchPercent = 0.9;
-    
+
     // Test ring entry logic
     const canEnter = matchPercent >= 0.8;
-    
+
     return canEnter && currentRing < targetRing;
   }
 
-  private static testCombatRules(): Promise<boolean> {
+  private static async testCombatRules(): Promise<boolean> {
     // Test combat damage calculation
     const attacker = { damage: 10 };
     const defender = { health: 100 };
-    
+
     const damage = attacker.damage;
     const newHealth = defender.health - damage;
-    
+
     return newHealth === 90 && newHealth >= 0;
   }
 
@@ -458,7 +458,7 @@ export class AutomatedTestRunner {
     const passedSuites = testSuites.filter(s => s.passed).length;
     const failedSuites = totalSuites - passedSuites;
     const overallPassed = failedSuites === 0;
-    
+
     const totalTests = testSuites.reduce((sum, suite) => sum + suite.totalTests, 0);
     const passedTests = testSuites.reduce((sum, suite) => sum + suite.passedTests, 0);
     const failedTests = totalTests - passedTests;
@@ -485,14 +485,14 @@ ${suite.passed ? '✅' : '❌'} ${suite.name} (${suite.type})
 
 RECOMMENDATIONS:
 ${overallPassed ? [
-  '✅ All tests passed - Ready for production deployment',
-  '✅ Game is stable and functioning correctly',
-  '✅ Consider adding more edge case tests'
-] : [
-  '❌ Some tests failed - Review and fix issues',
-  '❌ Address failed tests before deployment',
-  '❌ Review test failures and implement fixes'
-]}
+        '✅ All tests passed - Ready for production deployment',
+        '✅ Game is stable and functioning correctly',
+        '✅ Consider adding more edge case tests'
+      ] : [
+        '❌ Some tests failed - Review and fix issues',
+        '❌ Address failed tests before deployment',
+        '❌ Review test failures and implement fixes'
+      ]}
     `;
 
     const recommendations = overallPassed ? [

@@ -56,9 +56,9 @@ const tutorialLevels: LevelConfig[] = [
         winHoldSeconds: 1.0,
         timeLimit: 180,
         waveIntervals: { ring1: 7.6, ring2: 9.8, ring3: 12.8 },
-        burstSizes: { ring1: 10, ring2: 7, ring3: 4 },
+        burstSizes: { ring1: 30, ring2: 20, ring3: 15 }, // INCREASED FOR TESTING
         spawnWeights: { pigment: 0.8, neutral: 0.18, special: 0.02 },
-        botCount: 3,
+        botCount: 12, // INCREASED FOR TESTING
         boss: { boss1Enabled: false, boss2Enabled: false, boss1Time: 80, boss2Time: 140, boss1Health: 320, boss2Health: 500 },
         pity: { stuckThreshold: 7, duration: 4, multiplier: 1.75 },
         ring3Debuff: { enabled: false, threshold: 0.7, duration: 2, speedMultiplier: 0.98 },
@@ -71,9 +71,9 @@ const tutorialLevels: LevelConfig[] = [
         winHoldSeconds: 1.1,
         timeLimit: 170,
         waveIntervals: { ring1: 7.9, ring2: 10, ring3: 13.2 },
-        burstSizes: { ring1: 9, ring2: 6, ring3: 4 },
+        burstSizes: { ring1: 25, ring2: 18, ring3: 12 }, // INCREASED FOR TESTING
         spawnWeights: { pigment: 0.74, neutral: 0.22, special: 0.04 },
-        botCount: 4,
+        botCount: 15, // INCREASED FOR TESTING
         boss: { boss1Enabled: false, boss2Enabled: false, boss1Time: 80, boss2Time: 140, boss1Health: 360, boss2Health: 540 },
         pity: { stuckThreshold: 8, duration: 4, multiplier: 1.65 },
         ring3Debuff: { enabled: false, threshold: 0.7, duration: 2, speedMultiplier: 0.98 },
@@ -86,9 +86,9 @@ const tutorialLevels: LevelConfig[] = [
         winHoldSeconds: 1.2,
         timeLimit: 160,
         waveIntervals: { ring1: 8.2, ring2: 10.3, ring3: 13.5 },
-        burstSizes: { ring1: 9, ring2: 6, ring3: 4 },
+        burstSizes: { ring1: 20, ring2: 15, ring3: 10 }, // INCREASED FOR TESTING
         spawnWeights: { pigment: 0.7, neutral: 0.23, special: 0.07 },
-        botCount: 6,
+        botCount: 18, // INCREASED FOR TESTING
         boss: { boss1Enabled: false, boss2Enabled: false, boss1Time: 75, boss2Time: 135, boss1Health: 400, boss2Health: 600 },
         pity: { stuckThreshold: 9, duration: 4, multiplier: 1.55 },
         ring3Debuff: { enabled: false, threshold: 0.7, duration: 2, speedMultiplier: 0.98 },

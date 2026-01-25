@@ -2,7 +2,8 @@ import { PigmentVec3, RingId, Emotion, ShapeId, TattooId, PickupKind } from './s
 import type { LevelConfig } from './services/cjr/levels';
 
 export type { PigmentVec3, RingId, PickupKind };
-export { Emotion, ShapeId, TattooId } from './services/cjr/cjrTypes';
+export type { Emotion, ShapeId };
+export { TattooId } from './services/cjr/cjrTypes';
 export { TattooId as MutationId } from './services/cjr/cjrTypes'; // Keep alias for now if needed, but we are refactoring.
 
 export enum GamePhase {
@@ -62,6 +63,9 @@ export interface Player extends Entity {
   name: string;
   score: number;
   kills: number;
+  // Dopamine Stats
+  killStreak: number;
+  streakTimer: number; // Decays to 0
   maxHealth: number;
   currentHealth: number;
   tier: SizeTier;
@@ -178,7 +182,7 @@ export interface Player extends Entity {
     prismGuardThreshold?: number;
     prismGuardReduction?: number;
     grimHarvestDropCount?: number;
-    
+
     // Tattoo Synergy Effects - Phase 2 Gameplay Depth
     neutralPurification?: boolean;
     purificationRadius?: number;
@@ -276,7 +280,7 @@ export interface Particle extends Entity {
   lineLength?: number;
   lineWidth?: number;
   angle?: number;
-  
+
   // Synergy pattern effects
   isSynergyFusion?: boolean;
   fusionColor?: string;
@@ -289,7 +293,7 @@ export interface Particle extends Entity {
   geometricRadius?: number;
   rotationSpeed?: number;
   geometricColor?: string;
-  
+
   // Additional synergy effects
   isSynergyEffect?: boolean;
   synergyColor?: string;

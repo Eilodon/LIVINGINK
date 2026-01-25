@@ -1,154 +1,114 @@
-import {
-    RING_RADII,
-    COMMIT_BUFFS
-} from './cjrConstants';
-import { Player, Bot, RingId, GameState } from '../../types';
-import { distance } from '../engine/math';
-import { LevelConfig } from './levels';
-import { vfxIntegrationManager } from '../vfx/vfxIntegration';
+import { RingId, PigmentVec3 } from './cjrTypes';
+import { RING_RADII, RING_THRESHOLDS } from './cjrConstants';
+import { calculateMatch } from './colorMath';
 
-export const updateRingLogic = (entity: Player | Bot, dt: number, config: LevelConfig, state?: GameState) => {
-    const dist = distance(entity.position, { x: 0, y: 0 });
+export type RingCheckResult = {
+    ring: RingId;
+    action: 'stay' | 'commit' | 'bounce';
+    message?: string;
+};
 
-    // 1. Check current Ring based on position
-    let physicalRing: RingId = 1;
-    if (dist < RING_RADII.R3_BOUNDARY) physicalRing = 3;
-    else if (dist < RING_RADII.R2_BOUNDARY) physicalRing = 2;
-    else physicalRing = 1;
+/**
+ * Calculates the current Ring based on distance from center.
+ * DOES NOT handle logic of "gate keeping", just pure geometry.
+ */
+export function getGeometricRing(distance: number): RingId {
+    if (distance <= RING_RADII.R3) return 3;
+    if (distance <= RING_RADII.R2) return 2;
+    if (distance <= RING_RADII.R1) return 1;
+    return 0; // Out of bounds / Spawn
+}
 
-    // 2. Logic: One-way membrane, no gate blocking
-    // If entity.ring (committed ring) < physicalRing, allow only if match threshold met.
-    // If entity.ring > physicalRing, must push back (Trap)
+/**
+ * Logic to check if a player CAN enter the next ring.
+ * 1-Way Commit Rule: R1 -> R2 -> R3. (Cannot go back)
+ */
+export function updatePlayerRing(
+    currentRing: RingId,
+    positionsq: { x: number, y: number },
+    currentPigment: PigmentVec3,
+    targetPigment: PigmentVec3
+): RingCheckResult {
+    const dist = Math.sqrt(positionsq.x * positionsq.x + positionsq.y * positionsq.y);
+    const geometricRing = getGeometricRing(dist);
+    const match = calculateMatch(currentPigment, targetPigment);
 
-    // --- GATE CHECK (Entering inner ring) ---
-    if (physicalRing > entity.ring) {
-        // Attempting to enter higher ring
-        let allowed = false;
-        let deniedReason = '';
+    // Case 1: Player is geometrically in a "higher" (inner) ring
+    if (geometricRing > currentRing) {
+        // Attempting to ENTER Inner Ring
 
-        if (physicalRing === 2) {
-            // Check threshold
-            if (entity.matchPercent >= config.thresholds.ring2) {
-                allowed = true;
+        // Check R1 -> R2
+        if (currentRing === 1 && geometricRing >= 2) {
+            if (match >= RING_THRESHOLDS.ENTER_R2) {
+                return { ring: 2, action: 'commit', message: 'ENTERED RING 2' };
             } else {
-                deniedReason = 'LOW_MATCH';
+                return { ring: 1, action: 'bounce', message: `NEED ${RING_THRESHOLDS.ENTER_R2 * 100}% MATCH` };
             }
-        } else if (physicalRing === 3) {
-            if (entity.matchPercent >= config.thresholds.ring3) {
-                allowed = true;
+        }
+
+        // Check R2 -> R3
+        if (currentRing === 2 && geometricRing === 3) {
+            if (match >= RING_THRESHOLDS.ENTER_R3) {
+                return { ring: 3, action: 'commit', message: 'ENTERED DEATH ZONE' };
             } else {
-                deniedReason = 'LOW_MATCH';
+                return { ring: 2, action: 'bounce', message: `NEED ${RING_THRESHOLDS.ENTER_R3 * 100}% MATCH` };
             }
         }
-
-        if (allowed) {
-            // Success! Commit to new ring
-            commitToRing(entity, physicalRing, state);
-        } else {
-            // Denied! Membrane Bounce
-            applyMembraneBounce(entity, physicalRing, deniedReason);
-        }
     }
 
-    // --- TRAP CHECK (Leaving committed ring) ---
-    else if (physicalRing < entity.ring) {
-        // Trying to go OUT to outer ring? No backzies!
-        // Push back IN
-        const boundary = (entity.ring === 3) ? RING_RADII.R3_BOUNDARY : RING_RADII.R2_BOUNDARY;
-        applyMembraneTrap(entity, boundary);
+    // Case 2: Player is geometrically in a "lower" (outer) ring
+    // Rule: Cannot go back easily? Or just allowed?
+    // Vision doc says: "Vào rồi không ra: ring chỉ tăng, không giảm." (Enter then no exit: ring only increases, no decrease)
+    if (geometricRing < currentRing) {
+        // Player is trying to leave inner ring to outer.
+        // Force them back? Or just keep their "RingId" status as inner but physically they are outside?
+        // "RingId" usually determines spawn tier and rules.
+        // If we want to physically trap them, we need Physics Wall.
+        // If not physically trapped, they keep the ID.
+
+        return { ring: currentRing, action: 'stay' };
     }
 
-    // Ring 3 low-match debuff
-    if (entity.ring === 3) {
-        if (config.ring3Debuff.enabled && entity.matchPercent < config.ring3Debuff.threshold) {
-            entity.ring3LowMatchTime += dt;
-            if (entity.ring3LowMatchTime >= config.ring3Debuff.duration) {
-                applyTempSpeedBoost(entity, config.ring3Debuff.speedMultiplier, config.ring3Debuff.duration);
-                entity.ring3LowMatchTime = 0;
-            }
-        } else {
-            entity.ring3LowMatchTime = 0;
-        }
+    return { ring: currentRing, action: 'stay' };
+}
+
+/**
+ * Main update loop for Ring Logic.
+ * apply bouncing or committing state changes.
+ */
+export function updateRingLogic(
+    entity: any, // Player or Bot
+    dt: number,
+    levelConfig: any,
+    state: any
+) {
+    if (entity.isDead) return;
+
+    const res = updatePlayerRing(
+        entity.ring,
+        entity.position,
+        entity.pigment,
+        entity.targetPigment
+    );
+
+    if (res.action === 'commit') {
+        // ENTERING INNER RING
+        entity.ring = res.ring;
+        // Grant buff?
+        // createFloatingText(entity.position, res.message || "Welcome!", "#fff", 20, state);
+    } else if (res.action === 'bounce') {
+        // REJECTED
+        // Physics bounce vector
+        const angle = Math.atan2(entity.position.y, entity.position.x);
+        const bounceForce = 400; // Strong push back
+
+        // Normalize position to outside the boundary to prevent sticking
+        // This is simplified, ideally we know WHICH ring boundary
+        // For now, simple push outward
+        entity.velocity.x += Math.cos(angle) * bounceForce * dt;
+        entity.velocity.y += Math.sin(angle) * bounceForce * dt;
+
+        // Notify user occasionally (debounce this if possible)
+        // createFloatingText(entity.position, "ACCESS DENIED", "#f00", 20, state);
     }
-
-    // Pity boost when stuck below threshold too long
-    const targetThreshold = entity.ring === 1
-        ? config.thresholds.ring2
-        : entity.ring === 2
-            ? config.thresholds.ring3
-            : config.thresholds.win;
-    if (entity.matchPercent < targetThreshold) {
-        entity.matchStuckTime += dt;
-        if (entity.matchStuckTime >= config.pity.stuckThreshold) {
-            entity.statusEffects.colorBoostMultiplier = config.pity.multiplier;
-            entity.statusEffects.colorBoostTimer = config.pity.duration;
-            entity.statusEffects.pityBoost = config.pity.duration;
-            entity.matchStuckTime = 0;
-        }
-    } else {
-        entity.matchStuckTime = 0;
-    }
-};
-
-const commitToRing = (entity: Player | Bot, ring: RingId, state?: GameState) => {
-    entity.ring = ring;
-
-    // Apply Commit Buffs
-    applyTempSpeedBoost(entity, COMMIT_BUFFS.SPEED_BOOST, COMMIT_BUFFS.SPEED_DURATION);
-    entity.statusEffects.shielded = true;
-    entity.statusEffects.commitShield = COMMIT_BUFFS.SHIELD_DURATION;
-
-    // Play VFX for ring commit (only for players with game state)
-    if (state && 'score' in entity) {
-        vfxIntegrationManager.handleRingCommit(entity as Player, ring, state);
-    }
-
-    console.log(`[CJR] ${entity.name} committed to Ring ${ring}!`);
-};
-
-const applyMembraneBounce = (entity: Player | Bot, targetRing: RingId, reason?: string) => {
-    // Bounce OUT (Away from center)
-    const boundary = (targetRing === 3) ? RING_RADII.R3_BOUNDARY : RING_RADII.R2_BOUNDARY;
-    forcePosToRadius(entity, boundary + entity.radius + 5);
-
-    // Velocity Reflection
-    bounceVelocity(entity, 1.5); // Strong bounce
-
-    // Log reason for debugging/VFX
-    if (reason === 'LOW_MATCH') {
-        console.log(`[CJR] ${entity.name} needs higher match% to enter Ring ${targetRing}.`);
-    }
-};
-
-const applyMembraneTrap = (entity: Player | Bot, boundaryRadius: number) => {
-    // Bounce IN (Towards center)
-    // Position must be < boundary
-    forcePosToRadius(entity, boundaryRadius - entity.radius - 5);
-    bounceVelocity(entity, 0.5); // Soft bounce
-};
-
-const forcePosToRadius = (entity: Player | Bot, r: number) => {
-    const angle = Math.atan2(entity.position.y, entity.position.x);
-    entity.position.x = Math.cos(angle) * r;
-    entity.position.y = Math.sin(angle) * r;
-};
-
-const bounceVelocity = (entity: Player | Bot, elasticity: number) => {
-    const angle = Math.atan2(entity.position.y, entity.position.x);
-    const normal = { x: Math.cos(angle), y: Math.sin(angle) };
-
-    // V_new = V - (1+e)*(V.N)*N
-    const dot = entity.velocity.x * normal.x + entity.velocity.y * normal.y;
-    entity.velocity.x -= (1 + elasticity) * dot * normal.x;
-    entity.velocity.y -= (1 + elasticity) * dot * normal.y;
-};
-
-const applyTempSpeedBoost = (entity: Player | Bot, multiplier: number, duration: number) => {
-    const current = entity.statusEffects.tempSpeedBoost || 1;
-    if (multiplier >= 1) {
-        entity.statusEffects.tempSpeedBoost = Math.max(current, multiplier);
-    } else {
-        entity.statusEffects.tempSpeedBoost = Math.min(current, multiplier);
-    }
-    entity.statusEffects.tempSpeedTimer = Math.max(entity.statusEffects.tempSpeedTimer || 0, duration);
-};
+}

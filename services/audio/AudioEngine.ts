@@ -264,6 +264,30 @@ const SOUND_DEFINITIONS: Record<string, Omit<SoundDefinition, 'id'>> = {
     spatial: false,
     priority: 5,
   },
+  ring_commit_1: {
+    type: 'sfx',
+    generator: createRoundChangeSound,
+    volume: 0.6,
+    poolSize: 1,
+    spatial: false,
+    priority: 5,
+  },
+  ring_commit_2: {
+    type: 'sfx',
+    generator: createRoundChangeSound,
+    volume: 0.7,
+    poolSize: 1,
+    spatial: false,
+    priority: 5,
+  },
+  ring_commit_3: {
+    type: 'sfx',
+    generator: createEvolutionSound, // Epic for ring 3
+    volume: 0.8,
+    poolSize: 1,
+    spatial: false,
+    priority: 5,
+  },
 };
 
 // ============================================

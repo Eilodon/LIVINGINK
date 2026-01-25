@@ -7,7 +7,7 @@ import {
   Bot,
   Vector2
 } from '../../types';
-import { createParticle, createFloatingText as factoryCreateFloatingText } from './factories'; // wait, factories doesn't export floating text? I'll check factories.ts.
+import { createParticle } from './factories';
 // factories.ts I rewrote didn't export createFloatingText. I need to add it or inline it.
 // I'll inline it here or export it from factories.
 // Let's check factories.ts content I wrote.

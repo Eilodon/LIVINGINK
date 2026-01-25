@@ -148,6 +148,13 @@ export class GameRoom extends Room<GameRoomState> {
     }
   }
 
+  // Initializer helper to ensure fields exist if createPlayer doesn't set them (it's in factory, wait, I need to check factory)
+  // Actually, I should update the factory or just init here if it's missing.
+  // But wait, createPlayer is in services/engine/factories.ts, I should check that file too.
+  // For now, I'll rely on the class property initializer if possible or update factory.
+  // Checking factories.ts is safer. I'll do that in next step.
+
+
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, 'left!');
     this.state.players.delete(client.sessionId);
@@ -184,11 +191,11 @@ export class GameRoom extends Room<GameRoomState> {
       // Validate input before applying
       const lastInput = this.inputsBySession.get(player.id);
       const serverPlayer = this.state.players.get(player.id);
-      
+
       if (serverPlayer) {
         // Sanitize input
         const sanitizedInput = serverValidator.sanitizeInput(input);
-        
+
         // Validate input sequence and rules
         const validation = serverValidator.validateInput(
           player.id,
@@ -196,7 +203,7 @@ export class GameRoom extends Room<GameRoomState> {
           lastInput || null,
           serverPlayer
         );
-        
+
         if (!validation.isValid) {
           console.warn(`Invalid input from ${player.id}: ${validation.reason}`);
           // Skip this input but don't disconnect the player
@@ -235,7 +242,7 @@ export class GameRoom extends Room<GameRoomState> {
         player.id,
         player.position,
         { x: serverPlayer.position.x, y: serverPlayer.position.y },
-        1/60 // Assuming 60 FPS
+        1 / 60 // Assuming 60 FPS
       );
 
       if (!positionValidation.isValid) {
@@ -257,7 +264,7 @@ export class GameRoom extends Room<GameRoomState> {
           pigment: player.pigment
         } as PlayerState,
         serverPlayer,
-        1/60
+        1 / 60
       );
 
       if (!statsValidation.isValid) {

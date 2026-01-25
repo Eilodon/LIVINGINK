@@ -138,6 +138,8 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
       prismGuardReduction: 0.8,
       grimHarvestDropCount: 0,
     },
+    killStreak: 0,
+    streakTimer: 0,
   };
 };
 
@@ -235,19 +237,4 @@ export const createProjectile = (
   };
 };
 
-export const createFloatingText = (
-  position: Vector2,
-  text: string,
-  color: string,
-  size: number,
-  state: any // Avoid circular dep on GameState for factory return types if possible, or use explicit GameState
-): void => {
-  // Actually factories usually CREATE objects, not modify state directly.
-  // Ideally we return the object.
-  // But effects.ts called it.
-  // Let's match effects.ts expectation or change effects.ts to use this properly.
-  // effects.ts usage: createFloatingText(pos, text, color, size, state)
-  // So this function logic was originally in effects.ts, but I moved it?
-  // Wait, effects.ts tried to import it from factories.
-  // I should implement it here as returning FloatingText object
-};
+

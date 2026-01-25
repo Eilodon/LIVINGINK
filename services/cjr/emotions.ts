@@ -1,66 +1,96 @@
+import { Emotion, CJRPlayerState } from './cjrTypes';
 
-import { Player, Bot, Emotion } from '../../types';
-
-export const updateEmotion = (entity: Player | Bot, dt: number) => {
-    if (entity.emotionTimer > 0 && entity.emotionOverride) {
+/**
+ * Updates the emotion state based on recent events and current stats.
+ */
+/**
+ * Updates the emotion state based on recent events and current stats.
+ */
+export function updateEmotion(entity: any, dt: number) {
+    // Check overrides
+    if (entity.emotionTimer > 0) {
         entity.emotionTimer -= dt;
-        entity.emotion = entity.emotionOverride;
-        if (entity.emotionTimer <= 0) {
-            entity.emotionOverride = undefined;
+        if (entity.emotionOverride) {
+            entity.emotion = entity.emotionOverride;
+            if (entity.emotionTimer <= 0) {
+                entity.emotionOverride = undefined;
+            } else {
+                return;
+            }
         }
-        return;
     }
 
-    // 1. Defeat / Dead
-    if (entity.isDead) {
-        entity.emotion = 'ko';
-        return;
+    // Default Update
+    const healthP = (entity.currentHealth || 1) / (entity.maxHealth || 1);
+    const mass = entity.radius || 10; // proxy for mass
+    const match = entity.matchPercent || 0;
+
+    // We don't have an "Event" here, so we pass 'idle' or similar.
+    // Real events (damage, eat) should trigger transient overrides via triggerEmotion.
+    entity.emotion = calculateEmotion(entity.emotion, 'idle', healthP, mass, match, dt);
+}
+
+function calculateEmotion(
+    currentEmotion: Emotion,
+    event: 'eat' | 'damage' | 'idle' | 'kill' | 'enter_ring' | 'win_start',
+    healthPercent: number,
+    mass: number,
+    matchPercent: number,
+    dt: number
+): Emotion {
+    // 1. High Priority Overrides
+    if (healthPercent < 0.2) return 'panic';
+    if (event === 'win_start') return 'victory';
+    if (event === 'kill') return 'yum'; // or 'greed'
+
+    // 2. Transient Events (Timer based elsewhere, but logic here)
+    if (event === 'eat') return 'yum';
+    if (event === 'damage') return 'panic';
+    if (event === 'enter_ring') return 'focus';
+
+    // 3. Steady States
+    if (currentEmotion === 'yum' || currentEmotion === 'panic') {
+        // These should decay back to steady state after timer in the loop
+        // But if we are called every tick, we might need a timer passed in.
+        // For now, assuming this function is called on Event Trigger or periodically check steady state.
+        // If "idle", check conditions:
     }
 
-    // 2. Victory (Flag?)
-    // if (won) entity.emotion = 'victory';
+    // Steady State Logic
+    if (matchPercent < 0.5 && mass > 50) return 'despair'; // Big but wrong color
+    if (matchPercent > 0.9) return 'happy';
 
-    // 3. Combat (Recently matched or hit)
-    // We need timers. 
-    // Simplified State Machine:
+    if (mass < 20) return 'hungry';
 
-    // Recently hit -> panic
-    if (entity.lastHitTime < 0.6) {
-        entity.emotion = 'panic';
-        return;
+    return 'happy'; // Default
+}
+
+/**
+ * Returns the duration (ms) for a transient emotion.
+ */
+export function getEmotionDuration(emotion: Emotion): number {
+    switch (emotion) {
+        case 'yum': return 1000;
+        case 'panic': return 1500;
+        case 'victory': return 99999;
+        case 'focus': return 2000;
+        case 'ko': return 99999;
+        default: return 0; // Steady state
     }
+}
 
-    // Low Health (< 30%)
-    if (entity.currentHealth < entity.maxHealth * 0.3) {
-        entity.emotion = 'despair';
-        return;
+/**
+ * Triggers a transient emotion override.
+ */
+export function triggerEmotion(entity: any, emotion: Emotion) {
+    // Priority check could go here
+    const dur = getEmotionDuration(emotion);
+    if (dur > 0) {
+        entity.emotionOverride = emotion;
+        entity.emotionTimer = dur / 1000; // stored in seconds usually? checking GameRoom updates
+        // GameRoom uses dt in seconds.
+        // Let's assume dt is seconds. so dur is ms.
+        // wait, updateEmotion takes dt.
+        // entity structure has emotionTimer.
     }
-
-    // Hungry if not eating
-    if (entity.lastEatTime > 5.0) {
-        entity.emotion = 'hungry';
-        return;
-    }
-
-    // High Match % (Focused)
-    if (entity.matchPercent > 0.8) {
-        entity.emotion = 'focus';
-        return;
-    }
-
-    // Eating (Yum)
-    // Need trigger from consumePickup
-
-    // Default
-    entity.emotion = 'happy';
-};
-
-export const triggerEmotion = (entity: Player | Bot, trigger: 'eat' | 'hit' | 'score') => {
-    // Override temporary emotions
-    if (trigger === 'eat') entity.emotion = 'yum';
-    if (trigger === 'hit') entity.emotion = 'panic';
-    if (trigger === 'score') entity.emotion = 'greed';
-
-    entity.emotionOverride = entity.emotion;
-    entity.emotionTimer = 0.6;
-};
+}
