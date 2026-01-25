@@ -1,58 +1,73 @@
-// Basic Wobble Vertex Shader
+
+// SHADER COMPONENT - JELLY EFFECT
+// Vertex Shader: Wobbles vertices based on time and position (Soft Body simulation)
+// Fragment Shader: Simple color + rim lighting
+
 export const JELLY_VERTEX = `
   precision mediump float;
+
   attribute vec2 aVertexPosition;
-  attribute vec2 aTextureCoord;
-  
+  attribute vec2 aUvs;
+
   uniform mat3 translationMatrix;
   uniform mat3 projectionMatrix;
-  
-  uniform float uTime;
-  uniform float uSpeed;
-  uniform float uWobble;
 
-  varying vec2 vTextureCoord;
+  uniform float uTime;
+  uniform float uWobble;
+  uniform float uSquish;
+
+  varying vec2 vUvs;
 
   void main() {
-    vTextureCoord = aTextureCoord;
+    vUvs = aUvs;
     
+    // Normalize position relative to center (assuming 0,0 center in local space)
     vec2 pos = aVertexPosition;
     
-    // Simple wobble based on Time + Position Y
-    float wave = sin(uTime * 10.0 + pos.y * 0.1) * uWobble * 5.0;
-    pos.x += wave;
+    // 1. Wobble Effect (Sine wave on radius)
+    float angle = atan(pos.y, pos.x);
+    float dist = length(pos);
     
-    vec3 v = translationMatrix * vec3(pos, 1.0);
-    gl_Position = vec4((projectionMatrix * v).xy, 0.0, 1.0);
+    float wave = sin(angle * 5.0 + uTime * 5.0) * uWobble * dist;
+    
+    // 2. Squish Effect (Velocity stretch)
+    // Simple mock: stretch X, squash Y (rotated by container in JS)
+    pos.x *= (1.0 + uSquish);
+    pos.y *= (1.0 - uSquish);
+    
+    // Apply wobble
+    pos += vec2(cos(angle), sin(angle)) * wave;
+
+    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(pos, 1.0)).xy, 0.0, 1.0);
   }
 `;
 
-// Membrane Pulse Fragment Shader
-export const MEMBRANE_FRAG = `
+export const JELLY_FRAGMENT = `
   precision mediump float;
-  varying vec2 vTextureCoord;
-  
-  uniform vec3 uColor;
-  uniform float uTime;
+
+  varying vec2 vUvs;
+
+  uniform vec3 uColor; // RGB 0..1
   uniform float uAlpha;
-  
+  uniform vec3 uBorderColor;
+
   void main() {
-    // Distance from center of UV (assuming quad is 0..1)
+    // Circle distance from center (UV 0.5, 0.5)
     vec2 center = vec2(0.5);
-    float dist = distance(vTextureCoord, center) * 2.0; // 0..1
+    float dist = distance(vUvs, center) * 2.0; // 0..1
     
-    // Ring effect
-    float ringWidth = 0.1;
-    float ringRadius = 0.8 + sin(uTime * 3.0) * 0.05;
+    // Soft edge (Anti-aliasing)
+    float alpha = 1.0 - smoothstep(0.9, 1.0, dist);
     
-    float alpha = 0.0;
+    // Rim lighting (Inner glow)
+    float rim = smoothstep(0.7, 0.95, dist) * 0.5;
     
-    // Soft outer glow
-    if (dist > ringRadius - ringWidth && dist < ringRadius + ringWidth) {
-        float d = abs(dist - ringRadius);
-        alpha = 1.0 - smoothstep(0.0, ringWidth, d);
-    }
+    vec3 color = uColor + rim;
     
-    gl_FragColor = vec4(uColor, alpha * uAlpha);
+    // Border
+    // float border = smoothstep(0.85, 0.9, dist);
+    // color = mix(color, uBorderColor, border);
+
+    gl_FragColor = vec4(color, alpha * uAlpha);
   }
 `;

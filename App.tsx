@@ -1,5 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GameState, TattooId } from './types';
+import { GameState } from './types';
+import { TattooId } from './services/cjr/cjrTypes';
 import { ShapeId } from './services/cjr/cjrTypes';
 import { createInitialState, updateClientVisuals, updateGameState } from './services/engine';
 import MainMenu from './components/MainMenu';

@@ -46,6 +46,7 @@ import { updateWaveSpawner, resetWaveTimers } from '../cjr/waveSpawner';
 import { updateWinCondition } from '../cjr/winCondition';
 import { updateBossLogic, resetBossState } from '../cjr/bossCjr';
 import { updateEmotion } from '../cjr/emotions';
+import { assignRandomPersonality } from '../cjr/botPersonalities';
 import { getTattooChoices } from '../cjr/tattoos';
 import { TattooId } from '../cjr/cjrTypes';
 import { getLevelConfig } from '../cjr/levels';
@@ -426,6 +427,7 @@ const handleSpawning = (state: GameState, dt: number) => {
     // Logic to respawn random bot
     // Simplified
     const newBot = createBot(Math.random().toString());
+    assignRandomPersonality(newBot);
     state.bots.push(newBot);
   }
 
@@ -495,7 +497,11 @@ export const createInitialState = (level: number = 1): GameState => {
   return {
     player,
     players: [player],
-    bots: Array.from({ length: Math.max(levelConfig.botCount, 10) }, (_, i) => createBot(`${i}`)), // MINIMUM 10 BOTS
+    bots: Array.from({ length: Math.max(levelConfig.botCount, 10) }, (_, i) => {
+      const b = createBot(`${i}`);
+      assignRandomPersonality(b);
+      return b;
+    }), // MINIMUM 10 BOTS
     creeps: [], // Deprecated
     boss: null,
     food: Array.from({ length: initialFood }, () => createFood()),

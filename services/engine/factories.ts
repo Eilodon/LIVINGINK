@@ -24,7 +24,7 @@ import { getCurrentEngine } from './context';
 import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from './math';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
 import { pigmentToHex } from '../cjr/colorMath';
-import { assignRandomPersonality } from '../cjr/botPersonalities';
+
 
 // Helper: Random Pigment
 export const randomPigment = (): PigmentVec3 => ({
@@ -155,7 +155,7 @@ export const createBot = (id: string, spawnTime: number = 0): Bot => {
     personality: 'farmer',
   };
 
-  assignRandomPersonality(bot);
+
 
   return bot;
 };

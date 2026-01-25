@@ -1,10 +1,8 @@
-import { PigmentVec3, RingId, Emotion, ShapeId, TattooId, PickupKind } from './services/cjr/cjrTypes';
+import type { PigmentVec3, RingId, Emotion, ShapeId, PickupKind } from './services/cjr/cjrTypes';
 import type { LevelConfig } from './services/cjr/levels';
 
 export type { PigmentVec3, RingId, PickupKind };
 export type { Emotion, ShapeId };
-export { TattooId } from './services/cjr/cjrTypes';
-export { TattooId as MutationId } from './services/cjr/cjrTypes'; // Keep alias for now if needed, but we are refactoring.
 
 export enum GamePhase {
   Menu = 'MENU',
@@ -79,7 +77,7 @@ export interface Player extends Entity {
   ring: RingId;
   emotion: Emotion;
   shape: ShapeId;
-  tattoos: TattooId[];
+  tattoos: string[];
   lastHitTime: number;
   lastEatTime: number;
   matchStuckTime: number;
@@ -235,7 +233,7 @@ export interface Food extends Entity {
 }
 
 export interface TattooChoice {
-  id: TattooId;
+  id: string;
   name: string;
   tier: MutationTier;
   description: string;
@@ -251,7 +249,7 @@ export interface PlayerProfile {
   totalKills: number;
   highScore: number;
   unlockedSkins: string[];
-  unlockedTattoos: TattooId[];
+  unlockedTattoos: string[];
   cosmetics?: {
     ownedSkins: string[];
     ownedTrails: string[];
@@ -369,7 +367,7 @@ export interface GameState {
   levelConfig: LevelConfig;
 
   tattooChoices: TattooChoice[] | null;
-  unlockedTattoos: TattooId[];
+  unlockedTattoos: string[];
   isPaused: boolean;
   result: 'win' | 'lose' | null;
 

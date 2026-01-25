@@ -1,5 +1,6 @@
 
-import { PlayerProfile, TattooId } from '../types';
+import { PlayerProfile } from '../types';
+import { TattooId } from './cjr/cjrTypes';
 
 export const getEmptyProfile = (): PlayerProfile => ({
   gamesPlayed: 0,

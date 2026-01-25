@@ -1,5 +1,6 @@
 
-import { TattooId, MutationTier, Player, Bot, Food, GameState } from '../../types';
+import { MutationTier, Player, Bot, Food, GameState } from '../../types';
+import { TattooId } from './cjrTypes';
 import { COLOR_BALANCE } from './balance';
 import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { mixPigment, calcMatchPercent, pigmentToHex } from './colorMath';
@@ -164,7 +165,7 @@ export const applyTattoo = (player: Player, id: TattooId, state?: any) => {
         if (!player.tattoos.includes(id)) {
             player.tattoos.push(id);
             t.apply(player);
-            
+
             // Play tattoo activation VFX
             if (state) {
                 vfxIntegrationManager.handleTattooActivation(player, id, state);

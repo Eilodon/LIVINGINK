@@ -1,83 +1,55 @@
 
+import { GameState, Player } from '../../types';
 
-import { GameState, Player, Bot } from '../../types';
-import { createFloatingText } from '../engine/effects';
-
-const getContributionState = (runtime: GameState['runtime']) => runtime.contribution;
-
-export const trackDamage = (attacker: Player | Bot, victim: Player | Bot, amount: number, state: GameState) => {
-    if (!attacker || !victim) return;
-
-    const contribution = getContributionState(state.runtime);
-    const current = contribution.damageLog.get(attacker.id) || 0;
-    contribution.damageLog.set(attacker.id, current + amount);
-
-    // Track last hit for spotlight
-    contribution.lastHitBy.set(victim.id, attacker.id);
+export const resetContributionLog = (runtime: any) => {
+    runtime.contribution.damageLog.clear();
+    runtime.contribution.lastHitBy.clear();
 };
 
-export const getContributionRanking = (runtime: GameState['runtime']) => {
-    return Array.from(runtime.contribution.damageLog.entries())
-        .map(([id, dmg]) => ({ id, dmg }))
-        .sort((a, b) => b.dmg - a.dmg);
+export const trackBossDamage = (state: GameState, playerId: string, damage: number) => {
+    const current = state.runtime.contribution.damageLog.get(playerId) || 0;
+    state.runtime.contribution.damageLog.set(playerId, current + damage);
 };
 
-export const getLastHitter = (runtime: GameState['runtime'], victimId: string): string | undefined => {
-    return runtime.contribution.lastHitBy.get(victimId);
+export const trackDamage = (attacker: any, victim: any, amount: number, state: GameState) => {
+    if (victim.isBoss) {
+        trackBossDamage(state, attacker.id, amount);
+    }
 };
 
-/**
- * Apply contribution-based rewards when boss dies
- * Vision doc spec:
- * - Top1: speed +20% 4s + shield 2s
- * - Top2-3: speed +15% 3s
- * - Top4-8: speed +10% 2s
- */
-export const applyContributionBuffs = (players: (Player | Bot)[], runtime: GameState['runtime'], state?: GameState) => {
-    const ranking = getContributionRanking(runtime);
+export const distributeBossRewards = (state: GameState) => {
+    // Sort damage log
+    const damages = Array.from(state.runtime.contribution.damageLog.entries())
+        .sort((a, b) => b[1] - a[1]);
 
-    players.forEach(p => {
-        if (p.isDead) return;
+    damages.forEach((entry, index) => {
+        const [pid, dmg] = entry;
+        // Find player
+        const player = state.players.find(p => p.id === pid);
+        if (!player) return;
 
-        const rankIdx = ranking.findIndex(r => r.id === p.id);
-        if (rankIdx === -1) return;
-
-        const rank = rankIdx + 1; // 1-indexed
-
-        if (rank === 1) {
-            // Top1: Speed +20% for 4s, Shield 2s
-            p.statusEffects.speedBoost = 1.20;
-            p.statusEffects.shielded = true;
-            p.statusEffects.commitShield = 2.0;
-            if (state) createFloatingText(p.position, '🏆 TOP CONTRIBUTOR!', '#ffd700', 28, state);
-        } else if (rank <= 3) {
-            // Top2-3: Speed +15% for 3s
-            p.statusEffects.speedBoost = 1.15;
-            if (state) createFloatingText(p.position, '🥈 Great Effort!', '#c0c0c0', 22, state);
-        } else if (rank <= 8) {
-            // Top4-8: Speed +10% for 2s
-            p.statusEffects.speedBoost = 1.10;
-            if (state) createFloatingText(p.position, '⭐ Contributor!', '#cd7f32', 18, state);
+        // Tier Logic
+        if (index === 0) {
+            // Top 1
+            applyReward(player, { speed: 1.2, duration: 4000, shield: true });
+        } else if (index < 3) {
+            // Top 2-3
+            applyReward(player, { speed: 1.15, duration: 3000, shield: false });
+        } else {
+            // Participation
+            applyReward(player, { speed: 1.10, duration: 2000, shield: false });
         }
     });
 
-    // Give last-hitter spotlight VFX (drama, but NOT exclusive reward)
-    // This is handled separately in bossCjr when boss dies
+    // Clear log
+    state.runtime.contribution.damageLog.clear();
 };
 
-/**
- * Reset tracking for new boss fight
- */
-export const resetContributionLog = (runtime: GameState['runtime']) => {
-    runtime.contribution = {
-        damageLog: new Map(),
-        lastHitBy: new Map()
-    };
-};
-
-/**
- * Get total damage dealt to boss by player
- */
-export const getPlayerDamage = (runtime: GameState['runtime'], playerId: string): number => {
-    return runtime.contribution.damageLog.get(playerId) || 0;
+const applyReward = (player: Player, reward: any) => {
+    player.statusEffects.tempSpeedBoost = reward.speed;
+    player.statusEffects.tempSpeedTimer = reward.duration / 1000;
+    if (reward.shield) {
+        player.statusEffects.shielded = true;
+        player.statusEffects.invulnerable = 2.0;
+    }
 };

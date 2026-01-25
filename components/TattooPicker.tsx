@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { MutationTier, TattooId } from '../types';
-import { TattooChoice } from '../services/cjr/tattoos';
+import { MutationTier, TattooChoice } from '../types';
+import { TattooId } from '../services/cjr/cjrTypes';
 
 interface TattooPickerProps {
     choices: TattooChoice[];
-    onSelect: (id: TattooId) => void;
+    onSelect: (id: string) => void;
 }
 
 const tierColor = (tier: MutationTier) => {

@@ -3,7 +3,8 @@
  * Automated testing without manual gameplay required
  */
 
-import { GameState, Player, TattooId } from '../../types';
+import { GameState, Player } from '../../types';
+import { TattooId } from '../../services/cjr/cjrTypes';
 import { createInitialState, updateGameState } from '../../services/engine';
 import { createPlayer, createBot, createFood } from '../../services/engine/factories';
 import { applyTattoo } from '../../services/cjr/tattoos';

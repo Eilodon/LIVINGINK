@@ -8,7 +8,7 @@ import { getCurrentSpatialGrid } from '../context';
 import { distance, normalize } from '../math';
 import { calcMatchPercent } from '../../cjr/colorMath';
 import { applySkill } from './skills';
-import { updateBotPersonality } from '../../cjr/botPersonalities';
+import { updateBotPersonality, assignRandomPersonality } from '../../cjr/botPersonalities';
 
 export const updateAI = (bot: Bot, state: GameState, dt: number) => {
   if (bot.isDead) return;

@@ -1,52 +1,52 @@
-import { RING_THRESHOLDS, WIN_HOLD_DURATION } from './cjrConstants';
 
-export type WinState = {
-    isHolding: boolean;
-    holdTimer: number; // 0 -> WIN_HOLD_DURATION
-    winnerId: string | null;
-    pulseScale: number; // 0..1 for rendering heartbeat
-};
+import { GameState, Player } from '../../types';
+import { THRESHOLDS, RING_RADII } from './cjrConstants';
 
-import { GameState, Player, RingId } from '../../types';
+export const updateWinCondition = (state: GameState, dt: number, levelConfig: any) => {
+    // Only check for players inside center zone (e.g. radius < 200)
+    const WIN_ZONE_RADIUS = 200;
 
-export function updateWinCondition(
-    state: GameState,
-    dt: number,
-    config: any
-) {
-    if (state.result) return;
+    let potentialWinner: Player | null = null;
 
-    state.players.forEach(p => {
-        if (p.isDead) return;
+    const playersToCheck = [...state.players, ...state.bots];
 
-        // Check if eligible (Center Ring + High Match)
-        // Center Ring is Radius < 150 (approx) or just RingId.Inner
-        const dist = Math.hypot(p.position.x, p.position.y);
-        const inCenter = dist < 200 && p.ring === 3;
-        const hasMatch = p.matchPercent >= 0.90; // Win Hold Threshold
+    for (const p of playersToCheck) {
+        if (p.isDead) continue;
 
-        if (inCenter && hasMatch) {
-            p.stationaryTime = (p.stationaryTime || 0) + dt;
-
-            // WIN CONDITION MET
-            if (p.stationaryTime >= (config.winHoldSeconds || 1.5)) {
-                state.result = 'win';
-                state.kingId = p.id;
-                state.isPaused = true;
-                // Add bonus score
-                p.score += 5000;
-            }
-        } else {
-            // Decay
-            if (p.stationaryTime > 0) {
-                p.stationaryTime = Math.max(0, p.stationaryTime - dt * 2);
+        // Check Physics
+        const d = Math.hypot(p.position.x, p.position.y);
+        if (d < WIN_ZONE_RADIUS) {
+            if ('matchPercent' in p && p.matchPercent >= THRESHOLDS.WIN_HOLD) {
+                potentialWinner = p as Player; // Bots can win?
+                break;
             }
         }
-    });
-
-    // Also check time limit
-    if (state.gameTime >= config.timeLimit && !state.result) {
-        state.result = 'lose';
-        state.isPaused = true;
     }
-}
+
+    if (potentialWinner) {
+        if (!potentialWinner.kingForm) potentialWinner.kingForm = 0;
+
+        potentialWinner.kingForm += dt;
+
+        const pulseInterval = 0.5;
+        if (potentialWinner.kingForm % pulseInterval < dt) {
+            // Pulse!
+            state.vfxEvents.push(`pulse_${potentialWinner.id}`);
+            state.shakeIntensity = 5;
+        }
+
+        // Win Condition
+        if (potentialWinner.kingForm >= 1.5) { // 1.5s Hold
+            state.result = 'win';
+            state.kingId = potentialWinner.id;
+        }
+
+    } else {
+        // Decay channel if not holding
+        for (const p of playersToCheck) {
+            if ((p.kingForm || 0) > 0) {
+                p.kingForm = Math.max(0, (p.kingForm || 0) - dt * 2);
+            }
+        }
+    }
+};

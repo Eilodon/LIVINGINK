@@ -1,10 +1,13 @@
+
+// COLOR JELLY RUSH - Domain Types
+
 export type PigmentVec3 = {
     r: number; // 0..1
     g: number; // 0..1
     b: number; // 0..1
 };
 
-export type RingId = 0 | 1 | 2 | 3; // 0=Global/Spawn, 1=Outer, 2=Middle, 3=Inner/Core
+export type RingId = 1 | 2 | 3;
 
 export type Emotion =
     | 'happy'
@@ -25,33 +28,32 @@ export type PickupKind =
     | 'shield'
     | 'candy_vein';
 
-export type ShapeId =
-    | 'circle'   // Runner
-    | 'square'   // Tank
-    | 'triangle' // Assassin
-    | 'hex';     // Magnet
+export type ShapeId = 'circle' | 'square' | 'triangle' | 'hex';
 
 export enum TattooId {
-    FilterInk = 'filter_ink',
-    Overdrive = 'overdrive',
-    DepositShield = 'deposit_shield',
-    PigmentBomb = 'pigment_bomb',
-    PerfectMatch = 'perfect_match',
-    CatalystSense = 'catalyst_sense',
-    NeutralMastery = 'neutral_mastery',
-    SolventExpert = 'solvent_expert',
-    CatalystEcho = 'catalyst_echo',
-    PrismGuard = 'prism_guard',
-    InkLeech = 'ink_leech',
-    GrimHarvest = 'grim_harvest'
+    FilterInk = 'FilterInk',
+    Overdrive = 'Overdrive',
+    DepositShield = 'DepositShield',
+    PigmentBomb = 'PigmentBomb',
+    PerfectMatch = 'PerfectMatch',
+    CatalystSense = 'CatalystSense',
+    NeutralMastery = 'NeutralMastery',
+    SolventExpert = 'SolventExpert',
+    CatalystEcho = 'CatalystEcho',
+    PrismGuard = 'PrismGuard',
+    InkLeech = 'InkLeech',
+    GrimHarvest = 'GrimHarvest'
 }
 
-export interface CJRPlayerState {
-    pigment: PigmentVec3;
-    targetPigment: PigmentVec3; // The goal color for the current level/ring
-    matchPercent: number; // 0..1, similarity to targetPigment
-    ring: RingId;
-    emotion: Emotion;
-    shape: ShapeId;
-    tattoos: TattooId[];
+// Server Schema Mirror for StatusEffects (if not already in types.ts)
+export interface StatusEffectsCjr {
+    speedBoost: number;
+    shielded: boolean;
+    burning: boolean;
+    slowed: boolean;
+    invulnerable: number;
+    damageBoost: number;
+    defenseBoost: number;
+    commitShield: number;
+    pityBoost: number;
 }
