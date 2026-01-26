@@ -21,21 +21,10 @@ const createSynergyVisualEffect = (player: Player, config: {
   pattern: 'fusion' | 'explosion' | 'spiral' | 'geometric';
   duration: number;
 }, state: GameState): void => {
-  // Create visual effect for synergy activation
-  for (let i = 0; i < config.particleCount; i++) {
-    const angle = (i / config.particleCount) * Math.PI * 2;
-    const speed = 100 + Math.random() * 100;
-    
-    const particle = createParticle(player.position.x, player.position.y, config.particleColor, speed);
-    particle.velocity.x = Math.cos(angle) * speed;
-    particle.velocity.y = Math.sin(angle) * speed;
-    particle.life = config.duration;
-    particle.maxLife = config.duration;
-    particle.isSynergyEffect = true;
-    particle.synergyColor = config.particleColor;
-    
-    state.particles.push(particle);
-  }
+
+  // EIDOLON-V: Push Synergy Event
+  // "synergy:x:y:color:pattern"
+  state.vfxEvents.push(`synergy:${player.position.x}:${player.position.y}:${config.particleColor}:${config.pattern}`);
 };
 
 // ============================================
@@ -76,7 +65,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.neutralPurification = true;
       player.statusEffects.neutralMassBonus = 1.5; // Enhanced from 1.25
       player.statusEffects.purificationRadius = 150;
-      
+
       // Create visual effect
       createSynergyVisualEffect(player, {
         particleColor: '#E1BEE7',
@@ -96,7 +85,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 5.0
   },
-  
+
   {
     id: 'explosive_speed',
     name: 'Explosive Speed',
@@ -108,7 +97,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.overdriveExplosive = true;
       player.statusEffects.explosiveSpeed = 1.3;
       player.statusEffects.explosionRadius = 100;
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#FF6B35',
         particleCount: 40,
@@ -127,7 +116,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 6.0
   },
-  
+
   // ADVANCED SYNERGIES (Require strategic thinking)
   {
     id: 'golden_attraction',
@@ -140,7 +129,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.goldenAttraction = true;
       player.statusEffects.catalystAttractionRadius = 300;
       player.statusEffects.goldenMagneticForce = 2.0;
-      
+
       // Attract nearby catalysts
       state.food.forEach(food => {
         if (food.isDead || food.kind !== 'catalyst') return;
@@ -153,7 +142,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
           food.velocity.y += (dy / dist) * force;
         }
       });
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#FFD700',
         particleCount: 50,
@@ -172,7 +161,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 8.0
   },
-  
+
   {
     id: 'elemental_balance',
     name: 'Elemental Balance',
@@ -184,7 +173,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.elementalBalance = true;
       player.statusEffects.solventShieldPower = 2.5; // Enhanced from 2.0
       player.statusEffects.shieldSolventSynergy = true;
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#00BCD4',
         particleCount: 45,
@@ -277,7 +266,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 10.0
   },
-  
+
   // MASTER SYNERGIES (High skill requirement)
   {
     id: 'chromatic_mastery',
@@ -291,14 +280,14 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.chromaticImmunityDuration = 5.0;
       player.statusEffects.perfectMatchBonus = 2.0; // Enhanced from 1.5
       player.statusEffects.catalystMasteryRadius = 500;
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#9C27B0',
         particleCount: 80,
         pattern: 'geometric',
         duration: 4.0
       }, state);
-      
+
       createFloatingText(player.position, 'CHROMATIC MASTERY!', '#9C27B0', 28, state);
     },
     visualEffect: {
@@ -312,7 +301,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 15.0
   },
-  
+
   {
     id: 'kinetic_explosion',
     name: 'Kinetic Explosion',
@@ -324,14 +313,14 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.kineticExplosion = true;
       player.statusEffects.explosionDamage = 2.0;
       player.statusEffects.shieldPiercing = true;
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#FF5722',
         particleCount: 100,
         pattern: 'explosion',
         duration: 3.5
       }, state);
-      
+
       createFloatingText(player.position, 'KINETIC EXPLOSION!', '#FF5722', 32, state);
     },
     visualEffect: {
@@ -391,7 +380,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 14.0
   },
-  
+
   // LEGENDARY SYNERGIES (Game-changing)
   {
     id: 'absolute_mastery',
@@ -406,14 +395,14 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.perfectMatchThreshold = 0.7; // Lowered from 0.85
       player.statusEffects.catalystGuarantee = true; // Always get catalysts
       player.statusEffects.neutralGodMode = true; // Neutral becomes super
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#FFD700',
         particleCount: 150,
         pattern: 'geometric',
         duration: 5.0
       }, state);
-      
+
       createFloatingText(player.position, 'ABSOLUTE MASTERY!', '#FFD700', 36, state);
     },
     visualEffect: {
@@ -427,7 +416,7 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     },
     cooldown: 30.0
   },
-  
+
   {
     id: 'temporal_distortion',
     name: 'Temporal Distortion',
@@ -440,14 +429,14 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       player.statusEffects.timeManipulation = 0.5; // 50% time slow
       player.statusEffects.speedAmplifier = 3.0;
       player.statusEffects.explosionTimeDilation = 2.0;
-      
+
       createSynergyVisualEffect(player, {
         particleColor: '#E91E63',
         particleCount: 120,
         pattern: 'spiral',
         duration: 4.5
       }, state);
-      
+
       createFloatingText(player.position, 'TEMPORAL DISTORTION!', '#E91E63', 34, state);
     },
     visualEffect: {
@@ -484,12 +473,12 @@ export class TattooSynergyManager {
    */
   checkSynergies(player: Player, state: GameState): void {
     const playerTattoos = player.tattoos;
-    
+
     // Check each possible synergy
     for (const synergy of TATTOO_SYNERGIES) {
       // Skip if already on cooldown
       if (this.isSynergyOnCooldown(synergy.id)) continue;
-      
+
       // Check if player has required tattoos
       if (this.hasRequiredTattoos(playerTattoos, synergy.tattoos)) {
         // Check unlock requirements
@@ -512,11 +501,11 @@ export class TattooSynergyManager {
    */
   private meetsUnlockRequirements(player: Player, synergy: TattooSynergy): boolean {
     const req = synergy.unlockRequirement;
-    
+
     if (req.minPlayerLevel && player.radius < 15 + req.minPlayerLevel * 5) return false;
     if (req.minMatchPercent && player.matchPercent < req.minMatchPercent) return false;
     if (req.specificSituation && !this.isInSpecificSituation(player, req.specificSituation)) return false;
-    
+
     return true;
   }
 
@@ -543,7 +532,7 @@ export class TattooSynergyManager {
   private activateSynergy(player: Player, synergy: TattooSynergy, state: GameState): void {
     // Apply synergy effect
     synergy.effect(player, state);
-    
+
     // Track synergy
     const effectId = `${player.id}_${synergy.id}`;
     const effect: TattooSynergyEffect = {
@@ -554,19 +543,19 @@ export class TattooSynergyManager {
       duration: this.getSynergyDuration(synergy),
       tier: synergy.tier
     };
-    
+
     this.activeSynergies.set(effectId, effect);
-    
+
     // Set cooldown
     this.synergyCooldowns.set(synergy.id, synergy.cooldown);
-    
+
     // Mark as discovered
     this.discoveredSynergies.add(synergy.id);
-    
+
     // Update stats
     const currentCount = this.synergyStats.get(synergy.id) || 0;
     this.synergyStats.set(synergy.id, currentCount + 1);
-    
+
     // Create notification
     this.createSynergyNotification(player, synergy, state);
   }
@@ -605,13 +594,13 @@ export class TattooSynergyManager {
         this.synergyCooldowns.set(synergyId, newCooldown);
       }
     }
-    
+
     // Update active synergies
     for (const [effectId, effect] of this.activeSynergies.entries()) {
       effect.elapsed += dt;
       if (effect.elapsed >= effect.duration) {
         this.activeSynergies.delete(effectId);
-        
+
         // Remove synergy effects from player
         this.removeSynergyEffects(effect.playerId, effect.synergyId, state);
       }
@@ -633,7 +622,7 @@ export class TattooSynergyManager {
   private removeSynergyEffects(playerId: string, synergyId: string, state: GameState): void {
     const player = state.player.id === playerId ? state.player : state.bots.find(b => b.id === playerId);
     if (!player) return;
-    
+
     // Remove all synergy effects
     delete player.statusEffects.neutralPurification;
     delete player.statusEffects.purificationRadius;
@@ -675,7 +664,7 @@ export class TattooSynergyManager {
       master: '⭐⭐⭐',
       legendary: '⭐⭐⭐⭐'
     };
-    
+
     const message = `${tierEmoji[synergy.tier]} ${synergy.name}`;
     createFloatingText(player.position, message, synergy.visualEffect.particleColor, 24, state);
   }
@@ -684,8 +673,8 @@ export class TattooSynergyManager {
    * Get synergy information for UI
    */
   getSynergyInfo(tattoos: TattooId[]): TattooSynergy[] {
-    return TATTOO_SYNERGIES.filter(synergy => 
-      tattoos.length >= 2 && 
+    return TATTOO_SYNERGIES.filter(synergy =>
+      tattoos.length >= 2 &&
       synergy.tattoos.every(tattoo => tattoos.includes(tattoo))
     );
   }
@@ -694,7 +683,7 @@ export class TattooSynergyManager {
    * Get discovered synergies
    */
   getDiscoveredSynergies(): TattooSynergy[] {
-    return TATTOO_SYNERGIES.filter(synergy => 
+    return TATTOO_SYNERGIES.filter(synergy =>
       this.discoveredSynergies.has(synergy.id)
     );
   }
@@ -723,13 +712,13 @@ export class TattooSynergyManager {
    */
   getActiveSynergies(playerId: string): TattooSynergyEffect[] {
     const effects: TattooSynergyEffect[] = [];
-    
+
     for (const [effectId, effect] of this.activeSynergies.entries()) {
       if (effect.playerId === playerId) {
         effects.push(effect);
       }
     }
-    
+
     return effects;
   }
 }

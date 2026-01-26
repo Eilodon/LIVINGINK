@@ -44,6 +44,7 @@ export type LevelConfig = {
         speedMultiplier: number;
     };
     rushWindowDuration: number;
+    winCondition?: 'hold_center' | 'default';
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;

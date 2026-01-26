@@ -12,9 +12,9 @@ export class VFXSystem {
   // --- EVENTS (Server/Client Safe) ---
 
   playRingCommitVFX(player: Player, ringId: RingId, state: GameState): void {
-    // 1. Push Event String: "commit:playerId:ringId"
+    // 1. Push Event String: "commit:x:y:playerId:ringId"
     // Client (PixiGameCanvas) sẽ parse chuỗi này và gọi CrystalVFX.shockwave/spiral
-    state.vfxEvents.push(`commit:${player.id}:${ringId}`);
+    state.vfxEvents.push(`commit:${player.position.x}:${player.position.y}:${player.id}:${ringId}`);
 
     // 2. Audio (Placeholder)
     // if (typeof window !== 'undefined') {

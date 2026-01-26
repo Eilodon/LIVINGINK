@@ -124,7 +124,10 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
   // ... Rest of Loop ...
   updateProjectiles(state, dt);
-  updateParticles(state, dt);
+
+  // EIDOLON-V: Removed particle update loop (Client Side specific now)
+  // updateParticles(state, dt);
+
   updateFloatingTexts(state, dt);
   cleanupTransientEntities(state);
 
@@ -153,7 +156,7 @@ export const updateGameState = (state: GameState, dt: number): GameState => {
 
 export const updateClientVisuals = (state: GameState, dt: number): void => {
   bindEngine(state.engine);
-  updateParticles(state, dt);
+  // updateParticles(state, dt); // Removed
   updateFloatingTexts(state, dt);
   vfxIntegrationManager.update(state, dt);
   updateCamera(state);
@@ -180,30 +183,9 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
     handleCollision(player, other, state, dt);
   });
 
-<<<<<<< Updated upstream
-  const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
-  const magnetRadius = player.magneticFieldRadius || 0;
-  if (magnetRadius > 0 || catalystSense) {
-    const catalystRange = (player.statusEffects.catalystSenseRange || 2.0) * 130; // Base 130, scaled
-    const radius = catalystSense ? catalystRange : magnetRadius;
-    state.food.forEach(f => {
-      if (f.isDead) return;
-      if (catalystSense && f.kind !== 'catalyst') return;
-      const dx = player.position.x - f.position.x;
-      const dy = player.position.y - f.position.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < radius && dist > 1) {
-        const pull = 120 * dt;
-        f.velocity.x += (dx / dist) * pull;
-        f.velocity.y += (dy / dist) * pull;
-=======
   // EIDOLON-V: OPTIMIZED MAGNET LOGIC (Spatial Grid Lookups)
   const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
   const magnetRadius = player.magneticFieldRadius || 0;
-
-  // EIDOLON-V: OPTIMIZED MAGNET LOGIC (Spatial Grid Lookups)
-  // const catalystSense = player.tattoos.includes(TattooId.CatalystSense); // Removed, declared above
-  // const magnetRadius = player.magneticFieldRadius || 0; // Removed, declared above
 
   if (magnetRadius > 0 || catalystSense) {
     const catalystRange = (player.statusEffects.catalystSenseRange || 2.0) * 130;
@@ -236,7 +218,6 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
         const factor = pullPower / dist; // Normalize force
         f.velocity.x += dx * factor;
         f.velocity.y += dy * factor;
->>>>>>> Stashed changes
       }
     }
   }
@@ -415,59 +396,6 @@ const updateProjectiles = (state: GameState, dt: number) => {
       }
     });
   });
-};
-
-const updateParticles = (state: GameState, dt: number) => {
-  const engine = state.engine;
-  for (let i = state.particles.length - 1; i >= 0; i--) {
-    const p = state.particles[i];
-    if (p.isDead) {
-      engine.particlePool.release(p);
-      state.particles.splice(i, 1);
-      continue;
-    }
-    p.life -= dt;
-    if ((p as any).floatUpward) {
-      const floatSpeed = (p as any).floatSpeed ?? 20;
-      p.position.y -= floatSpeed * dt;
-    }
-    if ((p as any).expandSpeed) {
-      p.radius += (p as any).expandSpeed * dt;
-    }
-    if ((p as any).rotationSpeed) {
-      p.angle = (p.angle ?? 0) + (p as any).rotationSpeed * dt;
-    }
-    if ((p as any).isRipple) {
-      const rippleRadius = (p as any).rippleRadius ?? 0;
-      const rippleSpeed = (p as any).rippleSpeed ?? 0;
-      (p as any).rippleRadius = rippleRadius + rippleSpeed * dt;
-      if ((p as any).rippleMaxRadius && (p as any).rippleRadius >= (p as any).rippleMaxRadius) {
-        p.life = 0;
-      }
-    }
-    if ((p as any).isPulse) {
-      const pulseRadius = (p as any).pulseRadius ?? 0;
-      const pulseSpeed = (p as any).pulseSpeed ?? 0;
-      (p as any).pulseRadius = pulseRadius + pulseSpeed * dt;
-      if ((p as any).pulseMaxRadius && (p as any).pulseRadius >= (p as any).pulseMaxRadius) {
-        p.life = 0;
-      }
-    }
-    if ((p as any).isShockwave) {
-      const shockwaveRadius = (p as any).shockwaveRadius ?? 0;
-      const shockwaveSpeed = (p as any).shockwaveSpeed ?? 0;
-      (p as any).shockwaveRadius = shockwaveRadius + shockwaveSpeed * dt;
-      if ((p as any).shockwaveMaxRadius && (p as any).shockwaveRadius >= (p as any).shockwaveMaxRadius) {
-        p.life = 0;
-      }
-    }
-    p.position.x += p.velocity.x * dt;
-    p.position.y += p.velocity.y * dt;
-    if (p.life <= 0) {
-      engine.particlePool.release(p); // Return to pool
-      state.particles.splice(i, 1);
-    }
-  }
 };
 
 const updateFloatingTexts = (state: GameState, dt: number) => {

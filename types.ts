@@ -332,6 +332,9 @@ export interface GameRuntimeState {
   wave: WaveRuntimeState;
   boss: BossRuntimeState;
   contribution: ContributionRuntimeState;
+  winCondition?: {
+    timer: number;
+  };
 }
 
 // Forward declaration for engine

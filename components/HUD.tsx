@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { GameState } from '../types';
 import { getColorHint } from '../services/cjr/colorMath';
-// import { THRESHOLDS } from '../services/cjr/cjrConstants'; // Assuming this exists, or inline
+import { RING_RADII, COLOR_PALETTE } from '../services/cjr/cjrConstants';
 
 interface HUDProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -16,6 +16,11 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
   const percentCircleRef = useRef<SVGCircleElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const waveRef = useRef<HTMLDivElement>(null);
+
+  // Refs for Minimap/Win
+  const minimapRef = useRef<HTMLDivElement>(null);
+  const winHoldRef = useRef<HTMLDivElement>(null);
+  const winBarRef = useRef<HTMLDivElement>(null);
 
   // Cache giá trị cũ để tránh thao tác DOM dư thừa
   const cache = useRef({ score: -1, percent: -1, hint: '', ring: 1 });
@@ -62,7 +67,6 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
         cache.current.hint = hint;
         if (hintRef.current) {
           hintRef.current.textContent = hint;
-          // Fade in/out logic simple (transition class handles it if opacity set)
           hintRef.current.style.opacity = hint ? '1' : '0';
         }
       }
@@ -70,10 +74,31 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
       // 4. Wave Timer
       if (waveRef.current) {
         const now = state.gameTime;
-        // Assuming 10s wave timer for visual flair or use state.levelConfig logic
-        // Just an example visual
         const timer = (10.0 - (now % 10.0));
         waveRef.current.textContent = `WAVE IN ${timer.toFixed(1)}s`;
+      }
+
+      // 5. Minimap Sync
+      if (minimapRef.current) {
+        // Normalize P position to -1..1 or 0..1
+        // Map Radius = 3000 (example)
+        // Minimap is 128px
+        const mapRadius = 3000;
+        const x = (p.position.x / mapRadius) * 64;
+        const y = (p.position.y / mapRadius) * 64;
+        minimapRef.current.style.transform = `translate(${x}px, ${y}px)`;
+      }
+
+      // 6. Win Hold
+      const isWinHold = state.levelConfig.winCondition === 'hold_center' && (state.runtime?.winCondition?.timer || 0) > 0;
+      if (isWinHold) {
+        if (winHoldRef.current) winHoldRef.current.style.display = 'flex';
+        const t = state.runtime?.winCondition?.timer || 0;
+        const maxT = 1.5; // Example
+        const pctHold = Math.min(100, (t / maxT) * 100);
+        if (winBarRef.current) winBarRef.current.style.width = `${pctHold}%`;
+      } else {
+        if (winHoldRef.current) winHoldRef.current.style.display = 'none';
       }
 
       rafId = requestAnimationFrame(loop);
@@ -119,7 +144,6 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
         </div>
         <div ref={waveRef} className="text-white/60 text-xs font-mono uppercase">WAVE READY</div>
       </div>
-<<<<<<< Updated upstream
 
       {/* --- BOTTOM LEFT: MINIMAP --- */}
       <div className="absolute bottom-6 left-6 w-32 h-32 bg-black/50 rounded-full border-2 border-white/10 backdrop-blur-sm overflow-hidden flex items-center justify-center pointer-events-auto">
@@ -130,33 +154,25 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
         <div className="absolute w-[9%] h-[9%] rounded-full bg-yellow-500/20 box-border" /> {/* Center */}
 
         {/* Player Dot */}
-        {minimapData && (
-          <div
-            className="absolute w-2 h-2 bg-white rounded-full shadow-[0_0_4px_white]"
-            style={{
-              transform: `translate(${minimapData.x * 64}px, ${minimapData.y * 64}px)`
-            }}
-          />
-        )}
+        <div
+          ref={minimapRef}
+          className="absolute w-2 h-2 bg-white rounded-full shadow-[0_0_4px_white]"
+        />
       </div>
 
       {/* --- CENTER: WIN HOLD OVERLAY --- */}
-      {isWinHold && (
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 flex flex-col items-center animate-pulse">
-          <div className="text-yellow-400 font-display text-4xl drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
-            CHANNELING
-          </div>
-          <div className="w-64 h-3 bg-black/50 rounded mt-2 overflow-hidden border border-yellow-500/50">
-            <div
-              className="h-full bg-yellow-400 shadow-[0_0_10px_#fbbf24]"
-              style={{ width: `${Math.min(100, (winTimer / 1.5) * 100)}%` }}
-            />
-          </div>
+      <div ref={winHoldRef} className="absolute top-1/4 left-1/2 -translate-x-1/2 flex-col items-center animate-pulse hidden">
+        <div className="text-yellow-400 font-display text-4xl drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
+          CHANNELING
         </div>
-      )}
-
-=======
->>>>>>> Stashed changes
+        <div className="w-64 h-3 bg-black/50 rounded mt-2 overflow-hidden border border-yellow-500/50">
+          <div
+            ref={winBarRef}
+            className="h-full bg-yellow-400 shadow-[0_0_10px_#fbbf24]"
+            style={{ width: '0%' }}
+          />
+        </div>
+      </div>
     </div>
   );
 });
