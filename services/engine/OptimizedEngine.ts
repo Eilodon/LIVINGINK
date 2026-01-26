@@ -33,30 +33,20 @@ interface EntityBatch {
 }
 
 // EIDOLON-V FIX: Object pool for entity arrays
-class EntityArrayPool {
-  private pools: Map<string, Entity[]> = new Map();
+// EIDOLON-V FIX: Object pool for entity arrays
+class PersistentBatch {
+  public players: Player[] = [];
+  public bots: Bot[] = [];
+  public projectiles: Entity[] = [];
+  public food: Food[] = [];
+  public all: Entity[] = [];
 
-  getArray(type: string, size: number): Entity[] {
-    const pool = this.pools.get(type);
-    if (pool && pool.length >= size) {
-      const array = pool.splice(0, size);
-      array.length = size; // Ensure exact size
-      return array;
-    }
-
-    // Create new array if pool empty or insufficient
-    return new Array(size);
-  }
-
-  returnArray(type: string, array: Entity[]): void {
-    // Clear array and return to pool
-    array.length = 0;
-    const pool = this.pools.get(type);
-    if (pool) {
-      pool.push(...array);
-    } else {
-      this.pools.set(type, [...array]);
-    }
+  clear(): void {
+    this.players.length = 0;
+    this.bots.length = 0;
+    this.projectiles.length = 0;
+    this.food.length = 0;
+    this.all.length = 0;
   }
 }
 
@@ -64,12 +54,12 @@ class EntityArrayPool {
 class OptimizedGameEngine {
   private static instance: OptimizedGameEngine;
   private spatialGrid: any;
-  private arrayPool: EntityArrayPool;
+  private batch: PersistentBatch;
   private frameCount: number = 0;
 
   private constructor() {
     this.spatialGrid = getCurrentSpatialGrid();
-    this.arrayPool = new EntityArrayPool();
+    this.batch = new PersistentBatch();
   }
 
   public static getInstance(): OptimizedGameEngine {
@@ -85,53 +75,42 @@ class OptimizedGameEngine {
     if (!state.players?.length) state.players = players;
     if (players.length > 0 && state.player !== players[0]) state.player = players[0];
 
-    // Get arrays from pool
-    const allArray = this.arrayPool.getArray('all', players.length + state.bots.length + state.projectiles.length + state.food.length);
-    const playersArray = this.arrayPool.getArray('players', players.length);
-    const botsArray = this.arrayPool.getArray('bots', state.bots.length);
-    const projectilesArray = this.arrayPool.getArray('projectiles', state.projectiles.length);
-    const foodArray = this.arrayPool.getArray('food', state.food.length);
+    // Reset batch
+    this.batch.clear();
 
-    // Fill arrays
+    const { players: batchPlayers, bots: batchBots, projectiles: batchProjectiles, food: batchFood, all: batchAll } = this.batch;
+
+    // Direct assignment safe-guarding
+    // We strictly assume downstream systems do NOT modify the REFERENCE of these arrays, only content.
+
+    // Fill arrays - ZERO ALLOCATION
     for (let i = 0; i < players.length; i++) {
-      playersArray[i] = players[i];
-      allArray[i] = players[i] as Entity;
+      batchPlayers.push(players[i]);
+      batchAll.push(players[i] as Entity);
     }
 
-    let allIndex = players.length;
     for (let i = 0; i < state.bots.length; i++) {
-      botsArray[i] = state.bots[i];
-      allArray[allIndex++] = state.bots[i] as Entity;
+      batchBots.push(state.bots[i]);
+      batchAll.push(state.bots[i] as Entity);
     }
 
     for (let i = 0; i < state.projectiles.length; i++) {
-      projectilesArray[i] = state.projectiles[i];
-      allArray[allIndex++] = state.projectiles[i];
+      batchProjectiles.push(state.projectiles[i]);
+      batchAll.push(state.projectiles[i]);
     }
 
     for (let i = 0; i < state.food.length; i++) {
-      foodArray[i] = state.food[i];
-      allArray[allIndex++] = state.food[i] as Entity;
+      batchFood.push(state.food[i]);
+      batchAll.push(state.food[i] as Entity);
     }
 
-    const batch: EntityBatch = {
-      players: playersArray as Player[],
-      bots: botsArray as Bot[],
-      projectiles: projectilesArray,
-      food: foodArray as Food[],
-      all: allArray
-    };
-
-    return batch;
+    return this.batch;
   }
 
   // EIDOLON-V FIX: Return arrays to pool
+  // No-op for persistent batch
   private returnArrays(batch: EntityBatch): void {
-    this.arrayPool.returnArray('all', batch.all);
-    this.arrayPool.returnArray('players', batch.players as unknown as Entity[]);
-    this.arrayPool.returnArray('bots', batch.bots as unknown as Entity[]);
-    this.arrayPool.returnArray('projectiles', batch.projectiles);
-    this.arrayPool.returnArray('food', batch.food as unknown as Entity[]);
+    // Intentionally empty
   }
 
   // EIDOLON-V FIX: Batch physics integration
@@ -233,7 +212,98 @@ class OptimizedGameEngine {
 
     // Apply skill
     if (player.inputs?.space) {
-      applySkill(player, state);
+      applySkill(player, player.targetPosition, state);
+    }
+
+    // EIDOLON-V FIX: Ported Regen & Cooldown Logic
+    if (player.currentHealth < player.maxHealth) {
+      player.currentHealth += player.statusEffects.regen * dt;
+    }
+    player.lastEatTime += dt;
+    player.lastHitTime += dt;
+
+    if (player.skillCooldown > 0) {
+      player.skillCooldown = Math.max(0, player.skillCooldown - dt * player.skillCooldownMultiplier);
+    }
+
+    if (player.streakTimer && player.streakTimer > 0) {
+      player.streakTimer -= dt;
+      if (player.streakTimer <= 0) {
+        player.killStreak = 0;
+        // createFloatingText(player.position, 'Streak Lost', '#ccc', 16, state); // Visual only, maybe skip in engine
+      }
+    }
+
+    // EIDOLON-V FIX: Ported Magnet Logic
+    this.updateMagnetLogic(player, state, dt);
+
+    // EIDOLON-V FIX: Unit Collision (Combat)
+    this.checkUnitCollisions(player, state, dt);
+  }
+
+  // EIDOLON-V FIX: Magnet Logic
+  private updateMagnetLogic(player: Player, state: GameState, dt: number): void {
+    const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
+    const magnetRadius = player.magneticFieldRadius || 0;
+
+    if (magnetRadius > 0 || catalystSense) {
+      const catalystRange = (player.statusEffects.catalystSenseRange || 2.0) * 130;
+      const searchRadius = catalystSense ? Math.max(catalystRange, magnetRadius) : magnetRadius;
+      const searchRadiusSq = searchRadius * searchRadius;
+      const pullPower = 120 * dt;
+
+      // Note: In optimized engine, we might want to use the spatial grid efficiently
+      // But for now, parity first.
+      const nearby = this.spatialGrid.getNearby(player, searchRadius);
+
+      for (let i = 0; i < nearby.length; i++) {
+        const entity = nearby[i];
+        if (!('value' in entity)) continue; // Not food
+        const f = entity as unknown as any;
+        if (f.isDead) continue;
+
+        if (catalystSense && f.kind !== 'catalyst' && magnetRadius <= 0) continue;
+
+        const dx = player.position.x - f.position.x;
+        const dy = player.position.y - f.position.y;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < searchRadiusSq && distSq > 1) {
+          const dist = Math.sqrt(distSq);
+          const factor = pullPower / dist;
+          f.velocity.x += dx * factor;
+          f.velocity.y += dy * factor;
+        }
+      }
+    }
+  }
+
+  // EIDOLON-V FIX: Unit Collision
+  private checkUnitCollisions(entity: Player | Bot, state: GameState, dt: number): void {
+    const nearby = this.spatialGrid.getNearby(entity, 300); // 300 range check
+    for (let i = 0; i < nearby.length; i++) {
+      const other = nearby[i];
+      if (other === entity) continue;
+      if (entity.isDead || other.isDead) continue;
+
+      // Food collision
+      if ('value' in other) {
+        const food = other as Food;
+        const dx = entity.position.x - food.position.x;
+        const dy = entity.position.y - food.position.y;
+        const distSq = dx * dx + dy * dy;
+        const minDist = entity.radius + food.radius;
+
+        if (distSq < minDist * minDist) {
+          consumePickup(entity, food, state);
+        }
+        continue;
+      }
+
+      // Combat Collision
+      if ('score' in other) { // Is Unit
+        resolveCombat(entity, other as Player | Bot, dt, state, true, true);
+      }
     }
   }
 
@@ -242,6 +312,9 @@ class OptimizedGameEngine {
 
     // Bot AI update
     updateAI(bot, state, dt);
+
+    // EIDOLON-V FIX: Bot Collisions (Combat & Food)
+    this.checkUnitCollisions(bot, state, dt);
   }
 
   private updateProjectiles(state: GameState, dt: number): void {
@@ -255,7 +328,7 @@ class OptimizedGameEngine {
       // Apply projectile effect on collision
       const hit = this.checkProjectileCollision(projectile, state);
       if (hit) {
-        applyProjectileEffect(projectile, hit, state);
+        applyProjectileEffect(projectile, hit as Player | Bot, state);
         state.projectiles.splice(i, 1);
       }
 
@@ -275,7 +348,7 @@ class OptimizedGameEngine {
 
     for (let i = 0; i < nearby.length; i++) {
       const entity = nearby[i];
-      if (entity.id === projectile.ownerId) continue;
+      if ((projectile as any).ownerId && entity.id === (projectile as any).ownerId) continue;
 
       const dx = entity.position.x - projectile.position.x;
       const dy = entity.position.y - projectile.position.y;
@@ -339,8 +412,8 @@ class OptimizedGameEngine {
     if (state.tattooChoices) return;
 
     const player = state.player;
-    if (player.matchPercent >= 0.8 && player.level >= 2) {
-      state.tattooChoices = getTattooChoices(player);
+    if (player.matchPercent >= 0.8 && (player as any).level >= 2) {
+      state.tattooChoices = getTattooChoices(3);
     }
   }
 
@@ -409,7 +482,7 @@ class OptimizedGameEngine {
   } {
     return {
       frameCount: this.frameCount,
-      poolSize: this.arrayPool['pools'].size,
+      poolSize: 5, // Static batch arrays
       memoryUsage: 0 // TODO: Implement memory monitoring
     };
   }

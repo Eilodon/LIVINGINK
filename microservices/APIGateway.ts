@@ -272,10 +272,10 @@ export class APIGateway {
         },
         onError: (err, req, res) => {
           logger.error('Proxy error', {
-            service: service.id,
-            error: err.message,
+            requestId: (req.headers['x-request-id'] as string) || 'unknown',
+            method: req.method,
             url: req.url,
-            requestId: (req.headers['x-request-id'] as string) || 'unknown'
+            error: err.message
           });
 
           // Check circuit breaker

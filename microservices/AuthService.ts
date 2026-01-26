@@ -51,7 +51,7 @@ export interface AuthResponse {
 export class AuthService {
   private static instance: AuthService;
   private app: express.Application;
-  private server: Server;
+  private server!: Server;
   private jwtSecret: string;
   private jwtExpiresIn: string;
   private refreshTokenExpiresIn: string;
@@ -464,7 +464,7 @@ export class AuthService {
 
   // EIDOLON-V PHASE3: Generate JWT token
   private generateToken(user: any): string {
-    const options: SignOptions = { expiresIn: this.jwtExpiresIn as string | number };
+    const options: SignOptions = { expiresIn: this.jwtExpiresIn as any };
     return jwt.sign(
       {
         userId: user.id,
@@ -479,7 +479,7 @@ export class AuthService {
 
   // EIDOLON-V PHASE3: Generate refresh token
   private generateRefreshToken(user: any): string {
-    const options: SignOptions = { expiresIn: this.refreshTokenExpiresIn as string | number };
+    const options: SignOptions = { expiresIn: this.refreshTokenExpiresIn as any };
     return jwt.sign(
       {
         userId: user.id,
