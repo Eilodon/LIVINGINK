@@ -65,15 +65,27 @@ export const RING_RADII = {
 };
 
 export const THRESHOLDS = {
+  ENTER_RING2: 0.50,
+  ENTER_RING3: 0.70,
+  WIN_HOLD: 0.90,
+  // Alias for backward compatibility if needed
   INTO_RING2: 0.50,
   INTO_RING3: 0.70,
-  WIN_HOLD: 0.90,
 };
 
 export const COMMIT_BUFFS = {
   SHIELD_DURATION: 2.0,
   SPEED_BOOST: 1.10,
   SPEED_DURATION: 2.0,
+  // Ring specific buffs
+  R2: {
+    duration: 2.0,
+    speed: 1.10
+  },
+  R3: {
+    duration: 3.0,
+    speed: 1.20
+  }
 };
 
 export const COLOR_PALETTE = {
@@ -91,6 +103,11 @@ export const WAVE_CONFIG = {
     2: 10000,
     3: 14000,
   },
+  // Flattened aliases for waveSpawner.ts
+  INTERVAL_R1: 8000,
+  INTERVAL_R2: 10000,
+  INTERVAL_R3: 14000,
+
   SPAWN_WEIGHTS: {
     pigment: 0.60,
     neutral: 0.25,

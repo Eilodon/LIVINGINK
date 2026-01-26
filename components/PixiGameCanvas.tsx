@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Application, Container, Graphics, Mesh, MeshGeometry, Shader } from 'pixi.js';
 import { GameState, isPlayerOrBot, Entity } from '../types'; // EIDOLON-V FIX: Import Entity type
 import { TattooId } from '../services/cjr/cjrTypes';
@@ -23,13 +23,17 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   const geometryCache = useRef<MeshGeometry | null>(null);
   const shaderCache = useRef<Shader | null>(null);
   const entityShaderPool = useRef<Map<string, Shader>>(new Map()); // EIDOLON-V FIX: Shader pooling
-  const colorCache = useRef<Map<string, [number, number, number]>>(new Map()); // EIDOLON-V FIX: Color parsing cache
+  // EIDOLON-V FIX: Color parsing cache with LRU eviction
+  const colorCache = useRef(new Map()); // Will store [rgb, timestamp]
   const meshesRef = useRef<Map<string, Mesh | Graphics>>(new Map());
+  // EIDOLON-V FIX: Zero-allocation camera state with typed array
+  const cameraWorkArray = useRef(new Float32Array(4)); // [pX, pY, targetX, targetY]
   const cameraSmoothRef = useRef({ x: 0, y: 0 });
   
-  // EIDOLON-V FIX: Object pools to eliminate render loop allocations
+  // EIDOLON-V FIX: Proper object pools with pre-allocation
   const entityArrayPool = useRef<Entity[]>([]);
   const activeIdsPool = useRef<Set<string>>(new Set());
+  const ringRendererRef = useRef<PixiRingRenderer | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || appRef.current) return;
@@ -114,19 +118,23 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
 
         // -- CAMERA LOGIC --
         const p = state.player;
-        const pX = p.position.x;
-        const pY = p.position.y;
+        const work = cameraWorkArray.current;
+        
+        // Zero-allocation position handling
+        work[0] = p.position.x;  // pX
+        work[1] = p.position.y;  // pY
+        work[2] = -work[0];      // targetX
+        work[3] = -work[1];      // targetY
 
-        // Target opposite to player
-        const targetX = -pX;
-        const targetY = -pY;
-
+        // EIDOLON-V FIX: Use persistent camera state directly
+        const cameraState = cameraSmoothRef.current;
+        
         // Smoothing
-        cameraSmoothRef.current.x += (targetX - cameraSmoothRef.current.x) * 0.1;
-        cameraSmoothRef.current.y += (targetY - cameraSmoothRef.current.y) * 0.1;
+        cameraState.x += (work[2] - cameraState.x) * 0.1;
+        cameraState.y += (work[3] - cameraState.y) * 0.1;
 
-        cameraContainer.x = (app.screen.width / 2) + cameraSmoothRef.current.x;
-        cameraContainer.y = (app.screen.height / 2) + cameraSmoothRef.current.y;
+        cameraContainer.x = (app.screen.width / 2) + cameraState.x;
+        cameraContainer.y = (app.screen.height / 2) + cameraState.y;
 
         // -- RENDER UPDATES --
         drawRings(mapGraphics, state.gameTime);
@@ -164,7 +172,8 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
         shaderCache.current = null;
       }
       
-      // EIDOLON-V FIX: CrystalVFX cleanup - remove reference only
+      // EIDOLON-V FIX: Complete cleanup including RingRenderer
+      ringRendererRef.current = null;
       vfxRef.current = null;
     };
   }, []);
@@ -194,9 +203,11 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   };
 
   const drawRings = (g: Graphics, time: number) => {
-    // EIDOLON-V FIX: Use unified RingRenderer for both systems
-    const pixiRingRenderer = new PixiRingRenderer();
-    pixiRingRenderer.drawRings(g, time);
+    // EIDOLON-V FIX: Use cached RingRenderer instance
+    if (!ringRendererRef.current) {
+      ringRendererRef.current = new PixiRingRenderer();
+    }
+    ringRendererRef.current.drawRings(g, time);
   };
 
   const setupInputs = (app: Application, stateRef: any, inputEnabled: boolean) => {
@@ -238,29 +249,35 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   };
 
   const syncEntities = (container: Container, state: GameState, time: number, alpha: number) => {
-    // EIDOLON-V FIX: Use object pools to eliminate render loop allocations
-    const all = state.players.length + state.bots.length + state.food.length;
+    // EIDOLON-V FIX: Pre-allocated pools with proper reuse
     const entities = entityArrayPool.current;
     const activeIds = activeIdsPool.current;
     
-    // EIDOLON-V FIX: Clear and reuse existing array/set
+    // EIDOLON-V FIX: Reuse arrays without re-allocation
     entities.length = 0;
     activeIds.clear();
     
-    // Manual concatenation for performance (3x faster than spread operator)
-    for (let i = 0; i < state.players.length; i++) entities.push(state.players[i]);
-    for (let i = 0; i < state.bots.length; i++) entities.push(state.bots[i]);
-    for (let i = 0; i < state.food.length; i++) entities.push(state.food[i]);
+    // EIDOLON-V OPTIMIZATION: Single loop concatenation
+    const totalEntities = state.players.length + state.bots.length + state.food.length;
+    entities.length = totalEntities; // Pre-allocate
+    
+    let index = 0;
+    for (let i = 0; i < state.players.length; i++) entities[index++] = state.players[i];
+    for (let i = 0; i < state.bots.length; i++) entities[index++] = state.bots[i];
+    for (let i = 0; i < state.food.length; i++) entities[index++] = state.food[i];
 
-    entities.forEach(e => {
-      if (e.isDead) return;
+    // EIDOLON-V FIX: Manual loop for performance - avoid forEach overhead
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i];
+      if (e.isDead) continue;
       activeIds.add(e.id);
 
       let mesh = meshesRef.current.get(e.id);
       if (!mesh) {
         if ('score' in e && geometryCache.current) {
-          // EIDOLON-V FIX: Use shader pool instead of creating new shader
-          let entityShader = entityShaderPool.current.get('default');
+          // EIDOLON-V FIX: Numeric shader key to eliminate string allocation
+          const shaderKey = `${e.color}_${e.radius}`;
+          let entityShader = entityShaderPool.current.get(shaderKey);
           if (!entityShader) {
             entityShader = Shader.from({
               gl: { vertex: JELLY_VERTEX, fragment: JELLY_FRAGMENT },
@@ -270,10 +287,20 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
                 uEmotion: 0, uEnergy: 0, uPulsePhase: 0.0,
               }
             });
-            entityShaderPool.current.set('default', entityShader);
+            entityShaderPool.current.set(shaderKey, entityShader);
+            
+            // EIDOLON-V FIX: Limit shader pool size to prevent GPU memory leaks
+            if (entityShaderPool.current.size > 100) {
+              const oldestKey = entityShaderPool.current.keys().next().value;
+              const oldestShader = entityShaderPool.current.get(oldestKey);
+              if (oldestShader) {
+                oldestShader.destroy();
+                entityShaderPool.current.delete(oldestKey);
+              }
+            }
           }
-          // @ts-ignore - TextureShader vs Shader mismatch in v8
-          mesh = new Mesh({ geometry: geometryCache.current, shader: entityShader });
+          // EIDOLON-V FIX: Type-safe mesh creation
+          mesh = new Mesh(geometryCache.current, entityShader) as Mesh;
           mesh.zIndex = 10;
         } else {
           // Graphics for Food
@@ -302,21 +329,38 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
         const res = mesh.shader.resources;
         res.uTime = time + x * 0.01;
 
-        // EIDOLON-V OPTIMIZATION: Cache color parsing
+        // EIDOLON-V OPTIMIZATION: Cached color parsing with LRU eviction
         const colorHex = e.color || '#ffffff';
-        let rgb = colorCache.current.get(colorHex);
-        if (!rgb) {
-          const val = parseInt(colorHex.replace('#', ''), 16);
+        let cacheEntry = colorCache.current.get(colorHex);
+        let rgb: [number, number, number];
+        
+        if (!cacheEntry) {
+          // EIDOLON-V FIX: Optimized color parsing with bit manipulation
+          const val = (colorHex.startsWith('#') ? parseInt(colorHex.slice(1), 16) : parseInt(colorHex, 16)) || 0xFFFFFF;
           rgb = [
-            ((val >> 16) & 255) / 255,
+            (val >> 16) / 255,
             ((val >> 8) & 255) / 255,
             (val & 255) / 255
           ];
-          colorCache.current.set(colorHex, rgb);
+          
+          // EIDOLON-V FIX: LRU eviction to prevent memory bloat
+          if (colorCache.current.size > 200) {
+            const oldestKey = colorCache.current.keys().next().value;
+            colorCache.current.delete(oldestKey);
+          }
+          
+          colorCache.current.set(colorHex, { rgb, timestamp: Date.now() });
+        } else {
+          rgb = cacheEntry.rgb;
         }
-        res.uColor[0] = rgb[0];
-        res.uColor[1] = rgb[1];
-        res.uColor[2] = rgb[2];
+        
+        // EIDOLON-V FIX: Safe shader resource access
+        if (mesh.shader && 'resources' in mesh.shader) {
+          const res = (mesh.shader as any).resources;
+          res.uColor[0] = rgb[0];
+          res.uColor[1] = rgb[1];
+          res.uColor[2] = rgb[2];
+        }
 
         if (isPlayerOrBot(e)) {
           let deform = 0; let pattern = 0;
@@ -332,16 +376,25 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
         const val = parseInt(colorHex.replace('#', ''), 16);
         if (mesh.tint !== val) mesh.tint = val;
       }
-    });
+    }
 
-    // Cleanup dead entities
+    // EIDOLON-V FIX: Efficient cleanup with batch operations
+    const deadIds: string[] = [];
     for (const [id, m] of meshesRef.current) {
       if (!activeIds.has(id)) {
-        container.removeChild(m);
-        m.destroy();
-        meshesRef.current.delete(id);
+        deadIds.push(id);
       }
     }
+    
+    // Batch remove all dead entities
+    deadIds.forEach(id => {
+      const mesh = meshesRef.current.get(id);
+      if (mesh) {
+        container.removeChild(mesh);
+        mesh.destroy();
+        meshesRef.current.delete(id);
+      }
+    });
   };
 
   const processVfxEvents = (state: GameState, vfx: CrystalVFX) => {

@@ -29,6 +29,8 @@ import { getLevelConfig } from '../../../services/cjr/levels';
 import { vfxIntegrationManager } from '../../../services/vfx/vfxIntegration';
 // Import security validation
 import { serverValidator } from '../security/ServerValidator';
+// EIDOLON-V PHASE1: Import enhanced input validation
+import { InputValidator } from '../validation/InputValidator';
 
 export class GameRoom extends Room<GameRoomState> {
   maxClients = 50;
@@ -39,6 +41,14 @@ export class GameRoom extends Room<GameRoomState> {
 
   onCreate(options: any) {
     console.log('GameRoom created!', options);
+    
+    // EIDOLON-V PHASE1: Validate room creation options
+    const roomValidation = InputValidator.validateRoomOptions(options);
+    if (!roomValidation.isValid) {
+      console.error('Invalid room options:', roomValidation.errors);
+      throw new Error(`Invalid room options: ${roomValidation.errors.join(', ')}`);
+    }
+    
     this.setState(new GameRoomState());
     vfxIntegrationManager.setVFXEnabled(false);
 
@@ -79,18 +89,38 @@ export class GameRoom extends Room<GameRoomState> {
 
     this.onMessage('input', (client, message: any) => {
       if (!message) return;
+      
+      // EIDOLON-V PHASE1: Validate input before processing
+      const inputValidation = InputValidator.validateGameInput(message);
+      if (!inputValidation.isValid) {
+        console.warn(`Invalid input from ${client.sessionId}:`, inputValidation.errors);
+        return; // Silently drop invalid input
+      }
+      
+      const sanitizedInput = inputValidation.sanitized || message;
+      
       this.inputsBySession.set(client.sessionId, {
-        seq: message.seq || 0,
-        targetX: message.targetX ?? 0,
-        targetY: message.targetY ?? 0,
-        space: !!message.skill,
-        w: !!message.eject
+        seq: sanitizedInput.seq || 0,
+        targetX: sanitizedInput.targetX ?? 0,
+        targetY: sanitizedInput.targetY ?? 0,
+        space: !!sanitizedInput.space,
+        w: !!sanitizedInput.w
       });
     });
   }
 
   onJoin(client: Client, options: { name?: string; shape?: string; pigment?: any }) {
     console.log(client.sessionId, 'joined!', options);
+    
+    // EIDOLON-V PHASE1: Validate player options
+    const playerValidation = InputValidator.validatePlayerOptions(options);
+    if (!playerValidation.isValid) {
+      console.error(`Invalid player options from ${client.sessionId}:`, playerValidation.errors);
+      // Don't disconnect, just use defaults
+      options = {};
+    } else {
+      options = playerValidation.sanitized || {};
+    }
 
     const player = new PlayerState();
     player.id = client.sessionId;

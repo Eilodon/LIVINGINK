@@ -38,22 +38,23 @@ import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { tattooSynergyManager } from '../cjr/tattooSynergies';
 import { resetContributionLog } from '../cjr/contribution';
 import { inputManager } from '../input/InputManager'; // EIDOLON-V: Connected
+import { optimizedEngine } from './OptimizedEngine';
 import { gameStateManager } from './GameStateManager';
 
 // EIDOLON-V FIX: Export unified game state manager
-export { gameStateManager };
+export { gameStateManager, optimizedEngine };
 
 // Legacy export for backward compatibility
 export const updateGameState = (state: GameState, dt: number): GameState => {
-  // EIDOLON-V FIX: Use unified state manager
+  // EIDOLON-V FIX: Use Optimized Engine for logic
   gameStateManager.setCurrentState(state);
-  return gameStateManager.updateGameState(dt);
+  return optimizedEngine.updateGameState(state, dt);
 };
 
 export const updateClientVisuals = (state: GameState, dt: number): void => {
-  // EIDOLON-V FIX: Use unified state manager
+  // EIDOLON-V FIX: Use Optimized Engine for visuals
   gameStateManager.setCurrentState(state);
-  gameStateManager.updateClientVisuals(dt);
+  optimizedEngine.updateClientVisuals(state, dt);
 };
 
 const updatePlayer = (player: Player, state: GameState, dt: number) => {

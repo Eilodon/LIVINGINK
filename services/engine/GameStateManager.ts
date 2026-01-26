@@ -10,7 +10,7 @@ export class GameStateManager {
   private currentState: GameState | null = null;
   private subscribers: Set<(state: GameState) => void> = new Set();
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): GameStateManager {
     if (!GameStateManager.instance) {
@@ -34,17 +34,17 @@ export class GameStateManager {
 
     // Core game logic update
     this.updateCoreGameLogic(dt);
-    
+
     // Notify subscribers
     this.notifySubscribers();
-    
+
     return this.currentState;
   }
 
   // EIDOLON-V FIX: Single source of truth for client visual updates
   public updateClientVisuals(dt: number): void {
     if (!this.currentState) return;
-    
+
     updateClientVisuals(this.currentState, dt);
     this.notifySubscribers();
   }
@@ -62,54 +62,54 @@ export class GameStateManager {
   // EIDOLON-V FIX: Centralized entity management
   public addPlayer(player: Player): void {
     if (!this.currentState) return;
-    
+
     if (!this.currentState.players) {
       this.currentState.players = [];
     }
-    
+
     this.currentState.players.push(player);
     this.notifySubscribers();
   }
 
   public removePlayer(playerId: string): void {
     if (!this.currentState || !this.currentState.players) return;
-    
+
     this.currentState.players = this.currentState.players.filter(p => p.id !== playerId);
     this.notifySubscribers();
   }
 
   public addBot(bot: Bot): void {
     if (!this.currentState) return;
-    
+
     if (!this.currentState.bots) {
       this.currentState.bots = [];
     }
-    
+
     this.currentState.bots.push(bot);
     this.notifySubscribers();
   }
 
   public removeBot(botId: string): void {
     if (!this.currentState || !this.currentState.bots) return;
-    
+
     this.currentState.bots = this.currentState.bots.filter(b => b.id !== botId);
     this.notifySubscribers();
   }
 
   public addFood(food: Food): void {
     if (!this.currentState) return;
-    
+
     if (!this.currentState.food) {
       this.currentState.food = [];
     }
-    
+
     this.currentState.food.push(food);
     this.notifySubscribers();
   }
 
   public removeFood(foodId: string): void {
     if (!this.currentState || !this.currentState.food) return;
-    
+
     this.currentState.food = this.currentState.food.filter(f => f.id !== foodId);
     this.notifySubscribers();
   }
@@ -117,7 +117,7 @@ export class GameStateManager {
   // EIDOLON-V FIX: Centralized subscription system
   public subscribe(callback: (state: GameState) => void): () => void {
     this.subscribers.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       this.subscribers.delete(callback);
@@ -131,27 +131,10 @@ export class GameStateManager {
   }
 
   private updateCoreGameLogic(dt: number): void {
+    // EIDOLON-V FIX: Logic is now handled by OptimizedEngine
+    // This method remains empty to prevent double-updates
+    // if logic somehow routes back here.
     if (!this.currentState) return;
-
-    // Update game time
-    this.currentState.gameTime += dt;
-
-    // Update player
-    if (this.currentState.player) {
-      this.updatePlayer(this.currentState.player, dt);
-    }
-
-    // Update bots
-    if (this.currentState.bots) {
-      this.currentState.bots.forEach(bot => {
-        if (!bot.isDead) {
-          this.updatePlayer(bot, dt);
-        }
-      });
-    }
-
-    // Check win/loss conditions
-    this.checkWinLossConditions();
   }
 
   private updatePlayer(entity: Player | Bot, dt: number): void {

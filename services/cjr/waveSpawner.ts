@@ -10,22 +10,22 @@ export const updateWaveSpawner = (state: GameState, dt: number) => {
     // Ring 1 Wave
     state.runtime.wave.ring1 -= dt * 1000;
     if (state.runtime.wave.ring1 <= 0) {
-        spawnWave(state, 1);
-        state.runtime.wave.ring1 = WAVE_CONFIG.INTERVAL_R1;
+      spawnWave(state, 1);
+      state.runtime.wave.ring1 = WAVE_CONFIG.INTERVAL[1];
     }
 
     // Ring 2 Wave
     state.runtime.wave.ring2 -= dt * 1000;
     if (state.runtime.wave.ring2 <= 0) {
         spawnWave(state, 2);
-        state.runtime.wave.ring2 = WAVE_CONFIG.INTERVAL_R2;
+        state.runtime.wave.ring2 = WAVE_CONFIG.INTERVAL[2];
     }
 
     // Ring 3 Wave
     state.runtime.wave.ring3 -= dt * 1000;
     if (state.runtime.wave.ring3 <= 0) {
         spawnWave(state, 3);
-        state.runtime.wave.ring3 = WAVE_CONFIG.INTERVAL_R3;
+        state.runtime.wave.ring3 = WAVE_CONFIG.INTERVAL[3];
     }
 };
 
