@@ -9,7 +9,7 @@ import { Player, GameState } from '../../types';
 import { TattooId } from './cjrTypes';
 import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';
-import './synergyStatusEffects'; // Import status effects extensions
+// import './synergyStatusEffects'; // REMOVED (Merged into types/player.ts) // Import status effects extensions
 
 // ============================================
 // SYNERGY VISUAL EFFECTS HELPER
