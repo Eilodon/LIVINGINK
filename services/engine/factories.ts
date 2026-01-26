@@ -24,6 +24,7 @@ import { getCurrentEngine } from './context';
 import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from './math';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
 import { pigmentToHex } from '../cjr/colorMath';
+import { pooledEntityFactory } from '../pooling/ObjectPool'; // EIDOLON-V FIX: Import pooling
 
 
 // Helper: Random Pigment
@@ -193,20 +194,26 @@ export const createBotCreeps = (count: number): Bot[] => {
 };
 
 export const createFood = (pos?: Vector2, isEjected: boolean = false): Food => {
+  // EIDOLON-V FIX: Use pooled entity instead of heap allocation
+  const foodPool = pooledEntityFactory.createPooledFood();
+  const food = foodPool.acquire();
+  
   const pigment = randomPigment();
-  return {
-    id: Math.random().toString(),
-    position: pos || randomPosInRing(1),
-    velocity: { x: 0, y: 0 },
-    radius: FOOD_RADIUS,
-    color: pigmentToHex(pigment),
-    isDead: false,
-    trail: [],
-    value: 1,
-    isEjected,
-    kind: 'pigment', // Default
-    pigment,
-  };
+  
+  // Setup pooled food object
+  food.id = Math.random().toString();
+  food.position = pos || randomPosInRing(1);
+  food.velocity = { x: 0, y: 0 };
+  food.radius = FOOD_RADIUS;
+  food.color = pigmentToHex(pigment);
+  food.isDead = false;
+  food.value = 1;
+  food.isEjected = isEjected;
+  food.kind = 'pigment';
+  food.pigment = pigment;
+  food.trail.length = 0; // Clear trail array
+  
+  return food;
 };
 
 // Particle helper for VFX
@@ -224,25 +231,30 @@ export const createProjectile = (
   type: 'web' | 'ice' | 'sting' = 'ice',
   duration: number = 2.0
 ): Projectile => {
+  // EIDOLON-V FIX: Use pooled entity instead of heap allocation
+  const projectilePool = pooledEntityFactory.createPooledProjectile();
+  const projectile = projectilePool.acquire();
+  
   // Calculate velocity toward target
   const dx = target.x - position.x;
   const dy = target.y - position.y;
   const dist = Math.hypot(dx, dy);
   const speed = 300;
 
-  return {
-    id: Math.random().toString(),
-    position: { ...position },
-    velocity: dist > 0 ? { x: (dx / dist) * speed, y: (dy / dist) * speed } : { x: 0, y: 0 },
-    radius: 8,
-    color: type === 'ice' ? '#88ccff' : type === 'web' ? '#888888' : '#ff4444',
-    isDead: false,
-    trail: [],
-    ownerId,
-    damage,
-    type,
-    duration,
-  };
+  // Setup pooled projectile object
+  projectile.id = Math.random().toString();
+  projectile.position = { ...position };
+  projectile.velocity = dist > 0 ? { x: (dx / dist) * speed, y: (dy / dist) * speed } : { x: 0, y: 0 };
+  projectile.radius = 8;
+  projectile.color = type === 'ice' ? '#88ccff' : type === 'web' ? '#888888' : '#ff4444';
+  projectile.isDead = false;
+  projectile.trail.length = 0; // Clear trail array
+  projectile.ownerId = ownerId;
+  projectile.damage = damage;
+  projectile.type = type;
+  projectile.duration = duration;
+  
+  return projectile;
 };
 
 

@@ -6,6 +6,7 @@ import {
 } from '../../../constants';
 import { Entity, Player, Bot, SizeTier } from '../../../types';
 import { PhysicsWorld } from '../PhysicsWorld';
+import { fastMath } from '../../math/FastMath'; // EIDOLON-V FIX: Import FastMath
 
 /**
  * DOD PHYSICS UPDATE (The Purge)
@@ -38,7 +39,11 @@ export const updatePhysicsWorld = (world: PhysicsWorld, dt: number) => {
     const myR = world.radii[i];
 
     // Simple Boundary Check
-    if (Math.sqrt(r2) + myR > MAP_R) {
+    // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+    const MAP_R_sq = MAP_R * MAP_R;
+    const maxDistSq = (MAP_R - myR) * (MAP_R - myR);
+    
+    if (r2 > maxDistSq) {
       const angle = Math.atan2(world.positions[py], world.positions[px]);
       const safeR = MAP_R - myR;
       const nx = Math.cos(angle);
@@ -73,9 +78,13 @@ export const integrateEntity = (entity: Player | Bot, dt: number) => {
 
   // 2. Input Forces (Assume input handling modified velocity already)
   // Clamp Speed
-  const s = Math.hypot(entity.velocity.x, entity.velocity.y);
-  if (s > currentMaxSpeed) {
-    const k = currentMaxSpeed / s;
+  // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+  const speedSq = entity.velocity.x * entity.velocity.x + entity.velocity.y * entity.velocity.y;
+  const maxSpeedSq = currentMaxSpeed * currentMaxSpeed;
+  
+  if (speedSq > maxSpeedSq) {
+    const speed = fastMath.fastSqrt(speedSq);
+    const k = currentMaxSpeed / speed;
     entity.velocity.x *= k;
     entity.velocity.y *= k;
   }
@@ -111,14 +120,18 @@ export const checkCollisions = (
     if (entity === other) return;
     const dx = entity.position.x - other.position.x;
     const dy = entity.position.y - other.position.y;
-    const dist = Math.hypot(dx, dy);
-    const min = entity.radius + other.radius;
+    
+    // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+    const distSq = dx * dx + dy * dy;
+    const minDist = entity.radius + other.radius;
+    const minDistSq = minDist * minDist;
 
-    if (dist < min) {
+    if (distSq < minDistSq) {
       onCollide(other);
       // Soft Push
-      if (dist > 0 && !entity.isDead && !other.isDead && 'score' in other) {
-        const overlap = min - dist;
+      if (distSq > 0 && !entity.isDead && !other.isDead && 'score' in other) {
+        const dist = fastMath.fastSqrt(distSq);
+        const overlap = minDist - dist;
         const push = overlap * 0.5;
         const nx = dx / dist;
         const ny = dy / dist;
@@ -140,8 +153,12 @@ export const checkCollisions = (
 
 export const constrainToMap = (entity: Entity, radius: number) => {
   // Handled in updatePhysicsWorld, but kept for non-synced entities
-  const dist = Math.hypot(entity.position.x, entity.position.y);
-  if (dist + entity.radius > radius) {
+  // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+  const distSq = entity.position.x * entity.position.x + entity.position.y * entity.position.y;
+  const maxDistSq = (radius - entity.radius) * (radius - entity.radius);
+  
+  if (distSq > maxDistSq) {
+    const dist = fastMath.fastSqrt(distSq);
     const angle = Math.atan2(entity.position.y, entity.position.x);
     entity.position.x = Math.cos(angle) * (radius - entity.radius);
     entity.position.y = Math.sin(angle) * (radius - entity.radius);

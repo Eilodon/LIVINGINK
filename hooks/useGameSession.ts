@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GameState } from '../types';
 import { createInitialState, updateClientVisuals, updateGameState } from '../services/engine';
-import { FixedGameLoop } from '../services/engine/GameLoop';
+import { gameStateManager } from '../services/engine/GameStateManager'; // EIDOLON-V FIX: Import GameStateManager
 import { networkClient, NetworkStatus } from '../services/networking/NetworkClient';
 import { audioEngine } from '../services/audio/AudioEngine'; // EIDOLON-V FIX: Use unified AudioEngine
 import { inputManager } from '../services/input/InputManager';
@@ -45,7 +45,6 @@ export const useGameSession = () => {
 
     // 2. REFS (Performance Critical)
     const gameStateRef = useRef<GameState | null>(null);
-    const loopRef = useRef<FixedGameLoop | null>(null);
     const alphaRef = useRef(0);
     // Auto-detect touch device
     const isTouch = useRef(typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)).current;
@@ -118,7 +117,7 @@ export const useGameSession = () => {
             if (state.result === 'win') {
                 setProgression(p => ({ ...p, unlockedLevel: Math.max(p.unlockedLevel, state.level + 1) }));
             }
-            loopRef.current?.stop();
+            gameStateManager.stopGameLoop(); // EIDOLON-V FIX: Use GameStateManager
             setUi(s => ({ ...clearOverlays(s), screen: 'gameOver' }));
         }
 
@@ -137,12 +136,15 @@ export const useGameSession = () => {
     const actions = {
         game: {
             start: (name: string, shape: ShapeId, level: number, multiplayer = false) => {
-                if (loopRef.current) loopRef.current.stop();
+                gameStateManager.stopGameLoop(); // EIDOLON-V FIX: Stop existing loop
 
-                const state = createInitialState(level);
+                const state = gameStateManager.createInitialState(level);
                 state.player.name = name;
                 state.player.shape = shape;
                 gameStateRef.current = state;
+
+                // EIDOLON-V FIX: Set callbacks in GameStateManager
+                gameStateManager.setGameLoopCallbacks(onUpdate, onRender);
 
                 if (multiplayer) {
                     networkClient.connectWithRetry(name, shape);
@@ -151,14 +153,13 @@ export const useGameSession = () => {
 
                 setUi(s => ({ ...clearOverlays(s), screen: 'playing' }));
 
-                loopRef.current = new FixedGameLoop(60, onUpdate, onRender);
-                loopRef.current.start();
+                gameStateManager.startGameLoop(60); // EIDOLON-V FIX: Use GameStateManager
 
                 // Reset Input
                 inputManager.state.actions = { skill: false, eject: false };
             },
             quit: () => {
-                loopRef.current?.stop();
+                gameStateManager.stopGameLoop(); // EIDOLON-V FIX: Use GameStateManager
                 networkClient.disconnect();
                 gameStateRef.current = null;
                 setUi(s => ({ ...clearOverlays(s), screen: 'menu' }));

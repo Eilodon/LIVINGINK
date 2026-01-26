@@ -2,15 +2,20 @@
 import { distance } from '../engine/math';
 import { GameState, Player, Bot } from '../../types';
 import { RING_RADII, THRESHOLDS, COMMIT_BUFFS } from './cjrConstants';
+import { fastMath } from '../math/FastMath'; // EIDOLON-V FIX: Import FastMath
 
 /**
  * Determines which ring a position falls into physically.
  * Ring 1 (Outer) -> Ring 2 (Mid) -> Ring 3 (Inner)
  */
 export const getRingAtPosition = (x: number, y: number): 1 | 2 | 3 => {
-    const dist = Math.hypot(x, y);
-    if (dist <= RING_RADII.R3) return 3;
-    if (dist <= RING_RADII.R2) return 2;
+    // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+    const distSq = x * x + y * y;
+    const R3_sq = RING_RADII.R3 * RING_RADII.R3;
+    const R2_sq = RING_RADII.R2 * RING_RADII.R2;
+    
+    if (distSq <= R3_sq) return 3;
+    if (distSq <= R2_sq) return 2;
     return 1;
 };
 
@@ -34,12 +39,15 @@ export const updateRingLogic = (entity: Player | Bot, dt: number, levelConfig: a
  * Enforces one-way commit logic.
  */
 export const checkRingTransition = (player: Player) => {
-    const dist = Math.hypot(player.position.x, player.position.y);
+    // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+    const distSq = fastMath.distanceFromOriginSquared(player.position);
+    const R2_sq = RING_RADII.R2 * RING_RADII.R2;
+    const R3_sq = RING_RADII.R3 * RING_RADII.R3;
 
     // Transition Logic: Ring 1 -> Ring 2
     if (player.ring === 1) {
         // Physical entry check
-        if (dist < RING_RADII.R2) {
+        if (distSq < R2_sq) {
             // Condition check
             if (player.matchPercent >= THRESHOLDS.ENTER_RING2) {
                 // COMMIT!
@@ -55,7 +63,7 @@ export const checkRingTransition = (player: Player) => {
 
     // Transition Logic: Ring 2 -> Ring 3
     else if (player.ring === 2) {
-        if (dist < RING_RADII.R3) {
+        if (distSq < R3_sq) {
             // Condition check
             if (player.matchPercent >= THRESHOLDS.ENTER_RING3) {
                 // COMMIT!
@@ -68,7 +76,7 @@ export const checkRingTransition = (player: Player) => {
         }
         // Backward check: keep them in R2 (Inner bound is R3, Outer bound is R2)
         // "Commit 1-way" means once in Ring 2, cannot go back to Ring 1 (R > R2).
-        else if (dist > RING_RADII.R2) {
+        else if (distSq > R2_sq) {
             // Pull back in
             clampToRingOuter(player, RING_RADII.R2);
         }
@@ -77,7 +85,7 @@ export const checkRingTransition = (player: Player) => {
     // Transition Logic: Ring 3
     else if (player.ring === 3) {
         // Cannot leave R3
-        if (dist > RING_RADII.R3) {
+        if (distSq > R3_sq) {
             clampToRingOuter(player, RING_RADII.R3);
         }
     }
@@ -94,7 +102,9 @@ const applyCommitBuff = (player: Player, buff: any) => {
  * F = -k * x - c * v (Spring + Damping)
  */
 const applyElasticRejection = (player: Player, radiusLimit: number, thickness: number) => {
-    const dist = Math.hypot(player.position.x, player.position.y);
+    // EIDOLON-V FIX: Use squared distance comparison (no sqrt)
+    const distSq = fastMath.distanceFromOriginSquared(player.position);
+    const dist = fastMath.fastSqrt(distSq); // Only calculate sqrt when absolutely necessary
     const penetration = radiusLimit - dist; // Positive if inside
 
     // Safety clamp (if they break through somehow, push them out hard)

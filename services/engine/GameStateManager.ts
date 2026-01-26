@@ -4,11 +4,15 @@
 import { GameState, Player, Bot, Food, Entity } from '../../types';
 import { createInitialState } from './index';
 import { updateClientVisuals } from './index';
+import { FixedGameLoop } from './GameLoop'; // EIDOLON-V FIX: Import GameLoop
 
 export class GameStateManager {
   private static instance: GameStateManager;
   private currentState: GameState | null = null;
   private subscribers: Set<(state: GameState) => void> = new Set();
+  private gameLoop: FixedGameLoop | null = null; // EIDOLON-V FIX: Centralized GameLoop
+  private updateCallback: ((dt: number) => void) | null = null;
+  private renderCallback: ((alpha: number) => void) | null = null;
 
   private constructor() { }
 
@@ -187,8 +191,45 @@ export class GameStateManager {
 
   // EIDOLON-V FIX: Centralized cleanup
   public dispose(): void {
+    this.stopGameLoop(); // EIDOLON-V FIX: Stop loop before cleanup
     this.currentState = null;
     this.subscribers.clear();
+    this.updateCallback = null;
+    this.renderCallback = null;
+  }
+
+  // EIDOLON-V FIX: GameLoop management methods
+  public setGameLoopCallbacks(
+    updateCallback: (dt: number) => void,
+    renderCallback: (alpha: number) => void
+  ): void {
+    this.updateCallback = updateCallback;
+    this.renderCallback = renderCallback;
+  }
+
+  public startGameLoop(fps: number = 60): void {
+    if (!this.updateCallback || !this.renderCallback) {
+      console.warn('GameStateManager: Update or render callback not set');
+      return;
+    }
+
+    // Stop existing loop if running
+    this.stopGameLoop();
+
+    // Create and start new loop
+    this.gameLoop = new FixedGameLoop(fps, this.updateCallback, this.renderCallback);
+    this.gameLoop.start();
+  }
+
+  public stopGameLoop(): void {
+    if (this.gameLoop) {
+      this.gameLoop.stop();
+      this.gameLoop = null;
+    }
+  }
+
+  public isGameLoopRunning(): boolean {
+    return this.gameLoop !== null;
   }
 }
 
