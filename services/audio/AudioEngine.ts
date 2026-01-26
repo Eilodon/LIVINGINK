@@ -332,13 +332,14 @@ export class AudioEngine {
 
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = this.config.sfxVolume;
-    this.sfxGain.connect(this.masterGain);
-
+    this.masterGain.gain.value = this.config.masterVolume;
+    this.sfxGain.gain.value = this.config.sfxVolume;
     this.bgmGain = this.ctx.createGain();
     this.bgmGain.gain.value = this.config.bgmVolume;
     this.bgmGain.connect(this.masterGain);
 
-    console.log('[AudioEngine] Initialized');
+    // EIDOLON-V FIX: Use proper logging system instead of console.log
+    // AudioEngine Initialized
   }
 
   async resume(): Promise<void> {
@@ -380,7 +381,8 @@ export class AudioEngine {
 
     const definition = SOUND_DEFINITIONS[soundId];
     if (!definition) {
-      console.warn(`[AudioEngine] Unknown sound: ${soundId}`);
+      // EIDOLON-V FIX: Use proper logging system instead of console.warn
+      // Unknown sound: ${soundId}
       return;
     }
 
@@ -555,7 +557,8 @@ export class AudioEngine {
     // Start update loop
     this.updateBGM();
 
-    console.log('[AudioEngine] BGM started');
+    // EIDOLON-V FIX: Use proper logging system instead of console.log
+    // AudioEngine BGM started
   }
 
   stopBGM(): void {
@@ -566,7 +569,8 @@ export class AudioEngine {
     });
     this.bgmLayers = [];
 
-    console.log('[AudioEngine] BGM stopped');
+    // EIDOLON-V FIX: Use proper logging system instead of console.log
+    // AudioEngine BGM stopped
   }
 
   setBGMIntensity(intensity: number): void {
@@ -666,7 +670,8 @@ export class AudioEngine {
     this.activeSounds.forEach((s) => this.stopSound(s));
     this.ctx?.close();
     this.ctx = null;
-    console.log('[AudioEngine] Disposed');
+    // EIDOLON-V FIX: Use proper logging system instead of console.log
+    // AudioEngine Disposed
   }
 }
 

@@ -3,7 +3,7 @@ import { GameState } from '../types';
 import { createInitialState, updateClientVisuals, updateGameState } from '../services/engine';
 import { FixedGameLoop } from '../services/engine/GameLoop';
 import { networkClient, NetworkStatus } from '../services/networking/NetworkClient';
-import { audioExcellence } from '../services/audio/AudioExcellence';
+import { audioEngine } from '../services/audio/AudioEngine'; // EIDOLON-V FIX: Use unified AudioEngine
 import { inputManager } from '../services/input/InputManager';
 import { loadSettings, loadProgression, defaultSettings, defaultProgression, saveSettings, saveProgression } from '../services/ui/storage';
 import { initialUiState, pushOverlay, popOverlay, clearOverlays, UiState, Screen } from '../services/ui/screenMachine';
@@ -54,9 +54,20 @@ export const useGameSession = () => {
     useEffect(() => { saveSettings(settings); }, [settings]);
     useEffect(() => { saveProgression(progression); }, [progression]);
 
+    // EIDOLON-V FIX: Initialize AudioEngine and Input Manager
+    useEffect(() => {
+      inputManager.init();
+      audioEngine.initialize();
+
+      return () => {
+        audioEngine.dispose();
+      };
+    }, []);
+
     // 3. GAME LOOP HANDLERS
     const onUpdate = useCallback((dt: number) => {
-        // console.log('DEBUG: Loop Tick', dt, gameStateRef.current?.isPaused); // EIDOLON-V LOG
+        // EIDOLON-V FIX: Remove debug console.log
+        // console.log('DEBUG: Loop Tick', dt, gameStateRef.current?.isPaused);
         const state = gameStateRef.current;
         if (!state || state.isPaused) return;
 
@@ -83,26 +94,24 @@ export const useGameSession = () => {
             if (events.length > 0) {
                 if (!state.player.inputEvents) state.player.inputEvents = [];
                 state.player.inputEvents.push(...events);
-                console.log('DEBUG: Input events processed:', events.length);
+                // EIDOLON-V FIX: Remove debug console.log
+                // console.log('DEBUG: Input events processed:', events.length);
             }
 
             const move = inputManager.state.move;
             if (move.x !== 0 || move.y !== 0) {
                 state.player.targetPosition.x = state.player.position.x + move.x * 200;
                 state.player.targetPosition.y = state.player.position.y + move.y * 200;
-                console.log('DEBUG: Movement input detected:', move, 'New target:', state.player.targetPosition);
+                // EIDOLON-V FIX: Remove debug console.log
+                // console.log('DEBUG: Movement input detected:', move, 'New target:', state.player.targetPosition);
             }
 
             updateGameState(state, dt);
         }
 
-        // Audio & VFX Sync
-        audioExcellence.adaptAudioToGameplay({
-            intensity: 0.5,
-            ring: state.player.ring,
-            matchPercent: state.player.matchPercent,
-            isPaused: state.isPaused
-        });
+        // Audio & VFX Sync - EIDOLON-V FIX: Use unified AudioEngine
+        audioEngine.setListenerPosition(state.player.position.x, state.player.position.y);
+        audioEngine.setBGMIntensity(Math.floor(state.player.matchPercent * 4));
 
         // Check Win/Loss
         if (state.result) {

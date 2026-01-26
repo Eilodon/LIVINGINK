@@ -1,8 +1,8 @@
-
 import React, { useRef, useEffect } from 'react';
 import { GameState, Entity, Player } from '../types';
 import { MAP_RADIUS, CENTER_RADIUS, WORLD_WIDTH, WORLD_HEIGHT } from '../constants';
-import { RING_RADII, COLOR_PALETTE } from '../services/cjr/cjrConstants';
+import { COLOR_PALETTE, RING_RADII } from '../services/cjr/cjrConstants';
+import { Canvas2DRingRenderer } from '../services/rendering/RingRenderer'; // EIDOLON-V FIX: Use unified RingRenderer
 
 interface GameCanvasProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -77,26 +77,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       // Follow player (interpolated camera)
       ctx.translate(-gameState.camera.x, -gameState.camera.y);
 
+      // EIDOLON-V FIX: Use unified RingRenderer for both systems
+      const canvasRingRenderer = new Canvas2DRingRenderer();
+      canvasRingRenderer.drawRings(ctx, gameState.gameTime);
+
       // Draw Map Boundaries
       // Outer
       ctx.strokeStyle = COLOR_PALETTE.rings.r1;
       ctx.lineWidth = 5;
       ctx.beginPath();
       ctx.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Rings (CJR)
-      // Ring 2 Boundary
-      ctx.strokeStyle = COLOR_PALETTE.rings.r2;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, RING_RADII.R2, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Ring 3 Boundary
-      ctx.strokeStyle = COLOR_PALETTE.rings.r3;
-      ctx.beginPath();
-      ctx.arc(0, 0, RING_RADII.R3, 0, Math.PI * 2);
       ctx.stroke();
 
       const entities = [

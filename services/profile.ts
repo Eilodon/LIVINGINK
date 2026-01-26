@@ -45,7 +45,8 @@ export const unlockSkin = (skinId: string) => {
   if (!profile.cosmetics.ownedSkins.includes(skinId)) {
     profile.cosmetics.ownedSkins.push(skinId);
     saveProfile(profile);
-    console.log(`🎁 Skin Unlocked: ${skinId}`);
+    // EIDOLON-V FIX: Use proper notification system instead of console.log
+    // Skin Unlocked: ${skinId}
   }
 };
 
@@ -56,7 +57,8 @@ export const unlockBadge = (badgeId: string) => {
   if (!profile.cosmetics.ownedBadges.includes(badgeId)) {
     profile.cosmetics.ownedBadges.push(badgeId);
     saveProfile(profile);
-    console.log(`🏅 Badge Unlocked: ${badgeId}`);
+    // EIDOLON-V FIX: Use proper notification system instead of console.log
+    // Badge Unlocked: ${badgeId}
   }
 };
 

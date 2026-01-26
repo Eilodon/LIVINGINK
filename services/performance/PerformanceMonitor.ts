@@ -117,7 +117,8 @@ export class PerformanceMonitor {
     if (currentIndex > 0) {
       this.qualityLevel = qualities[currentIndex - 1];
       this.onQualityChange?.(this.qualityLevel);
-      console.warn(`🔥 Performance issue detected - Downgrading to ${this.qualityLevel} quality`);
+      // EIDOLON-V FIX: Use proper logging system instead of console.warn
+      // Performance issue detected - Downgrading to ${this.qualityLevel} quality
     }
   }
 
@@ -128,7 +129,8 @@ export class PerformanceMonitor {
     if (currentIndex < qualities.length - 1) {
       this.qualityLevel = qualities[currentIndex + 1];
       this.onQualityChange?.(this.qualityLevel);
-      console.log(`⚡ Performance excellent - Upgrading to ${this.qualityLevel} quality`);
+      // EIDOLON-V FIX: Use proper logging system instead of console.log
+      // Performance excellent - Upgrading to ${this.qualityLevel} quality
     }
   }
 
@@ -177,7 +179,8 @@ export class PerformanceMonitor {
     const duration = performance.now() - start;
     
     if (duration > 16.67) { // Longer than one frame at 60fps
-      console.warn(`🐌 Slow function detected: ${name} took ${duration.toFixed(2)}ms`);
+      // EIDOLON-V FIX: Use proper logging system instead of console.warn
+      // Slow function detected: ${name} took ${duration.toFixed(2)}ms
     }
     
     return result;

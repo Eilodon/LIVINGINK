@@ -38,89 +38,22 @@ import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { tattooSynergyManager } from '../cjr/tattooSynergies';
 import { resetContributionLog } from '../cjr/contribution';
 import { inputManager } from '../input/InputManager'; // EIDOLON-V: Connected
+import { gameStateManager } from './GameStateManager';
 
+// EIDOLON-V FIX: Export unified game state manager
+export { gameStateManager };
+
+// Legacy export for backward compatibility
 export const updateGameState = (state: GameState, dt: number): GameState => {
-  if (state.isPaused) return state;
-
-  const players = state.players?.length ? state.players : [state.player];
-  if (!state.players?.length) state.players = players;
-  if (players.length > 0 && state.player !== players[0]) state.player = players[0];
-
-  bindEngine(state.engine);
-  const grid = getCurrentSpatialGrid();
-  grid.clear();
-
-  // 1. PHYSICS INTEGRATION
-  players.forEach(p => integrateEntity(p, dt));
-  state.bots.forEach(b => { if (!b.isDead) integrateEntity(b, dt); });
-
-  // 2. GAME TIME
-  state.gameTime += dt;
-  if (state.gameTime > state.levelConfig.timeLimit && !state.result) {
-    state.result = 'lose';
-    state.isPaused = true;
-  }
-
-  // 3. SPATIAL GRID OPTIMIZATION (EIDOLON-V FIX)
-  // Only clear and re-insert DYNAMIC entities each frame
-  // Static food remains in grid persistently for massive performance gain
-  // TODO: EIDOLON-V - Implement Static/Dynamic Grid separation
-  // Food (260+ static objects) should be in a separate static grid
-  // Only update static grid when food is eaten or spawned
-  // This will prevent re-hashing hundreds of static objects 60 times per second
-  const dynamicEntities = [...players, ...state.bots, ...state.projectiles];
-  
-  // Clear only dynamic buckets (much faster than full clear)
-  grid.clearDynamic();
-  
-  // Insert dynamic entities
-  dynamicEntities.forEach(entity => grid.insert(entity));
-  
-  // Static food is only inserted when spawned or removed (see cleanupTransientEntities)
-
-  // 4. LOGIC UPDATES
-  players.forEach(player => updatePlayer(player, state, dt));
-  state.bots.forEach(bot => updateBot(bot, state, dt));
-
-  updateProjectiles(state, dt);
-  // updateParticles(state, dt); // EIDOLON-V: REMOVED (Handled by CrystalVFX on GPU)
-  updateFloatingTexts(state, dt);
-  cleanupTransientEntities(state);
-
-  updateWaveSpawner(state, dt);
-  players.forEach(player => updateRingLogic(player, dt, state.levelConfig, state));
-  state.bots.forEach(b => updateRingLogic(b, dt, state.levelConfig, state));
-  updateBossLogic(state, dt);
-  updateDynamicBounty(state, dt);
-  updateWinCondition(state, dt, state.levelConfig);
-
-  players.forEach(player => updateEmotion(player, dt));
-  state.bots.forEach(b => updateEmotion(b, dt));
-  updateCamera(state);
-
-  checkTattooUnlock(state);
-  vfxIntegrationManager.update(state, dt);
-
-  players.forEach(player => tattooSynergyManager.checkSynergies(player, state));
-  tattooSynergyManager.updateSynergies(state, dt);
-
-  const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
-  state.camera.x += shakeOffset.x;
-  state.camera.y += shakeOffset.y;
-
-  return state;
+  // EIDOLON-V FIX: Use unified state manager
+  gameStateManager.setCurrentState(state);
+  return gameStateManager.updateGameState(dt);
 };
 
 export const updateClientVisuals = (state: GameState, dt: number): void => {
-  bindEngine(state.engine);
-  // updateParticles(state, dt); // REMOVED
-  updateFloatingTexts(state, dt);
-  vfxIntegrationManager.update(state, dt);
-  updateCamera(state);
-
-  const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
-  state.camera.x += shakeOffset.x;
-  state.camera.y += shakeOffset.y;
+  // EIDOLON-V FIX: Use unified state manager
+  gameStateManager.setCurrentState(state);
+  gameStateManager.updateClientVisuals(dt);
 };
 
 const updatePlayer = (player: Player, state: GameState, dt: number) => {
@@ -140,31 +73,15 @@ const updatePlayer = (player: Player, state: GameState, dt: number) => {
 
   // DEBUG: Log movement data
   if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-    console.log('DEBUG: Player movement - Pos:', player.position, 'Target:', player.targetPosition, 'Distance:', dist);
-  }
-
-  // Deadzone to prevent jitter
-  if (dist > 5) { // 5px deadzone
+    // EIDOLON-V FIX: Use simplified movement logic
     const speed = player.maxSpeed * (player.statusEffects.speedBoost || 1);
-
-    // Normalize desired velocity
-    const nx = dx / dist;
-    const ny = dy / dist;
-
-    const desiredX = nx * speed;
-    const desiredY = ny * speed;
-
-    // Steering Force (Responsiveness)
-    // High factor = snappy (0.2), Low factor = drift (0.05)
-    const steerFactor = 0.2;
-
-    player.velocity.x += (desiredX - player.velocity.x) * steerFactor;
-    player.velocity.y += (desiredY - player.velocity.y) * steerFactor;
-    
-    console.log('DEBUG: Applying velocity - Desired:', {x: desiredX, y: desiredY}, 'New Velocity:', player.velocity);
+    player.velocity.x = (dx / dist) * speed;
+    player.velocity.y = (dy / dist) * speed;
   } else {
     // Decelerate if no input (Friction handles this, but we can help it)
     // actually physics.ts handles friction, so we just stop adding force.
+    player.velocity.x *= 0.9;
+    player.velocity.y *= 0.9;
   }
 
   constrainToMap(player, MAP_RADIUS);
@@ -314,12 +231,12 @@ const updateFloatingTexts = (state: GameState, dt: number) => {
 
 const cleanupTransientEntities = (state: GameState) => {
   const grid = getCurrentSpatialGrid();
-  
+
   if (state.food.length > 0) {
     // Remove dead food from static grid
     const deadFood = state.food.filter(f => f.isDead);
     deadFood.forEach(food => grid.removeStatic(food));
-    
+
     // Keep only alive food
     state.food = state.food.filter(f => !f.isDead);
   }
@@ -332,7 +249,7 @@ const updateCamera = (state: GameState) => {
     const prevCamera = { x: state.camera.x, y: state.camera.y };
     state.camera.x += (state.player.position.x - state.camera.x) * 0.1;
     state.camera.y += (state.player.position.y - state.camera.y) * 0.1;
-    
+
     // DEBUG: Log camera movement
     if (Math.abs(state.camera.x - prevCamera.x) > 1 || Math.abs(state.camera.y - prevCamera.y) > 1) {
       console.log('DEBUG: Camera movement - Player:', state.player.position, 'Camera:', state.camera);

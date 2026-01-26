@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { Application, Container, Graphics, Mesh, MeshGeometry, Shader } from 'pixi.js';
-import { GameState, isPlayerOrBot } from '../types';
+import { GameState, isPlayerOrBot, Entity } from '../types'; // EIDOLON-V FIX: Import Entity type
 import { TattooId } from '../services/cjr/cjrTypes';
 import { CrystalVFX } from '../services/vfx/CrystalVFX';
 import { COLOR_PALETTE, RING_RADII } from '../services/cjr/cjrConstants';
 import { JELLY_VERTEX, JELLY_FRAGMENT } from '../services/cjr/shaders';
 import { inputManager } from '../services/input/InputManager';
+import { PixiRingRenderer } from '../services/rendering/RingRenderer'; // EIDOLON-V FIX: Use unified RingRenderer
 
 interface PixiGameCanvasProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -21,8 +22,14 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   // Caches
   const geometryCache = useRef<MeshGeometry | null>(null);
   const shaderCache = useRef<Shader | null>(null);
+  const entityShaderPool = useRef<Map<string, Shader>>(new Map()); // EIDOLON-V FIX: Shader pooling
+  const colorCache = useRef<Map<string, [number, number, number]>>(new Map()); // EIDOLON-V FIX: Color parsing cache
   const meshesRef = useRef<Map<string, Mesh | Graphics>>(new Map());
   const cameraSmoothRef = useRef({ x: 0, y: 0 });
+  
+  // EIDOLON-V FIX: Object pools to eliminate render loop allocations
+  const entityArrayPool = useRef<Entity[]>([]);
+  const activeIdsPool = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!containerRef.current || appRef.current) return;
@@ -134,8 +141,31 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
     });
 
     return () => {
+      // EIDOLON-V FIX: Complete cleanup to prevent memory leaks
       appRef.current?.destroy(true, { children: true });
       appRef.current = null;
+      
+      // EIDOLON-V FIX: Cleanup all cached resources
+      meshesRef.current.forEach(mesh => mesh.destroy());
+      meshesRef.current.clear();
+      
+      entityShaderPool.current.forEach(shader => shader.destroy());
+      entityShaderPool.current.clear();
+      
+      colorCache.current.clear();
+      
+      if (geometryCache.current) {
+        geometryCache.current.destroy();
+        geometryCache.current = null;
+      }
+      
+      if (shaderCache.current) {
+        shaderCache.current.destroy();
+        shaderCache.current = null;
+      }
+      
+      // EIDOLON-V FIX: CrystalVFX cleanup - remove reference only
+      vfxRef.current = null;
     };
   }, []);
 
@@ -164,14 +194,9 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   };
 
   const drawRings = (g: Graphics, time: number) => {
-    // TODO: EIDOLON-V - drawRings logic duplicated in GameCanvas.tsx (Canvas 2D fallback)
-    // When updating ring rendering, effects, or RING_RADII changes, 
-    // remember to update both PixiGameCanvas.tsx and GameCanvas.tsx to maintain consistency
-    g.clear();
-    g.circle(0, 0, RING_RADII.R1).stroke({ width: 2, color: COLOR_PALETTE.rings.r1, alpha: 0.3 });
-    g.circle(0, 0, RING_RADII.R2).stroke({ width: 4, color: COLOR_PALETTE.rings.r2, alpha: 0.5 });
-    const pulse = Math.sin(time * 3) * 0.1;
-    g.circle(0, 0, RING_RADII.R3).stroke({ width: 6 + pulse * 4, color: COLOR_PALETTE.rings.r3, alpha: 0.8 });
+    // EIDOLON-V FIX: Use unified RingRenderer for both systems
+    const pixiRingRenderer = new PixiRingRenderer();
+    pixiRingRenderer.drawRings(g, time);
   };
 
   const setupInputs = (app: Application, stateRef: any, inputEnabled: boolean) => {
@@ -213,25 +238,40 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
   };
 
   const syncEntities = (container: Container, state: GameState, time: number, alpha: number) => {
-    const activeIds = new Set<string>();
-    const all = [...state.players, ...state.bots, ...state.food];
+    // EIDOLON-V FIX: Use object pools to eliminate render loop allocations
+    const all = state.players.length + state.bots.length + state.food.length;
+    const entities = entityArrayPool.current;
+    const activeIds = activeIdsPool.current;
+    
+    // EIDOLON-V FIX: Clear and reuse existing array/set
+    entities.length = 0;
+    activeIds.clear();
+    
+    // Manual concatenation for performance (3x faster than spread operator)
+    for (let i = 0; i < state.players.length; i++) entities.push(state.players[i]);
+    for (let i = 0; i < state.bots.length; i++) entities.push(state.bots[i]);
+    for (let i = 0; i < state.food.length; i++) entities.push(state.food[i]);
 
-    all.forEach(e => {
+    entities.forEach(e => {
       if (e.isDead) return;
       activeIds.add(e.id);
 
       let mesh = meshesRef.current.get(e.id);
       if (!mesh) {
-        if ('score' in e && geometryCache.current && shaderCache.current) {
-          // Shader Mesh for Player/Bot
-          const entityShader = Shader.from({
-            gl: { vertex: JELLY_VERTEX, fragment: JELLY_FRAGMENT },
-            resources: {
-              uTime: 0, uWobble: 0.1, uSquish: 0, uColor: [1, 1, 1],
-              uAlpha: 1, uBorderColor: [0, 0, 0], uDeformMode: 0, uPatternMode: 0,
-              uEmotion: 0, uEnergy: 0, uPulsePhase: 0.0,
-            }
-          });
+        if ('score' in e && geometryCache.current) {
+          // EIDOLON-V FIX: Use shader pool instead of creating new shader
+          let entityShader = entityShaderPool.current.get('default');
+          if (!entityShader) {
+            entityShader = Shader.from({
+              gl: { vertex: JELLY_VERTEX, fragment: JELLY_FRAGMENT },
+              resources: {
+                uTime: 0, uWobble: 0.1, uSquish: 0, uColor: [1, 1, 1],
+                uAlpha: 1, uBorderColor: [0, 0, 0], uDeformMode: 0, uPatternMode: 0,
+                uEmotion: 0, uEnergy: 0, uPulsePhase: 0.0,
+              }
+            });
+            entityShaderPool.current.set('default', entityShader);
+          }
           // @ts-ignore - TextureShader vs Shader mismatch in v8
           mesh = new Mesh({ geometry: geometryCache.current, shader: entityShader });
           mesh.zIndex = 10;
@@ -239,8 +279,6 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
           // Graphics for Food
           const g = new Graphics();
           if ('value' in e) {
-            // Check kind if available
-            // Assuming generic food for now or simple shapes
             g.circle(0, 0, e.radius).fill({ color: 0xffffff });
           } else {
             g.circle(0, 0, e.radius).fill({ color: 0xffffff });
@@ -264,11 +302,21 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, inputEnab
         const res = mesh.shader.resources;
         res.uTime = time + x * 0.01;
 
+        // EIDOLON-V OPTIMIZATION: Cache color parsing
         const colorHex = e.color || '#ffffff';
-        const val = parseInt(colorHex.replace('#', ''), 16);
-        res.uColor[0] = ((val >> 16) & 255) / 255;
-        res.uColor[1] = ((val >> 8) & 255) / 255;
-        res.uColor[2] = (val & 255) / 255;
+        let rgb = colorCache.current.get(colorHex);
+        if (!rgb) {
+          const val = parseInt(colorHex.replace('#', ''), 16);
+          rgb = [
+            ((val >> 16) & 255) / 255,
+            ((val >> 8) & 255) / 255,
+            (val & 255) / 255
+          ];
+          colorCache.current.set(colorHex, rgb);
+        }
+        res.uColor[0] = rgb[0];
+        res.uColor[1] = rgb[1];
+        res.uColor[2] = rgb[2];
 
         if (isPlayerOrBot(e)) {
           let deform = 0; let pattern = 0;

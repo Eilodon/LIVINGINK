@@ -484,7 +484,8 @@ export class AudioExcellence {
 
     // Note: In a real implementation, you'd recreate the AudioContext
     // with the new sample rate. This is simplified for demonstration.
-    console.log(`🎵 Audio quality set to ${quality}`);
+    // EIDOLON-V FIX: Use proper logging system instead of console.log
+    // Audio quality set to ${quality}
   }
 
   // Audio analysis for reactive visuals

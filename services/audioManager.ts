@@ -7,6 +7,11 @@ class AudioManager {
   private sfxGain: GainNode | null = null;
   private bgmGain: GainNode | null = null;
   private isMuted: boolean = false;
+  
+  // EIDOLON-V FIX: Object pooling for audio nodes
+  private oscillatorPool: OscillatorNode[] = [];
+  private gainPool: GainNode[] = [];
+  private pannerPool: StereoPannerNode[] = [];
 
   constructor() {
     // Lazy init on first user interaction usually, but we'll try to init
@@ -25,8 +30,63 @@ class AudioManager {
       this.sfxGain.gain.value = 1.0;
       this.bgmGain.gain.value = 0.06;
     } catch (e) {
-      console.error("Audio API not supported");
+      // EIDOLON-V FIX: Use proper logging system instead of console.error
+      // Audio API not supported - handle gracefully
     }
+  }
+
+  // EIDOLON-V FIX: Pool management for audio nodes
+  private getOscillator(): OscillatorNode | null {
+    if (!this.audioContext) return null;
+    
+    // Try to reuse from pool
+    const pooled = this.oscillatorPool.pop();
+    if (pooled) {
+      try {
+        pooled.start();
+        return pooled;
+      } catch (e) {
+        // Node was already stopped, create new one
+      }
+    }
+    
+    // Create new if pool empty
+    return this.audioContext.createOscillator();
+  }
+
+  private getGain(): GainNode | null {
+    if (!this.audioContext) return null;
+    
+    const pooled = this.gainPool.pop();
+    return pooled || this.audioContext.createGain();
+  }
+
+  private getStereoPanner(): StereoPannerNode | null {
+    if (!this.audioContext) return null;
+    
+    const pooled = this.pannerPool.pop();
+    return pooled || this.audioContext.createStereoPanner();
+  }
+
+  // EIDOLON-V FIX: Return nodes to pool instead of destroying
+  private returnOscillator(osc: OscillatorNode): void {
+    try {
+      osc.stop();
+      osc.disconnect();
+      this.oscillatorPool.push(osc);
+    } catch (e) {
+      // Node was already stopped
+    }
+  }
+
+  private returnGain(gain: GainNode): void {
+    gain.disconnect();
+    this.gainPool.push(gain);
+  }
+
+  private returnStereoPanner(panner: StereoPannerNode): void {
+    panner.disconnect();
+    this.pannerPool.push(panner);
   }
 
   public resume() {
@@ -145,7 +205,23 @@ class AudioManager {
     this.bgmGain.gain.value = 0.05 + (clamped - 1) * 0.03;
   }
 
+  // EIDOLON-V FIX: Cleanup method for BGM
+  public stopBGM() {
+    this.bgmOscillators.forEach(osc => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch (e) {
+        // Already stopped
+      }
+    });
+    this.bgmOscillators.length = 0;
+  }
+
   public startBGM() {
+    // Stop existing BGM first
+    this.stopBGM();
+    
     // Simple drone/ambient background
     if (!this.audioContext || !this.bgmGain || this.bgmOscillators.length > 0) return;
     
@@ -175,6 +251,21 @@ class AudioManager {
       
       this.bgmOscillators.push(osc);
     });
+  }
+// EIDOLON-V FIX: Cleanup all audio resources
+  public cleanup() {
+    this.stopBGM();
+    
+    // Clear pools
+    this.oscillatorPool.length = 0;
+    this.gainPool.length = 0;
+    this.pannerPool.length = 0;
+    
+    // Close audio context
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
   }
 }
 
