@@ -40,6 +40,8 @@ export const loadProfile = (): PlayerProfile => {
 
 export const unlockSkin = (skinId: string) => {
   const profile = loadProfile();
+  if (!profile.cosmetics) profile.cosmetics = { ownedSkins: [], ownedTrails: [], ownedAuras: [], ownedBadges: [], active: {} };
+
   if (!profile.cosmetics.ownedSkins.includes(skinId)) {
     profile.cosmetics.ownedSkins.push(skinId);
     saveProfile(profile);
@@ -49,6 +51,8 @@ export const unlockSkin = (skinId: string) => {
 
 export const unlockBadge = (badgeId: string) => {
   const profile = loadProfile();
+  if (!profile.cosmetics) profile.cosmetics = { ownedSkins: [], ownedTrails: [], ownedAuras: [], ownedBadges: [], active: {} };
+
   if (!profile.cosmetics.ownedBadges.includes(badgeId)) {
     profile.cosmetics.ownedBadges.push(badgeId);
     saveProfile(profile);

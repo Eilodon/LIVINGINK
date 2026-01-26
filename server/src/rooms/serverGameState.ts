@@ -84,7 +84,7 @@ export const createServerGameState = (serverState: GameRoomState, runtime: GameR
       },
       rewindHistory: [],
       stationaryTime: 0,
-      trail: [],
+      trail: [], // Client-side handled (Not Synced)
       isDead: false,
       statusEffects: {
         speedBoost: serverPlayer.statusEffects.speedBoost || 1,
@@ -152,7 +152,7 @@ export const createServerGameState = (serverState: GameRoomState, runtime: GameR
       value: 1, // Default value
       isDead: false,
       color: '#ffffff', // Default color
-      trail: [] // Required trail property
+      trail: [] // Client-side
     };
     food.push(foodItem);
   });

@@ -4,7 +4,7 @@
  * Authoritative State
  */
 
-import { Schema, type, MapSchema, ArraySchema } from '@colyseus/schema';
+import { Schema, type, MapSchema, ArraySchema, filter } from '@colyseus/schema';
 
 // ============================================
 // SUB-SCHEMAS
@@ -62,7 +62,11 @@ export class PlayerState extends Schema {
   @type('int32') score: number = 0;
   @type('int16') kills: number = 0;
   @type('float32') skillCooldown: number = 0;
-  @type('int32') lastProcessedInput: number = 0;
+  @type('int32')
+  @filter(function (this: PlayerState, client: any, value: any, root: any) {
+    return client.sessionId === this.sessionId;
+  })
+  lastProcessedInput: number = 0;
 
   // State flags
   @type('boolean') isDead: boolean = false;
@@ -73,8 +77,8 @@ export class PlayerState extends Schema {
   // Tattoos (stored as string IDs)
   @type(['string']) tattoos = new ArraySchema<string>();
 
-  // Trail
-  @type([Vector2]) trail = new ArraySchema<Vector2>();
+  // Trail - Removed for bandwidth optimization (Client-side only)
+
 }
 
 export class BotState extends PlayerState {

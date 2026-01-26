@@ -134,8 +134,9 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
       state.food.forEach(food => {
         if (food.isDead || food.kind !== 'catalyst') return;
         const dist = Math.hypot(food.position.x - player.position.x, food.position.y - player.position.y);
-        if (dist < player.statusEffects.catalystAttractionRadius) {
-          const force = player.statusEffects.goldenMagneticForce * 50;
+        const attrRadius = player.statusEffects.catalystAttractionRadius || 0;
+        if (dist < attrRadius) {
+          const force = (player.statusEffects.goldenMagneticForce || 0) * 50;
           const dx = player.position.x - food.position.x;
           const dy = player.position.y - food.position.y;
           food.velocity.x += (dx / dist) * force;

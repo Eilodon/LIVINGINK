@@ -3,7 +3,9 @@ import {
   FRICTION_BASE,
   MAP_RADIUS
 } from '../../../constants';
-import { Bot, GameState, Player, Food } from '../../../types';
+import { Bot, Player } from '../../../types/player';
+import { GameState } from '../../../types/state';
+import { Food } from '../../../types/entity';
 import { getCurrentSpatialGrid } from '../context';
 import { distance, normalize } from '../math';
 import { calcMatchPercent } from '../../cjr/colorMath';
@@ -43,7 +45,7 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
       const dist = distance(bot.position, e.position);
 
       if ('score' in e) { // Agent
-        const other = e as Player | Bot;
+        const other = e as unknown as (Player | Bot);
         if (other.isDead) return;
 
         if (other.radius > bot.radius * 1.1) {
@@ -58,7 +60,7 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
           }
         }
       } else if ('value' in e) { // Food
-        const f = e as Food;
+        const f = e as unknown as Food;
         if (f.isDead) return;
         // Score based on distance and COLOR MATCH
         // If pigment matches target, high score.
@@ -83,27 +85,27 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
 
     // Decision Tree
     if (threat && closestThreatDist < 300) {
-      bot.aiState = 'flee';
-      bot.targetEntityId = threat.id;
+      (bot as any).aiState = 'flee';
+      (bot as any).targetEntityId = (threat as any).id;
 
       // Panic Skill
       if (closestThreatDist < 150) {
         applySkill(bot, undefined, state);
       }
     } else if (targetEntity && closestPreyDist < 400) {
-      bot.aiState = 'chase';
-      bot.targetEntityId = targetEntity.id;
+      (bot as any).aiState = 'chase';
+      (bot as any).targetEntityId = (targetEntity as any).id;
 
       // Attack Skill (if configured)
       if (closestPreyDist < 150) {
         applySkill(bot, undefined, state);
       }
     } else if (targetFood) {
-      bot.aiState = 'forage';
+      (bot as any).aiState = 'forage';
       // Move to food
       // We don't store food ID in targetEntityId usually, just move logic below
     } else {
-      bot.aiState = 'wander';
+      (bot as any).aiState = 'wander';
     }
 
     // Execute Movement
@@ -111,15 +113,15 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
     let tx = 0, ty = 0;
 
     if (bot.aiState === 'flee' && threat) {
-      const dir = normalize({ x: bot.position.x - threat.position.x, y: bot.position.y - threat.position.y });
+      const dir = normalize({ x: (bot as any).position.x - (threat as any).position.x, y: (bot as any).position.y - (threat as any).position.y });
       tx = dir.x * speed;
       ty = dir.y * speed;
     } else if (bot.aiState === 'chase' && targetEntity) {
-      const dir = normalize({ x: targetEntity.position.x - bot.position.x, y: targetEntity.position.y - bot.position.y });
+      const dir = normalize({ x: (targetEntity as any).position.x - (bot as any).position.x, y: (targetEntity as any).position.y - (bot as any).position.y });
       tx = dir.x * speed;
       ty = dir.y * speed;
     } else if (bot.aiState === 'forage' && targetFood) {
-      const dir = normalize({ x: targetFood.position.x - bot.position.x, y: targetFood.position.y - bot.position.y });
+      const dir = normalize({ x: (targetFood as any).position.x - (bot as any).position.x, y: (targetFood as any).position.y - (bot as any).position.y });
       tx = dir.x * speed;
       ty = dir.y * speed;
     } else {

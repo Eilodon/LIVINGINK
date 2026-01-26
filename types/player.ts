@@ -7,6 +7,83 @@ export function isPlayerOrBot(entity: Entity): entity is Player | Bot {
     return 'score' in entity;
 }
 
+// Status Effects Interface
+export interface StatusEffects {
+    speedBoost: number;
+    tempSpeedBoost: number;
+    tempSpeedTimer: number;
+    shielded: boolean;
+    burning: boolean;
+    burnTimer: number;
+    slowed: boolean;
+    slowTimer: number;
+    slowMultiplier: number;
+    poisoned: boolean;
+    poisonTimer: number;
+    regen: number;
+    airborne: boolean;
+    stealthed: boolean;
+    stealthCharge: number;
+    invulnerable: number;
+    rooted: number;
+    speedSurge: number;
+    kingForm: number;
+    damageBoost: number;
+    defenseBoost: number;
+    // New CJR buffs
+    commitShield?: number;
+    pityBoost?: number;
+    colorBoostTimer?: number;
+    colorBoostMultiplier?: number;
+    overdriveTimer?: number;
+    magnetTimer?: number;
+    // Tattoo Effects
+    wrongPigmentReduction?: number;
+    overdriveActive?: boolean;
+    coreShieldBonus?: boolean;
+    pigmentBombActive?: boolean;
+    pigmentBombChance?: number;
+    perfectMatchThreshold?: number;
+    perfectMatchBonus?: number;
+    catalystSenseRange?: number;
+    catalystSenseActive?: boolean;
+    neutralMassBonus?: number;
+    solventPower?: number;
+    solventSpeedBoost?: number;
+    catalystEchoBonus?: number;
+    catalystEchoDuration?: number;
+    prismGuardThreshold?: number;
+    prismGuardReduction?: number;
+    grimHarvestDropCount?: number;
+
+    // Tattoo Synergy Effects - Phase 2 Gameplay Depth
+    neutralPurification?: boolean;
+    purificationRadius?: number;
+    overdriveExplosive?: boolean;
+    explosiveSpeed?: number;
+    explosionRadius?: number;
+    goldenAttraction?: boolean;
+    catalystAttractionRadius?: number;
+    goldenMagneticForce?: number;
+    elementalBalance?: boolean;
+    solventShieldPower?: number;
+    shieldSolventSynergy?: boolean;
+    colorImmunity?: boolean;
+    chromaticImmunityDuration?: number;
+    catalystMasteryRadius?: number;
+    catalystGuarantee?: boolean;
+    neutralGodMode?: boolean;
+    kineticExplosion?: boolean;
+    explosionDamage?: number;
+    shieldPiercing?: boolean;
+    absoluteMastery?: boolean;
+    colorControl?: number;
+    temporalDistortion?: boolean;
+    timeManipulation?: number;
+    speedAmplifier?: number;
+    explosionTimeDilation?: number;
+}
+
 export interface Player extends Entity {
     name: string;
     score: number;
@@ -84,81 +161,7 @@ export interface Player extends Entity {
     stationaryTime: number;
 
     // Status Effects
-    statusEffects: {
-        speedBoost: number;
-        tempSpeedBoost: number;
-        tempSpeedTimer: number;
-        shielded: boolean;
-        burning: boolean;
-        burnTimer: number;
-        slowed: boolean;
-        slowTimer: number;
-        slowMultiplier: number;
-        poisoned: boolean;
-        poisonTimer: number;
-        regen: number;
-        airborne: boolean;
-        stealthed: boolean;
-        stealthCharge: number;
-        invulnerable: number;
-        rooted: number;
-        speedSurge: number;
-        kingForm: number;
-        damageBoost: number;
-        defenseBoost: number;
-        // New CJR buffs
-        commitShield?: number;
-        pityBoost?: number;
-        colorBoostTimer?: number;
-        colorBoostMultiplier?: number;
-        overdriveTimer?: number;
-        magnetTimer?: number;
-        // Tattoo Effects
-        wrongPigmentReduction?: number;
-        overdriveActive?: boolean;
-        coreShieldBonus?: boolean;
-        pigmentBombActive?: boolean;
-        pigmentBombChance?: number;
-        perfectMatchThreshold?: number;
-        perfectMatchBonus?: number;
-        catalystSenseRange?: number;
-        catalystSenseActive?: boolean;
-        neutralMassBonus?: number;
-        solventPower?: number;
-        solventSpeedBoost?: number;
-        catalystEchoBonus?: number;
-        catalystEchoDuration?: number;
-        prismGuardThreshold?: number;
-        prismGuardReduction?: number;
-        grimHarvestDropCount?: number;
-
-        // Tattoo Synergy Effects - Phase 2 Gameplay Depth
-        neutralPurification?: boolean;
-        purificationRadius?: number;
-        overdriveExplosive?: boolean;
-        explosiveSpeed?: number;
-        explosionRadius?: number;
-        goldenAttraction?: boolean;
-        catalystAttractionRadius?: number;
-        goldenMagneticForce?: number;
-        elementalBalance?: boolean;
-        solventShieldPower?: number;
-        shieldSolventSynergy?: boolean;
-        colorImmunity?: boolean;
-        chromaticImmunityDuration?: number;
-        catalystMasteryRadius?: number;
-        catalystGuarantee?: boolean;
-        neutralGodMode?: boolean;
-        kineticExplosion?: boolean;
-        explosionDamage?: number;
-        shieldPiercing?: boolean;
-        absoluteMastery?: boolean;
-        colorControl?: number;
-        temporalDistortion?: boolean;
-        timeManipulation?: number;
-        speedAmplifier?: number;
-        explosionTimeDilation?: number;
-    };
+    statusEffects: StatusEffects;
 }
 
 export interface Bot extends Player {

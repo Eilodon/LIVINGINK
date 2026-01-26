@@ -1,5 +1,5 @@
 import { GRID_CELL_SIZE } from '../../constants';
-import { Entity, Particle } from '../../types';
+import { Entity, Particle } from '../../types/entity';
 import { randomRange } from './math';
 
 // --- Optimization: Persistent Spatial Grid ---
