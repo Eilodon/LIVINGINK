@@ -1,4 +1,5 @@
 import { Vector2 } from './shared';
+import { IGameEngine } from './engine';
 import { Player, Bot, TattooChoice, MatchSummary } from './player';
 import { Food, Particle, Projectile, FloatingText, DelayedAction } from './entity';
 import { LevelConfig } from '../services/cjr/levels';
@@ -54,10 +55,7 @@ export interface GameState {
     floatingTexts: FloatingText[];
     delayedActions: DelayedAction[];
 
-    // EIDOLON-V FIX: Cập nhật type engine
-    // Đảm bảo không dùng 'any' nếu có thể, nhưng tránh circular import
-    // Nếu import GameEngine gây lỗi vòng lặp, dùng 'any' tạm thời hoặc Interface rút gọn
-    engine: any;
+    engine: IGameEngine;
     runtime: GameRuntimeState;
 
     worldSize: Vector2;

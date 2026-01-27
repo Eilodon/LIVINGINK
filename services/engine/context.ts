@@ -1,4 +1,5 @@
 import { GRID_CELL_SIZE } from '../../constants';
+import { IGameEngine, ISpatialGrid, IParticlePool } from '../../types/engine';
 import { Entity, Particle } from '../../types/entity';
 import { randomRange } from './math';
 
@@ -13,7 +14,7 @@ import { SpatialHashGrid, SpatialQueryResult } from '../spatial/SpatialHashGrid'
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
-export class SpatialGrid {
+export class SpatialGrid implements ISpatialGrid {
   private grid: SpatialHashGrid;
 
   constructor() {
@@ -67,7 +68,7 @@ export class SpatialGrid {
 }
 
 // --- Optimization: Particle Pooling ---
-class ParticlePool {
+class ParticlePool implements IParticlePool {
   private pool: Particle[] = [];
   private readonly MAX_POOL_SIZE = 100; // Prevent memory leaks
 
@@ -115,7 +116,7 @@ class ParticlePool {
 // Each GameState owns its own engine instance, preventing multi-mount issues.
 import { PhysicsWorld } from './PhysicsWorld';
 
-export class GameEngine {
+export class GameEngine implements IGameEngine {
   public spatialGrid: SpatialGrid;
   public particlePool: ParticlePool;
   public physicsWorld: PhysicsWorld;
@@ -128,29 +129,29 @@ export class GameEngine {
 }
 
 // Factory function for creating engine instances
-export const createGameEngine = (): GameEngine => new GameEngine();
+export const createGameEngine = (): IGameEngine => new GameEngine();
 
 // Module-level reference to current engine (set at start of each updateGameState call)
 // This is safe because:
 // 1. It's set FROM the state at the start of each frame
 // 2. Only one game loop runs at a time per game instance
 // 3. Each GameState owns its own GameEngine via state.engine
-let currentEngine: GameEngine | null = null;
-let currentSpatialGrid: SpatialGrid | null = null;
+let currentEngine: IGameEngine | null = null;
+let currentSpatialGrid: ISpatialGrid | null = null;
 
-export const bindEngine = (engine: GameEngine) => {
+export const bindEngine = (engine: IGameEngine) => {
   currentEngine = engine;
   currentSpatialGrid = engine.spatialGrid;
 };
 
-export const getCurrentEngine = () => {
+export const getCurrentEngine = (): IGameEngine => {
   if (!currentEngine) {
     throw new Error('GameEngine not bound to update loop');
   }
   return currentEngine;
 };
 
-export const getCurrentSpatialGrid = () => {
+export const getCurrentSpatialGrid = (): ISpatialGrid => {
   if (!currentSpatialGrid) {
     throw new Error('Spatial grid not bound to update loop');
   }
