@@ -1,16 +1,10 @@
+import { InputState, createDefaultInputState } from '../../types/input';
+
 export type InputManager = typeof inputManager;
 
 export const inputManager = {
     // State hiện tại (được Engine đọc mỗi tick)
-    state: {
-        move: { x: 0, y: 0 },
-        actions: {
-            skill: false,
-            eject: false,
-        },
-        // Event queue cho những hành động "bấm một lần" (skill)
-        events: [] as Array<{ type: 'skill' | 'eject', id: string }>
-    },
+    state: createDefaultInputState() as InputState,
 
     // --- Keyboard Handling ---
     keys: new Set<string>(),
@@ -26,10 +20,7 @@ export const inputManager = {
     reset() {
         this.keys.clear();
         this.joystickVector = { x: 0, y: 0 };
-        this.state.move = { x: 0, y: 0 };
-        this.state.actions.skill = false;
-        this.state.actions.eject = false;
-        this.state.events = [];
+        this.state = createDefaultInputState();
     },
 
     onKey(code: string, isDown: boolean) {
@@ -38,12 +29,12 @@ export const inputManager = {
 
         // Skill Trigger (Space)
         if (code === 'Space') {
-            this.state.actions.skill = isDown;
+            this.state.actions.space = isDown; // EIDOLON-V: use specific action
             if (isDown) this.pushEvent('skill');
         }
         // Eject Trigger (W)
         if (code === 'KeyW') {
-            this.state.actions.eject = isDown;
+            this.state.actions.w = isDown; // EIDOLON-V: use specific action
             if (isDown) this.pushEvent('eject');
         }
     },
@@ -58,7 +49,11 @@ export const inputManager = {
     },
 
     setButton(btn: 'skill' | 'eject', isDown: boolean) {
-        this.state.actions[btn] = isDown;
+        // Map btn to generic action key if needed, or update actions directly
+        // Currently hardcoded mapping:
+        if (btn === 'skill') this.state.actions.space = isDown;
+        if (btn === 'eject') this.state.actions.w = isDown;
+
         if (isDown) this.pushEvent(btn);
     },
 
@@ -100,8 +95,9 @@ export const inputManager = {
         }
     },
 
-    pushEvent(type: 'skill' | 'eject') {
-        this.state.events.push({ type, id: Math.random().toString(36).slice(2) });
+    pushEvent(type: 'skill' | 'eject' | 'boost') {
+        // EIDOLON-V: Use timestamp
+        this.state.events.push({ type, timestamp: Date.now() });
     },
 
     // Engine gọi hàm này để lấy và xóa queue

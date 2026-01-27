@@ -89,6 +89,7 @@ export interface Player extends Entity {
     name: string;
     score: number;
     kills: number;
+    /** @deprecated Use InputManager.state.events instead */
     inputEvents?: any[];
     // Dopamine Stats
     killStreak: number;
@@ -127,10 +128,12 @@ export interface Player extends Entity {
     isInvulnerable: boolean;
     skillCooldown: number;
     maxSkillCooldown: number;
+    /** @deprecated Use InputManager.state instead */
     inputs?: {
         space: boolean;
         w: boolean;
     };
+    /** @deprecated Use InputManager.state.events instead */
     inputSeq?: number;
     // #endregion
 

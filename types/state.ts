@@ -78,9 +78,11 @@ export interface GameState {
     // Các hiệu ứng nổ/particle dùng VFXRingBuffer và không lưu trong state
     vfxEvents: string[];
 
+    /** @deprecated Use InputManager.state instead */
     inputs: {
         space: boolean;
         w: boolean;
     };
+    /** @deprecated Use InputManager.state.events instead */
     inputEvents: any[];
 }

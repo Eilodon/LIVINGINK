@@ -109,23 +109,39 @@ export class GameStateManager {
 
       const actions = this.inputManager.state.actions;
       const networkInputs = {
-        space: actions.skill,
-        w: actions.eject
+        space: actions.space,
+        w: actions.w
       };
 
       this.networkClient.sendInput(moveTarget, networkInputs, dt, events);
     } else {
       // Singleplayer Logic
+      // Singleplayer Logic
+      // EIDOLON-V: Pull from InputManager
       const events = this.inputManager.popEvents();
-      if (events.length > 0) {
-        if (!state.player.inputEvents) state.player.inputEvents = [];
+      // Using deprecated inputEvents for now on Player, but populating from IM is correct 
+      // Ideally we stop pushing to player array and handle events directly here or in engine.
+      // For legacy compat, we push to player array if it exists
+      if (events.length > 0 && state.player.inputEvents) {
         state.player.inputEvents.push(...events);
+      } else if (events.length > 0) {
+        // If array missing, define it or handle logic directly
+        // Currently safe to ignore or just log, as Engine likely checks IM in future
+        state.player.inputEvents = [...events];
       }
 
       const move = this.inputManager.state.move;
       if (move.x !== 0 || move.y !== 0) {
         state.player.targetPosition.x = state.player.position.x + move.x * 200;
         state.player.targetPosition.y = state.player.position.y + move.y * 200;
+      }
+
+      // Sync actions to player.inputs for backward compatibility
+      // But Engine should read from IM ideally. 
+      // Current legacy engines read player.inputs
+      if (state.player.inputs) {
+        state.player.inputs.space = this.inputManager.state.actions.space;
+        state.player.inputs.w = this.inputManager.state.actions.w;
       }
 
       // Core physics/logic update
@@ -294,7 +310,10 @@ export class GameStateManager {
       state.player.name = config.name;
       state.player.shape = config.shape;
       state.player.velocity = { x: 0, y: 0 };
-      state.player.inputs = { w: false, space: false };
+      // EIDOLON-V: Initialize legacy inputs if needed
+      if (state.player.inputs) {
+        state.player.inputs = { w: false, space: false };
+      }
     } else {
       console.error('CRITICAL: Player not found in initial state');
     }
