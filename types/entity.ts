@@ -1,8 +1,27 @@
 import { Vector2 } from './shared';
 export type { Vector2 }; // Re-export for player.ts import compatibility
 
+// For systems that should only READ position
+export type ReadonlyPosition = Readonly<{ x: number; y: number }>;
+
+// For systems that can WRITE position (only PhysicsWorld)
+export type WritablePosition = { x: number; y: number };
+
 export interface Entity {
     id: string;
+    /**
+     * Entity position in world coordinates.
+     * 
+     * OWNERSHIP MODEL (EIDOLON-V):
+     * - WRITE: Only PhysicsWorld.syncBodiesToBatch() may modify
+     * - READ: All other systems read only
+     * 
+     * LIFECYCLE:
+     * 1. Birth: factories.ts creates initial position
+     * 2. Update: PhysicsWorld applies velocity each frame
+     * 3. Constrain: PhysicsWorld clamps to world bounds
+     * 4. Death: Position becomes invalid when isDead=true
+     */
     position: Vector2;
     velocity: Vector2;
     radius: number; // Represents Mass/Size
