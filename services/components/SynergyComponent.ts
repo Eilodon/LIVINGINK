@@ -1,5 +1,3 @@
-import { Component } from '../Component';
-
 export type TattooSynergyEffect = {
     id: string;
     synergyId: string;
@@ -8,14 +6,15 @@ export type TattooSynergyEffect = {
     tier: 'basic' | 'advanced' | 'master' | 'legendary';
 };
 
-export class SynergyComponent extends Component {
+export class SynergyComponent {
+    entityId: string;
     activeEffects: TattooSynergyEffect[];
     cooldowns: Map<string, number>;
     stats: Map<string, number>;
     discovered: Set<string>;
 
     constructor(entityId: string) {
-        super(entityId);
+        this.entityId = entityId;
         this.activeEffects = [];
         this.cooldowns = new Map();
         this.stats = new Map();

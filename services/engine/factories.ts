@@ -34,7 +34,7 @@ export const randomPigment = (): PigmentVec3 => ({
   b: Math.random(),
 });
 
-import { SynergyComponent } from '../ecs/components/SynergyComponent';
+import { SynergyComponent } from '../components/SynergyComponent';
 
 export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime: number = 0): Player => {
   const position = randomPosInRing(1);
