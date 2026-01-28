@@ -2,7 +2,8 @@
 import { distance } from '../engine/math';
 import { GameState, Player, Bot } from '../../types';
 import { RING_RADII, THRESHOLDS, COMMIT_BUFFS } from '../../constants';
-import { fastMath } from '../math/FastMath'; // EIDOLON-V FIX: Import FastMath
+import { fastMath } from '../math/FastMath';
+import { StatusFlag } from '../engine/statusFlags';
 
 /**
  * Determines which ring a position falls into physically.
@@ -92,9 +93,9 @@ export const checkRingTransition = (player: Player) => {
 };
 
 const applyCommitBuff = (player: Player, buff: any) => {
-    player.statusEffects.commitShield = buff.shield;
-    player.statusEffects.speedBoost = Math.max(player.statusEffects.speedBoost, buff.speed);
-    player.statusEffects.tempSpeedTimer = buff.duration;
+    player.statusScalars.commitShield = buff.shield;
+    player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed || 1, buff.speed);
+    player.statusTimers.tempSpeed = buff.duration;
 };
 
 /**

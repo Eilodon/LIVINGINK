@@ -1,5 +1,6 @@
 
 import { GameState, Player } from '../../types';
+import { StatusFlag } from '../engine/statusFlags';
 
 export const resetContributionLog = (runtime: any) => {
     runtime.contribution.damageLog.clear();
@@ -46,10 +47,10 @@ export const distributeBossRewards = (state: GameState) => {
 };
 
 const applyReward = (player: Player, reward: any) => {
-    player.statusEffects.tempSpeedBoost = reward.speed;
-    player.statusEffects.tempSpeedTimer = reward.duration / 1000;
+    player.statusMultipliers.speed = reward.speed;
+    player.statusTimers.tempSpeed = reward.duration / 1000;
     if (reward.shield) {
-        player.statusEffects.shielded = true;
-        player.statusEffects.invulnerable = 2.0;
+        player.statusFlags |= StatusFlag.SHIELDED;
+        player.statusTimers.invulnerable = 2.0;
     }
 };

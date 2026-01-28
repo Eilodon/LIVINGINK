@@ -4,7 +4,7 @@
 import { GameState, Player, Bot, Food, Entity, Projectile } from '../../types';
 import { gameStateManager } from './GameStateManager';
 import { bindEngine, getCurrentSpatialGrid, getCurrentEngine } from './context';
-import { integrateEntity, checkCollisions, constrainToMap, updatePhysicsWorld } from './systems/physics';
+
 import { updateAI } from './systems/ai';
 import { applyProjectileEffect, resolveCombat, consumePickup } from './systems/combat';
 import { applySkill } from './systems/skills';
@@ -24,6 +24,9 @@ import { resetContributionLog } from '../cjr/contribution';
 
 import { pooledEntityFactory } from '../pooling/ObjectPool';
 import { filterInPlace } from '../utils/arrayUtils';
+import { PhysicsSystem } from './dod/systems/PhysicsSystem';
+import { MovementSystem } from './dod/systems/MovementSystem';
+import { TransformStore, PhysicsStore, EntityLookup } from './dod/ComponentStores';
 
 // EIDOLON-V FIX: Batch processing system to reduce function call overhead
 interface EntityBatch {
@@ -31,7 +34,7 @@ interface EntityBatch {
   bots: Bot[];
   projectiles: Entity[];
   food: Food[];
-  all: Entity[];
+  // EIDOLON-V FIX: Removed 'all' to prevent polymorphism de-opt
 }
 
 // EIDOLON-V FIX: Object pool for entity arrays
@@ -40,14 +43,12 @@ class PersistentBatch {
   public bots: Bot[] = [];
   public projectiles: Entity[] = [];
   public food: Food[] = [];
-  public all: Entity[] = [];
 
   clear(): void {
     this.players.length = 0;
     this.bots.length = 0;
     this.projectiles.length = 0;
     this.food.length = 0;
-    this.all.length = 0;
   }
 }
 
@@ -82,35 +83,31 @@ class OptimizedGameEngine {
     // Clear batch arrays (giữ nguyên tham chiếu mảng, chỉ reset length = 0)
     this.batch.clear();
 
-    const { players, bots, projectiles, food, all } = this.batch;
+    const { players, bots, projectiles, food } = this.batch;
 
     // Fill arrays - ZERO ALLOCATION (Không dùng map/filter/concat)
     // 1. Players
     const sourcePlayers = state.players;
     for (let i = 0; i < sourcePlayers.length; i++) {
       players.push(sourcePlayers[i]);
-      all.push(sourcePlayers[i]);
     }
 
     // 2. Bots
     const sourceBots = state.bots;
     for (let i = 0; i < sourceBots.length; i++) {
       bots.push(sourceBots[i]);
-      all.push(sourceBots[i]);
     }
 
     // 3. Projectiles
     const sourceProj = state.projectiles;
     for (let i = 0; i < sourceProj.length; i++) {
       projectiles.push(sourceProj[i]);
-      all.push(sourceProj[i]);
     }
 
     // 4. Food
     const sourceFood = state.food;
     for (let i = 0; i < sourceFood.length; i++) {
       food.push(sourceFood[i]);
-      all.push(sourceFood[i]);
     }
 
     return this.batch;
@@ -127,21 +124,36 @@ class OptimizedGameEngine {
     const world = getCurrentEngine().physicsWorld;
 
     // BƯỚC 1: PUSH (Sync từ Logic game -> Physics World)
-    // Chỉ sync những vật thể di chuyển (Players, Bots)
-    // Food là static hoặc ít di chuyển, Projectile xử lý riêng
+    // Ensures DOD Entities exist and have up-to-date props (like mass/radius changes)
     world.syncBodiesFromBatch(batch.players);
     world.syncBodiesFromBatch(batch.bots);
+    // Projectiles? If projectiles are physics bodies, sync them too.
 
     // BƯỚC 2: EXECUTE (Chạy mô phỏng vật lý SoA)
-    // Hàm này sẽ cập nhật vị trí dựa trên vận tốc và xử lý va chạm chồng lấn (overlap)
-    updatePhysicsWorld(world, dt);
+    // DOD Physics update
+    PhysicsSystem.update(dt);
 
     // BƯỚC 3: PULL (Sync từ Physics World -> Logic game)
-    // Cập nhật lại vị trí hiển thị cho Player/Bot
-    world.syncBodiesToBatch(batch.players);
-    world.syncBodiesToBatch(batch.bots);
+    // Required for Collision Logic (checkUnitCollisions) and Legacy Renderers
+    this.syncBatchFromDOD(batch.players);
+    this.syncBatchFromDOD(batch.bots);
+  }
 
-    // Lưu ý: Projectiles tự quản lý chuyển động trong updateProjectiles
+  private syncBatchFromDOD(entities: Entity[]): void {
+    const tData = TransformStore.data;
+    const pData = PhysicsStore.data;
+
+    for (let i = 0; i < entities.length; i++) {
+      const ent = entities[i];
+      const idx = ent.physicsIndex;
+      if (idx !== undefined) {
+        const baseIdx = idx * 8; // Stride 8
+        ent.position.x = tData[baseIdx];
+        ent.position.y = tData[baseIdx + 1];
+        ent.velocity.x = pData[baseIdx];
+        ent.velocity.y = pData[baseIdx + 1];
+      }
+    }
   }
 
   // EIDOLON-V FIX: Optimized spatial grid updates
@@ -149,23 +161,22 @@ class OptimizedGameEngine {
     const grid = this.spatialGrid;
 
     // EIDOLON-V: Chỉ clear dynamic entities (Player, Bot, Projectile)
-    // Food nằm ở layer tĩnh (layer 2), không clear mỗi frame trừ khi có thay đổi lớn
     grid.clearDynamic();
 
-    // Re-insert dynamic entities
-    // Chỉ insert những thứ CẦN va chạm
-    const dynamicItems = batch.all;
-    for (let i = 0; i < dynamicItems.length; i++) {
-      const ent = dynamicItems[i];
-      // Bỏ qua Food vì Food đã ở static layer (nếu code init đúng)
-      // Nếu Food có di chuyển (magnet), ta cần xử lý riêng hoặc coi nó là dynamic
-      if (!('value' in ent)) {
-        grid.insert(ent);
-      }
+    // Re-insert dynamic entities explicitly by type to avoid Type Pollution
+    const { players, bots, projectiles } = batch;
+
+    for (let i = 0; i < players.length; i++) {
+      grid.insert(players[i]);
     }
 
-    // Xử lý Food bị hút (Magnet) - chuyển thành dynamic tạm thời?
-    // Hiện tại giữ đơn giản: Food tĩnh nằm yên.
+    for (let i = 0; i < bots.length; i++) {
+      grid.insert(bots[i]);
+    }
+
+    for (let i = 0; i < projectiles.length; i++) {
+      grid.insert(projectiles[i]);
+    }
   }
 
   // EIDOLON-V FIX: Batch logic updates
@@ -217,24 +228,24 @@ class OptimizedGameEngine {
 
     // Input handled externally (by useGameSession or NetworkClient)
 
-    // Optimized movement calculation
-    const dx = player.targetPosition.x - player.position.x;
-    const dy = player.targetPosition.y - player.position.y;
-    const distSq = dx * dx + dy * dy;
+    // EIDOLON-V FIX: Read Position from Physics World (DOD)
+    // Position is already synced back in integratePhysics step 3.
+    // So player.position IS correct here.
+    const px = player.position.x;
+    const py = player.position.y;
 
-    // Use squared distance to avoid sqrt operation
-    if (distSq > 25) { // 5px deadzone squared
-      const speed = player.maxSpeed * (player.statusEffects.speedBoost || 1);
-      const dist = Math.sqrt(distSq);
-
-      // Normalize and apply velocity
-      player.velocity.x = (dx / dist) * speed;
-      player.velocity.y = (dy / dist) * speed;
-    } else {
-      // Apply friction when close to target
-      player.velocity.x *= 0.9;
-      player.velocity.y *= 0.9;
-    }
+    // EIDOLON-V FIX: Unified Movement Logic (DOD)
+    // Use the same logic as Prediction/Re-simulation
+    MovementSystem.applyInput(
+      player.position,
+      player.velocity,
+      player.targetPosition,
+      {
+        maxSpeed: player.maxSpeed,
+        speedMultiplier: player.statusMultipliers.speed || 1
+      },
+      dt
+    );
 
     // Apply skill
     if (player.inputs?.space) {
@@ -243,7 +254,7 @@ class OptimizedGameEngine {
 
     // EIDOLON-V FIX: Ported Regen & Cooldown Logic
     if (player.currentHealth < player.maxHealth) {
-      player.currentHealth += player.statusEffects.regen * dt;
+      player.currentHealth += player.statusScalars.regen * dt;
     }
     player.lastEatTime += dt;
     player.lastHitTime += dt;
@@ -267,30 +278,49 @@ class OptimizedGameEngine {
     this.checkUnitCollisions(player, state, dt);
   }
 
-  // EIDOLON-V FIX: Magnet Logic
+  // EIDOLON-V FIX: Magnet Logic (Optimized)
   private updateMagnetLogic(player: Player, state: GameState, dt: number): void {
+    const rawGrid = (this.spatialGrid as any).grid;
+    if (!rawGrid) return;
+
     const catalystSense = player.tattoos.includes(TattooId.CatalystSense);
     const magnetRadius = player.magneticFieldRadius || 0;
 
     if (magnetRadius > 0 || catalystSense) {
-      const catalystRange = (player.statusEffects.catalystSenseRange || 2.0) * 130;
+      const catalystRange = (player.statusScalars.catalystSenseRange || 2.0) * 130;
       const searchRadius = catalystSense ? Math.max(catalystRange, magnetRadius) : magnetRadius;
+
+      const indices: number[] = [];
+      rawGrid.queryRadiusInto(player.position.x, player.position.y, searchRadius, indices);
+
       const searchRadiusSq = searchRadius * searchRadius;
       const pullPower = 120 * dt;
+      const tData = TransformStore.data;
 
-      // Note: In optimized engine, we might want to use the spatial grid efficiently
-      // But for now, parity first.
-      const nearby = this.spatialGrid.getNearby(player, searchRadius);
+      const count = indices.length;
+      for (let i = 0; i < count; i++) {
+        const idx = indices[i];
+        if (idx === player.physicsIndex) continue;
 
-      for (let i = 0; i < nearby.length; i++) {
-        const entity = nearby[i];
+        // Lookup Object to check if it's Food/Catalyst
+        // We can't tell just from indices if it's Food vs Projectile vs Bot efficiently without Flag bitmask?
+        // Optimization: Use StateStore.flags checking! 
+        // EntityFlags.FOOD = 1 << 4
+
+        // EIDOLON-V OPT: Bitmask check
+        // We need to import StateStore and EntityFlags first? They are not imported in this file yet?
+        // Wait, OptimizedEngine imports TransformStore, PhysicsStore, EntityLookup. I should import StateStore and EntityFlags if I want to use them.
+        // For now, Lookup is safe enough.
+
+        const entity = EntityLookup[idx];
+        if (!entity) continue;
         if (!('value' in entity)) continue; // Not food
         const f = entity as unknown as any;
         if (f.isDead) continue;
 
         if (catalystSense && f.kind !== 'catalyst' && magnetRadius <= 0) continue;
 
-        const dx = player.position.x - f.position.x;
+        const dx = player.position.x - f.position.x; // Use object position or DOD? Object is synced.
         const dy = player.position.y - f.position.y;
         const distSq = dx * dx + dy * dy;
 
@@ -304,31 +334,58 @@ class OptimizedGameEngine {
     }
   }
 
-  // EIDOLON-V FIX: Unit Collision
+  // EIDOLON-V FIX: Unit Collision (Optimized Index-Based)
   private checkUnitCollisions(entity: Player | Bot, state: GameState, dt: number): void {
-    const nearby = this.spatialGrid.getNearby(entity, 300); // 300 range check
-    for (let i = 0; i < nearby.length; i++) {
-      const other = nearby[i];
-      if (other === entity) continue;
-      if (entity.isDead || other.isDead) continue;
+    const rawGrid = (this.spatialGrid as any).grid; // Access raw SpatialHashGrid
+    if (!rawGrid) return; // Should not happen if initialized correctly
 
-      // Food collision
-      if ('value' in other) {
-        const food = other as Food;
-        const dx = entity.position.x - food.position.x;
-        const dy = entity.position.y - food.position.y;
-        const distSq = dx * dx + dy * dy;
-        const minDist = entity.radius + food.radius;
+    const indices: number[] = [];
+    const tData = TransformStore.data;
+    const pData = PhysicsStore.data;
 
-        if (distSq < minDist * minDist) {
-          consumePickup(entity, food, state);
+    // 1. Query Indices (Zero Alloc)
+    // Range 300 for awareness/combat
+    rawGrid.queryRadiusInto(entity.position.x, entity.position.y, 300, indices);
+
+    const count = indices.length;
+    for (let i = 0; i < count; i++) {
+      const idx = indices[i];
+
+      // Skip self
+      if (idx === entity.physicsIndex) continue;
+
+      // 2. DOD Distance Check (Zero Object Access)
+      const tIdx = idx * 8;
+      const pIdx = idx * 8;
+
+      const ox = tData[tIdx];
+      const oy = tData[tIdx + 1];
+      const or = pData[pIdx + 4]; // radius
+
+      const dx = entity.position.x - ox;
+      const dy = entity.position.y - oy;
+      const distSq = dx * dx + dy * dy;
+
+      // Broad phase check (Sum of radii)
+      const minDist = entity.radius + or;
+
+      if (distSq < minDist * minDist) {
+        // 3. Resolve Object (Only on Collision)
+        const other = EntityLookup[idx];
+        if (!other) continue;
+
+        if (other.isDead) continue;
+
+        // Food collision
+        if ('value' in other) {
+          consumePickup(entity, other as Food, state);
+          continue;
         }
-        continue;
-      }
 
-      // Combat Collision
-      if ('score' in other) { // Is Unit
-        resolveCombat(entity, other as Player | Bot, dt, state, true, true);
+        // Unit Collision
+        if ('score' in other) {
+          resolveCombat(entity, other as Player | Bot, dt, state, true, true);
+        }
       }
     }
   }
@@ -370,18 +427,43 @@ class OptimizedGameEngine {
   }
 
   private checkProjectileCollision(projectile: Entity, state: GameState): Entity | null {
-    const nearby = this.spatialGrid.getNearby(projectile);
+    const rawGrid = (this.spatialGrid as any).grid;
+    if (!rawGrid) return null;
 
-    for (let i = 0; i < nearby.length; i++) {
-      const entity = nearby[i];
-      if ((projectile as any).ownerId && entity.id === (projectile as any).ownerId) continue;
+    const indices: number[] = [];
+    const tData = TransformStore.data;
+    const pData = PhysicsStore.data;
 
-      const dx = entity.position.x - projectile.position.x;
-      const dy = entity.position.y - projectile.position.y;
+    // Query nearby
+    rawGrid.queryRadiusInto(projectile.position.x, projectile.position.y, 50, indices); // 50 seems safe margin
+
+    const count = indices.length;
+    for (let i = 0; i < count; i++) {
+      const idx = indices[i];
+
+      // Skip self (if projectile was in grid? usually it is)
+      if (idx === projectile.physicsIndex) continue;
+
+      // DOD Distance Check
+      const tIdx = idx * 8;
+      const pIdx = idx * 8;
+
+      const ox = tData[tIdx];
+      const oy = tData[tIdx + 1];
+      const or = pData[pIdx + 4];
+
+      const dx = ox - projectile.position.x;
+      const dy = oy - projectile.position.y;
       const distSq = dx * dx + dy * dy;
-      const collisionDist = entity.radius + projectile.radius;
+      const collisionDist = or + projectile.radius;
 
       if (distSq < collisionDist * collisionDist) {
+        const entity = EntityLookup[idx];
+        if (!entity) continue;
+
+        // Logic Check: Owner
+        if ((projectile as any).ownerId && entity.id === (projectile as any).ownerId) continue;
+
         return entity;
       }
     }
@@ -430,7 +512,15 @@ class OptimizedGameEngine {
     }
 
     // Remove dead entities
-    filterInPlace(state.bots, b => !b.isDead);
+    filterInPlace(state.bots, b => {
+      if (b.isDead) {
+        // EIDOLON-V FIX: Cleanup events/synergies to prevent ID reuse bugs
+        const { TattooEventManager } = require('../cjr/tattooEvents');
+        TattooEventManager.triggerDeactivate(b.id);
+        return false;
+      }
+      return true;
+    });
     filterInPlace(state.particles, p => p.life > 0);
     filterInPlace(state.delayedActions, a => a.timer > 0);
   }

@@ -5,7 +5,11 @@ export class TattooVFXSystem {
 
   playTattooActivationVFX(player: Player, tattooId: TattooId, state: GameState): void {
     // Push Event: "tattoo:playerId:tattooId"
-    state.vfxEvents.push(`tattoo:${player.id}:${tattooId}`);
+    const { vfxSystem } = require('./vfxSystem');
+    // Type 7 = Tattoo Proc
+    // Note: Data is number, but we need tattoo ID. 
+    // Currently dropped or need to map Enum to Int in future. For now visual cue generic.
+    vfxSystem.emitVFX(state, 7, player.position.x, player.position.y, 0, player.id);
 
     // Floating Text
     state.floatingTexts.push({

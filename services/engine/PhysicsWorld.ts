@@ -1,62 +1,44 @@
 
+import { entityManager } from './dod/EntityManager';
+import { TransformStore, PhysicsStore, StateStore } from './dod/ComponentStores';
+import { EntityFlags } from './dod/EntityFlags';
+
 export class PhysicsWorld {
-    public capacity: number;
-    public count: number;
+    // Adapter properties
+    // We don't expose raw Float32Arrays here anymore because of Stride differences.
+    // Consumers must use TransformStore directly or helper methods.
 
-    // Structure of Arrays (SoA)
-    // 0: x, 1: y
-    public positions: Float32Array;
-    public velocities: Float32Array;
-    public forces: Float32Array;
-
-    // Scalars
-    public radii: Float32Array;
-    public invMass: Float32Array; // 1/mass for faster mult
-    public flags: Uint8Array; // 1 = Active, 2 = Solid, 4 = Static
-
-    // ID Mapping (EntityID string -> Index)
+    // ID Mapping (EntityID string -> DOD Index)
     public idToIndex: Map<string, number>;
-    public indexToId: string[];
-    public freeIndices: number[];
+    public indexToId: Map<number, string>; // Reverse map for collision callbacks?
 
-    constructor(capacity: number = 500) {
-        this.capacity = capacity;
-        this.count = 0;
+    public capacity: number = 4096; // Delegate to MAX_ENTITIES
 
-        this.positions = new Float32Array(capacity * 2);
-        this.velocities = new Float32Array(capacity * 2);
-        this.forces = new Float32Array(capacity * 2);
-        this.radii = new Float32Array(capacity);
-        this.invMass = new Float32Array(capacity);
-        this.flags = new Uint8Array(capacity);
-
+    constructor() {
         this.idToIndex = new Map();
-        this.indexToId = new Array(capacity).fill('');
-        this.freeIndices = [];
-        for (let i = capacity - 1; i >= 0; i--) this.freeIndices.push(i);
+        this.indexToId = new Map();
     }
 
-    addBody(id: string, x: number, y: number, radius: number, mass: number, isSolid: boolean = true) {
+    addBody(id: string, x: number, y: number, radius: number, mass: number, isSolid: boolean = true): number {
         if (this.idToIndex.has(id)) return this.idToIndex.get(id)!;
 
-        // EIDOLON-V FIX: Grow instead of returning -1
-        if (this.freeIndices.length === 0) {
-            this.grow();
+        // Allocate DOD ID
+        const idx = entityManager.createEntity();
+        if (idx === -1) {
+            console.error('PhysicsWorld: Max entities reached');
+            return -1;
         }
 
-        const idx = this.freeIndices.pop()!;
         this.idToIndex.set(id, idx);
-        this.indexToId[idx] = id;
+        this.indexToId.set(idx, id);
 
-        this.positions[idx * 2] = x;
-        this.positions[idx * 2 + 1] = y;
-        this.velocities[idx * 2] = 0;
-        this.velocities[idx * 2 + 1] = 0;
-        this.radii[idx] = radius;
-        this.invMass[idx] = mass > 0 ? 1 / mass : 0;
+        // Init Data
+        TransformStore.set(idx, x, y, 0, 1);
+        PhysicsStore.set(idx, 0, 0, mass, radius);
 
-        if (isSolid) this.flags[idx] |= 2;
-        this.flags[idx] |= 1; // Active
+        let flags = EntityFlags.ACTIVE;
+        if (isSolid) flags |= EntityFlags.OBSTACLE; // Or similar
+        StateStore.flags[idx] = flags;
 
         return idx;
     }
@@ -65,149 +47,88 @@ export class PhysicsWorld {
         const idx = this.idToIndex.get(id);
         if (idx === undefined) return;
 
-        this.flags[idx] = 0; // Inactive
+        StateStore.flags[idx] = 0; // Inactive
+        entityManager.removeEntity(idx);
         this.idToIndex.delete(id);
-        this.indexToId[idx] = '';
-        this.freeIndices.push(idx);
+        this.indexToId.delete(idx);
     }
 
-    // EIDOLON-V: Dynamic capacity growth when pool exhausted
-    private grow(): void {
-        const newCapacity = this.capacity * 2;
-
-        // Create new arrays with double capacity
-        const newPositions = new Float32Array(newCapacity * 2);
-        const newVelocities = new Float32Array(newCapacity * 2);
-        const newForces = new Float32Array(newCapacity * 2);
-        const newRadii = new Float32Array(newCapacity);
-        const newInvMass = new Float32Array(newCapacity);
-        const newFlags = new Uint8Array(newCapacity);
-        const newIndexToId = new Array(newCapacity).fill('');
-
-        // Copy existing data
-        newPositions.set(this.positions);
-        newVelocities.set(this.velocities);
-        newForces.set(this.forces);
-        newRadii.set(this.radii);
-        newInvMass.set(this.invMass);
-        newFlags.set(this.flags);
-        for (let i = 0; i < this.capacity; i++) {
-            newIndexToId[i] = this.indexToId[i];
-        }
-
-        // Add new free indices (in reverse for stack behavior)
-        for (let i = newCapacity - 1; i >= this.capacity; i--) {
-            this.freeIndices.push(i);
-        }
-
-        // Swap arrays
-        this.positions = newPositions;
-        this.velocities = newVelocities;
-        this.forces = newForces;
-        this.radii = newRadii;
-        this.invMass = newInvMass;
-        this.flags = newFlags;
-        this.indexToId = newIndexToId;
-        this.capacity = newCapacity;
-
-        console.log(`[PhysicsWorld] Capacity grown to ${newCapacity}`);
-    }
-
-
-    // Helper to sync from Entity object
+    // Sync from Entity object
     syncBody(id: string, x: number, y: number, vx: number, vy: number) {
         const idx = this.idToIndex.get(id);
         if (idx !== undefined) {
-            this.positions[idx * 2] = x;
-            this.positions[idx * 2 + 1] = y;
-            this.velocities[idx * 2] = vx;
-            this.velocities[idx * 2 + 1] = vy;
+            const tData = TransformStore.data;
+            const pData = PhysicsStore.data;
+
+            // Update Position?
+            // Usually we only sync Velocity from Logic -> Physics
+            // But for teleportation/initialization we might sync pos.
+            tData[idx * 8] = x;
+            tData[idx * 8 + 1] = y;
+
+            pData[idx * 8] = vx;
+            pData[idx * 8 + 1] = vy;
         }
     }
 
-    // EIDOLON-V: Direct index sync (no Map lookup)
-    syncBodyDirect(idx: number, x: number, y: number, vx: number, vy: number): void {
-        this.positions[idx * 2] = x;
-        this.positions[idx * 2 + 1] = y;
-        this.velocities[idx * 2] = vx;
-        this.velocities[idx * 2 + 1] = vy;
-    }
-
-    syncBackDirect(idx: number, out: { x: number, y: number, vx: number, vy: number }): void {
-        out.x = this.positions[idx * 2];
-        out.y = this.positions[idx * 2 + 1];
-        out.vx = this.velocities[idx * 2];
-        out.vy = this.velocities[idx * 2 + 1];
-    }
-
-    // Accessors for Cursor Pattern
+    // Accessors
     getX(id: string): number {
         const idx = this.idToIndex.get(id);
-        return idx !== undefined ? this.positions[idx * 2] : 0;
+        return idx !== undefined ? TransformStore.data[idx * 8] : 0;
     }
 
     getY(id: string): number {
         const idx = this.idToIndex.get(id);
-        return idx !== undefined ? this.positions[idx * 2 + 1] : 0;
+        return idx !== undefined ? TransformStore.data[idx * 8 + 1] : 0;
     }
 
     getRadius(id: string): number {
         const idx = this.idToIndex.get(id);
-        return idx !== undefined ? this.radii[idx] : 0;
+        return idx !== undefined ? PhysicsStore.data[idx * 8 + 4] : 0;
     }
 
-    // Sync from PhysicsWorld back to Entity object (for rendering compatibility)
-    syncBackToEntity(id: string, entity: { position: { x: number, y: number }, velocity: { x: number, y: number } }) {
+    getVx(id: string): number {
         const idx = this.idToIndex.get(id);
-        if (idx !== undefined) {
-            entity.position.x = this.positions[idx * 2];
-            entity.position.y = this.positions[idx * 2 + 1];
-            entity.velocity.x = this.velocities[idx * 2];
-            entity.velocity.y = this.velocities[idx * 2 + 1];
-        }
+        return idx !== undefined ? PhysicsStore.data[idx * 8] : 0;
     }
-    // --- EIDOLON-V: BATCH SYNCHRONIZATION ---
 
-    // 1. PUSH: Đẩy dữ liệu từ Entity (JS Object) vào SoA (Float32Array)
-    // Dùng trước khi tính toán vật lý (step)
+    getVy(id: string): number {
+        const idx = this.idToIndex.get(id);
+        return idx !== undefined ? PhysicsStore.data[idx * 8 + 1] : 0;
+    }
+
+    // Batch Sync helpers (Legacy support)
     syncBodiesFromBatch(entities: { id: string; physicsIndex?: number; position: { x: number, y: number }; velocity: { x: number, y: number } }[]) {
+        // This was the "Push" step in OptimizedEngine.
+        const tData = TransformStore.data;
+        const pData = PhysicsStore.data;
+
         for (let i = 0; i < entities.length; i++) {
             const ent = entities[i];
             let idx = ent.physicsIndex;
 
-            // Fallback to Map lookup if index missing
             if (idx === undefined) {
                 idx = this.idToIndex.get(ent.id);
+                // Auto-create body
+                if (idx === undefined) {
+                    const r = (ent as any).radius || 20;
+                    const mass = 1;
+                    idx = this.addBody(ent.id, ent.position.x, ent.position.y, r, mass);
+                }
+                if (idx !== -1) ent.physicsIndex = idx;
             }
 
-            if (idx !== undefined) {
-                // Chỉ cập nhật Vận tốc (Velocity) và Vị trí (Position) hiện tại vào Physics World
-                // Để Physics World xử lý va chạm dựa trên vị trí mới nhất
-                this.positions[idx * 2] = ent.position.x;
-                this.positions[idx * 2 + 1] = ent.position.y;
-                this.velocities[idx * 2] = ent.velocity.x;
-                this.velocities[idx * 2 + 1] = ent.velocity.y;
-            }
-        }
-    }
+            if (idx !== undefined && idx !== -1) {
+                // Update Pos/Vel from Object
+                tData[idx * 8] = ent.position.x;
+                tData[idx * 8 + 1] = ent.position.y;
+                pData[idx * 8] = ent.velocity.x;
+                pData[idx * 8 + 1] = ent.velocity.y;
 
-    // 2. PULL: Kéo kết quả từ SoA về lại Entity
-    // Dùng sau khi tính toán vật lý xong
-    syncBodiesToBatch(entities: { id: string; physicsIndex?: number; position: { x: number, y: number }; velocity: { x: number, y: number } }[]) {
-        for (let i = 0; i < entities.length; i++) {
-            const ent = entities[i];
-            let idx = ent.physicsIndex;
-
-            // Fallback to Map lookup if index missing
-            if (idx === undefined) {
-                idx = this.idToIndex.get(ent.id);
-            }
-
-            if (idx !== undefined) {
-                ent.position.x = this.positions[idx * 2];
-                ent.position.y = this.positions[idx * 2 + 1];
-                ent.velocity.x = this.velocities[idx * 2];
-                ent.velocity.y = this.velocities[idx * 2 + 1];
+                // Also update Radius if it changed (e.g. growth)
+                if ((ent as any).radius) {
+                    pData[idx * 8 + 4] = (ent as any).radius;
+                }
             }
         }
     }

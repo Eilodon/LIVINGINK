@@ -9,7 +9,7 @@ import { Player, GameState } from '../../types';
 import { TattooId } from './cjrTypes';
 import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';
-// import './synergyStatusEffects'; // REMOVED (Merged into types/player.ts) // Import status effects extensions
+import { StatusFlag, TattooFlag } from '../engine/statusFlags'; // EIDOLON-V: Import Flags
 
 // ============================================
 // SYNERGY VISUAL EFFECTS HELPER
@@ -22,9 +22,11 @@ const createSynergyVisualEffect = (player: Player, config: {
   duration: number;
 }, state: GameState): void => {
 
-  // EIDOLON-V: Push Synergy Event
-  // "synergy:x:y:color:pattern"
-  state.vfxEvents.push(`synergy:${player.position.x}:${player.position.y}:${config.particleColor}:${config.pattern}`);
+  // EIDOLON-V: Push Synergy Event (Type 8)
+  // We encode visual config into the 'id' field for now (Temporary until Enums)
+  const { vfxSystem } = require('../vfx/vfxSystem');
+  const meta = `${config.particleColor}:${config.pattern}:${config.particleCount}:${config.duration}`;
+  vfxSystem.emitVFX(state, 8, player.position.x, player.position.y, 0, meta);
 };
 
 // ============================================
@@ -62,9 +64,9 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'basic',
     effect: (player, state) => {
       // Apply purification effect
-      player.statusEffects.neutralPurification = true;
-      player.statusEffects.neutralMassBonus = 1.5; // Enhanced from 1.25
-      player.statusEffects.purificationRadius = 150;
+      player.tattooFlags |= TattooFlag.NEUTRAL_PURIFICATION;
+      player.statusMultipliers.neutralMass = 1.5; // Enhanced from 1.25
+      player.statusScalars.purificationRadius = 150;
 
       // Create visual effect
       createSynergyVisualEffect(player, {
@@ -94,9 +96,9 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'basic',
     effect: (player, state) => {
       // Apply explosive speed effect
-      player.statusEffects.overdriveExplosive = true;
-      player.statusEffects.explosiveSpeed = 1.3;
-      player.statusEffects.explosionRadius = 100;
+      player.tattooFlags |= TattooFlag.OVERDRIVE_EXPLOSIVE;
+      player.statusMultipliers.explosiveSpeed = 1.3;
+      player.statusScalars.explosionRadius = 100;
 
       createSynergyVisualEffect(player, {
         particleColor: '#FF6B35',
@@ -126,17 +128,17 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'advanced',
     effect: (player, state) => {
       // Apply golden attraction effect
-      player.statusEffects.goldenAttraction = true;
-      player.statusEffects.catalystAttractionRadius = 300;
-      player.statusEffects.goldenMagneticForce = 2.0;
+      player.tattooFlags |= TattooFlag.GOLDEN_ATTRACTION;
+      player.statusScalars.catalystAttractionRadius = 300;
+      player.statusMultipliers.goldenMagneticForce = 2.0;
 
       // Attract nearby catalysts
       state.food.forEach(food => {
         if (food.isDead || food.kind !== 'catalyst') return;
         const dist = Math.hypot(food.position.x - player.position.x, food.position.y - player.position.y);
-        const attrRadius = player.statusEffects.catalystAttractionRadius || 0;
+        const attrRadius = player.statusScalars.catalystAttractionRadius || 0;
         if (dist < attrRadius) {
-          const force = (player.statusEffects.goldenMagneticForce || 0) * 50;
+          const force = (player.statusMultipliers.goldenMagneticForce || 0) * 50;
           const dx = player.position.x - food.position.x;
           const dy = player.position.y - food.position.y;
           food.velocity.x += (dx / dist) * force;
@@ -171,9 +173,9 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'advanced',
     effect: (player, state) => {
       // Apply elemental balance
-      player.statusEffects.elementalBalance = true;
-      player.statusEffects.solventShieldPower = 2.5; // Enhanced from 2.0
-      player.statusEffects.shieldSolventSynergy = true;
+      player.tattooFlags |= TattooFlag.ELEMENTAL_BALANCE;
+      player.statusScalars.solventShieldPower = 2.5; // Enhanced from 2.0
+      player.tattooFlags |= TattooFlag.SHIELD_SOLVENT_SYNERGY;
 
       createSynergyVisualEffect(player, {
         particleColor: '#00BCD4',
@@ -201,10 +203,10 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     description: 'Perfect guard window grants a stronger shield and a short speed burst',
     tier: 'advanced',
     effect: (player, state) => {
-      player.statusEffects.shielded = true;
-      player.statusEffects.commitShield = Math.max(player.statusEffects.commitShield || 0, 4.0);
-      player.statusEffects.tempSpeedBoost = Math.max(player.statusEffects.tempSpeedBoost || 1, 1.15);
-      player.statusEffects.tempSpeedTimer = Math.max(player.statusEffects.tempSpeedTimer || 0, 3.5);
+      player.statusFlags |= StatusFlag.SHIELDED;
+      player.statusScalars.commitShield = Math.max(player.statusScalars.commitShield || 0, 4.0);
+      player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed || 1, 1.15);
+      player.statusTimers.tempSpeed = Math.max(player.statusTimers.tempSpeed || 0, 3.5);
 
       createSynergyVisualEffect(player, {
         particleColor: '#F59E0B',
@@ -232,10 +234,10 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     description: 'Perfect matches surge color focus and pull nearby catalysts',
     tier: 'advanced',
     effect: (player, state) => {
-      player.statusEffects.colorBoostMultiplier = Math.max(player.statusEffects.colorBoostMultiplier || 1, 1.8);
-      player.statusEffects.colorBoostTimer = Math.max(player.statusEffects.colorBoostTimer || 0, 4.0);
+      player.statusMultipliers.colorBoost = Math.max(player.statusMultipliers.colorBoost || 1, 1.8);
+      player.statusTimers.colorBoost = Math.max(player.statusTimers.colorBoost || 0, 4.0);
       player.magneticFieldRadius = Math.max(player.magneticFieldRadius || 0, 180);
-      player.statusEffects.magnetTimer = Math.max(player.statusEffects.magnetTimer || 0, 3.0);
+      player.statusTimers.magnet = Math.max(player.statusTimers.magnet || 0, 3.0);
 
       state.food.forEach(food => {
         if (food.isDead || food.kind !== 'catalyst') return;
@@ -277,10 +279,10 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'master',
     effect: (player, state) => {
       // Apply chromatic mastery
-      player.statusEffects.colorImmunity = true;
-      player.statusEffects.chromaticImmunityDuration = 5.0;
-      player.statusEffects.perfectMatchBonus = 2.0; // Enhanced from 1.5
-      player.statusEffects.catalystMasteryRadius = 500;
+      player.tattooFlags |= TattooFlag.COLOR_IMMUNITY;
+      player.statusTimers.chromaticImmunity = 5.0;
+      player.statusMultipliers.perfectMatch = 2.0; // Enhanced from 1.5
+      player.statusScalars.catalystMasteryRadius = 500;
 
       createSynergyVisualEffect(player, {
         particleColor: '#9C27B0',
@@ -311,9 +313,9 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'master',
     effect: (player, state) => {
       // Apply kinetic explosion
-      player.statusEffects.kineticExplosion = true;
-      player.statusEffects.explosionDamage = 2.0;
-      player.statusEffects.shieldPiercing = true;
+      player.tattooFlags |= TattooFlag.KINETIC_EXPLOSION;
+      player.statusMultipliers.explosionDamage = 2.0;
+      player.tattooFlags |= TattooFlag.SHIELD_PIERCING;
 
       createSynergyVisualEffect(player, {
         particleColor: '#FF5722',
@@ -359,8 +361,8 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
         state.food.push(drop);
       }
 
-      player.statusEffects.tempSpeedBoost = Math.max(player.statusEffects.tempSpeedBoost || 1, 1.2);
-      player.statusEffects.tempSpeedTimer = Math.max(player.statusEffects.tempSpeedTimer || 0, 3.0);
+      player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed || 1, 1.2);
+      player.statusTimers.tempSpeed = Math.max(player.statusTimers.tempSpeed || 0, 3.0);
 
       createSynergyVisualEffect(player, {
         particleColor: '#EF4444',
@@ -391,11 +393,11 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'legendary',
     effect: (player, state) => {
       // Apply absolute mastery
-      player.statusEffects.absoluteMastery = true;
-      player.statusEffects.colorControl = 1.0; // Full control
-      player.statusEffects.perfectMatchThreshold = 0.7; // Lowered from 0.85
-      player.statusEffects.catalystGuarantee = true; // Always get catalysts
-      player.statusEffects.neutralGodMode = true; // Neutral becomes super
+      player.tattooFlags |= TattooFlag.ABSOLUTE_MASTERY;
+      player.statusScalars.colorControl = 1.0; // Full control
+      player.statusScalars.perfectMatchThreshold = 0.7; // Lowered from 0.85
+      player.tattooFlags |= TattooFlag.CATALYST_GUARANTEE; // Always get catalysts
+      player.tattooFlags |= TattooFlag.NEUTRAL_GOD_MODE; // Neutral becomes super
 
       createSynergyVisualEffect(player, {
         particleColor: '#FFD700',
@@ -426,10 +428,10 @@ const TATTOO_SYNERGIES: TattooSynergy[] = [
     tier: 'legendary',
     effect: (player, state) => {
       // Apply temporal distortion
-      player.statusEffects.temporalDistortion = true;
-      player.statusEffects.timeManipulation = 0.5; // 50% time slow
-      player.statusEffects.speedAmplifier = 3.0;
-      player.statusEffects.explosionTimeDilation = 2.0;
+      player.tattooFlags |= TattooFlag.TEMPORAL_DISTORTION;
+      player.statusScalars.timeManipulation = 0.5; // 50% time slow
+      player.statusMultipliers.speedAmplifier = 3.0;
+      player.statusMultipliers.explosionTimeDilation = 2.0;
 
       createSynergyVisualEffect(player, {
         particleColor: '#E91E63',
@@ -625,35 +627,52 @@ export class TattooSynergyManager {
     if (!player) return;
 
     // Remove all synergy effects
-    delete player.statusEffects.neutralPurification;
-    delete player.statusEffects.purificationRadius;
-    delete player.statusEffects.overdriveExplosive;
-    delete player.statusEffects.explosiveSpeed;
-    delete player.statusEffects.explosionRadius;
-    delete player.statusEffects.goldenAttraction;
-    delete player.statusEffects.catalystAttractionRadius;
-    delete player.statusEffects.goldenMagneticForce;
-    delete player.statusEffects.elementalBalance;
-    delete player.statusEffects.solventShieldPower;
-    delete player.statusEffects.shieldSolventSynergy;
-    delete player.statusEffects.colorImmunity;
-    delete player.statusEffects.chromaticImmunityDuration;
-    delete player.statusEffects.catalystMasteryRadius;
-    delete player.statusEffects.catalystGuarantee;
-    delete player.statusEffects.neutralGodMode;
-    delete player.statusEffects.kineticExplosion;
-    delete player.statusEffects.explosionDamage;
-    delete player.statusEffects.shieldPiercing;
-    delete player.statusEffects.absoluteMastery;
-    delete player.statusEffects.colorControl;
-    delete player.statusEffects.perfectMatchThreshold;
-    delete player.statusEffects.catalystGuarantee;
-    delete player.statusEffects.neutralGodMode;
-    delete player.statusEffects.temporalDistortion;
-    delete player.statusEffects.timeManipulation;
-    delete player.statusEffects.speedAmplifier;
-    delete player.statusEffects.explosionTimeDilation;
+    // EIDOLON-V FIX: Reset flags and values instead of delete
+    player.tattooFlags &= ~TattooFlag.NEUTRAL_PURIFICATION;
+    player.statusMultipliers.neutralMass = 1; // Reset to 1 (Multipliers default)
+    player.statusScalars.purificationRadius = 0;
+
+    player.tattooFlags &= ~TattooFlag.OVERDRIVE_EXPLOSIVE;
+    player.statusMultipliers.explosiveSpeed = 1;
+    player.statusScalars.explosionRadius = 0;
+
+    player.tattooFlags &= ~TattooFlag.GOLDEN_ATTRACTION;
+    player.statusScalars.catalystAttractionRadius = 0;
+    player.statusMultipliers.goldenMagneticForce = 0; // Value or mult? Logic was `* (value || 0)`. So 0.
+
+    player.tattooFlags &= ~TattooFlag.ELEMENTAL_BALANCE;
+    player.statusScalars.solventShieldPower = 0;
+    player.tattooFlags &= ~TattooFlag.SHIELD_SOLVENT_SYNERGY;
+
+    player.tattooFlags &= ~TattooFlag.COLOR_IMMUNITY;
+    player.statusTimers.chromaticImmunity = 0;
+    player.statusMultipliers.perfectMatch = 1;
+    player.statusScalars.catalystMasteryRadius = 0;
+
+    player.tattooFlags &= ~TattooFlag.CATALYST_GUARANTEE;
+    player.tattooFlags &= ~TattooFlag.NEUTRAL_GOD_MODE;
+
+    player.tattooFlags &= ~TattooFlag.KINETIC_EXPLOSION;
+    player.statusMultipliers.explosionDamage = 1;
+    player.tattooFlags &= ~TattooFlag.SHIELD_PIERCING;
+
+    player.tattooFlags &= ~TattooFlag.ABSOLUTE_MASTERY;
+    player.statusScalars.colorControl = 0;
+    player.statusScalars.perfectMatchThreshold = 0.8; // Reset to default
+
+    player.tattooFlags &= ~TattooFlag.TEMPORAL_DISTORTION;
+    player.statusScalars.timeManipulation = 0;
+    player.statusMultipliers.speedAmplifier = 0; // Logic `* (amp || 0)` or `1`? Default should be safe.
+    player.statusMultipliers.explosionTimeDilation = 0;
+
+    // Reset Scalars that don't have explicit flags but were modified
+    // EIDOLON-V: Decay handles tempSpeed naturally via statusTimers
+    // Actually Logic handles tempSpeedBoost decay, so force reset might interfere if multiple buffs stack?
+    // For now, assume synergies handle their own resets or rely on decay.
+    // Ideally we should subtract, but "delete" implies full removal.
+    // We'll leave shared scalars to decay logic if they are timed.
   }
+
 
   /**
    * Create notification for synergy activation
@@ -721,6 +740,29 @@ export class TattooSynergyManager {
     }
 
     return effects;
+  }
+
+  /**
+   * EIDOLON-V FIX: Cleanup all synergies for a specific entity
+   * Called when entity dies or is deactivated to prevent ID recycling bugs
+   */
+  cleanupEntity(playerId: string): void {
+    // Find all effects for this player
+    const toRemove: string[] = [];
+    for (const [effectId, effect] of this.activeSynergies.entries()) {
+      if (effect.playerId === playerId) {
+        toRemove.push(effectId);
+      }
+    }
+
+    // Remove them
+    toRemove.forEach(effectId => {
+      this.activeSynergies.delete(effectId);
+    });
+
+    // Note: We don't need to call removeSynergyEffects() because the entity is dead/resetting anyway.
+    // The flags/stats on the entity object will be reset by the ObjectPool or Factory.
+    // We just need to clear the Manager's references.
   }
 }
 

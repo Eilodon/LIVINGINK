@@ -9,9 +9,39 @@ export class VFXSystem {
     this.screenShake = new ScreenShakeController();
   }
 
+  emitVFX(state: GameState, type: number, x: number, y: number, data: number = 0, id: string = ''): void {
+    const MAX_EVENTS = 50;
+    // Check if vfxEvents is initialized (some tests or legacy states might validly fail this if not migrated)
+    if (!state.vfxEvents || !Array.isArray(state.vfxEvents)) return;
+
+    // Safety for legacy "push" array that hasn't been re-inited as object pool
+    if (state.vfxEvents.length !== MAX_EVENTS) {
+      // Optionally migrating on the fly, but safer to assume it's set up
+      // If it is string[], this will crash or type error at runtime, but we changed types.
+      // Runtime check:
+      if (state.vfxEvents.length === 0 || typeof state.vfxEvents[0] !== 'object') {
+        // Reset
+        state.vfxEvents = Array.from({ length: MAX_EVENTS }, () => ({ type: 0, x: 0, y: 0, data: 0, id: '', seq: 0 }));
+        state.vfxHead = 0;
+      }
+    }
+
+    const idx = (state.vfxHead || 0) % MAX_EVENTS;
+    const evt = state.vfxEvents[idx];
+    if (evt) {
+      evt.type = type;
+      evt.x = x;
+      evt.y = y;
+      evt.data = data;
+      evt.id = id;
+      evt.seq = Date.now();
+    }
+    state.vfxHead = ((state.vfxHead || 0) + 1) % MAX_EVENTS;
+  }
+
   playRingCommitVFX(player: Player, ringId: RingId, state: GameState): void {
-    // EIDOLON-V: Push Event String "commit:x:y:id:ringId"
-    state.vfxEvents.push(`commit:${player.position.x}:${player.position.y}:${player.id}:${ringId}`);
+    // 1 = Ring Commit
+    this.emitVFX(state, 1, player.position.x, player.position.y, ringId, player.id);
 
     if (typeof window !== 'undefined') {
       audioEngine.play(`ring_commit_${ringId}`);

@@ -12,6 +12,7 @@ import { calcMatchPercent } from '../../cjr/colorMath';
 import { applySkill } from './skills';
 import { updateBotPersonality, assignRandomPersonality } from '../../cjr/botPersonalities';
 import { Entity } from '../../../types';
+import { TransformStore } from '../dod/ComponentStores';
 
 // EIDOLON-V: Singleton scratchpad to avoid array allocations per bot per frame
 // This is safe because updateAI is synchronous and single-threaded in JS
@@ -19,6 +20,17 @@ const AI_QUERY_BUFFER: Entity[] = [];
 
 export const updateAI = (bot: Bot, state: GameState, dt: number) => {
   if (bot.isDead) return;
+
+  // EIDOLON-V FIX: Read Bot Position Directly from DOD Store
+  // "Lobotomy Fix": Bypass stale object sync
+  let botX = bot.position.x;
+  let botY = bot.position.y;
+
+  if (bot.physicsIndex !== undefined) {
+    const idx = bot.physicsIndex * 8; // TransformStore.STRIDE
+    botX = TransformStore.data[idx];
+    botY = TransformStore.data[idx + 1];
+  }
 
   // BOT PERSONALITIES: Use personality-based AI if set
   if (bot.personality && bot.personality !== 'farmer') {
@@ -48,10 +60,24 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
     let closestPreyDist = Infinity;
     let bestFoodScore = -Infinity;
 
+    const tData = TransformStore.data;
+
     for (let i = 0; i < count; i++) {
       const e = AI_QUERY_BUFFER[i];
       if (e === bot) return;
-      const dist = distance(bot.position, e.position);
+
+      // EIDOLON-V FIX: Read Target Position Directly from DOD Store
+      let ex = e.position.x;
+      let ey = e.position.y;
+      if (e.physicsIndex !== undefined) {
+        const idx = e.physicsIndex * 8;
+        ex = tData[idx];
+        ey = tData[idx + 1];
+      }
+
+      const dx = botX - ex;
+      const dy = botY - ey;
+      const dist = Math.sqrt(dx * dx + dy * dy); // Inline distance
 
       if ('score' in e) { // Agent
         const other = e as unknown as (Player | Bot);
@@ -124,10 +150,19 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
     const speed = bot.maxSpeed;
     let tx = 0, ty = 0;
 
+    // Helper to get target pos safely
+    const getTargetPos = (t: Entity) => {
+      if (t.physicsIndex !== undefined) {
+        const idx = t.physicsIndex * 8;
+        return { x: tData[idx], y: tData[idx + 1] };
+      }
+      return t.position;
+    };
+
     if (bot.aiState === 'flee' && threat) {
-      // EIDOLON-V FIX: Direct math, no object allocation
-      const dx = (bot as any).position.x - (threat as any).position.x;
-      const dy = (bot as any).position.y - (threat as any).position.y;
+      const tPos = getTargetPos(threat);
+      const dx = botX - tPos.x;
+      const dy = botY - tPos.y;
       const distSq = dx * dx + dy * dy;
 
       if (distSq > 0.001) {
@@ -136,9 +171,9 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
         ty = dy * invDist * speed;
       }
     } else if (bot.aiState === 'chase' && targetEntity) {
-      // EIDOLON-V FIX: Direct math, no object allocation
-      const dx = (targetEntity as any).position.x - (bot as any).position.x;
-      const dy = (targetEntity as any).position.y - (bot as any).position.y;
+      const tPos = getTargetPos(targetEntity);
+      const dx = tPos.x - botX;
+      const dy = tPos.y - botY;
       const distSq = dx * dx + dy * dy;
 
       if (distSq > 0.001) {
@@ -147,9 +182,9 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
         ty = dy * invDist * speed;
       }
     } else if (bot.aiState === 'forage' && targetFood) {
-      // EIDOLON-V FIX: Direct math, no object allocation
-      const dx = (targetFood as any).position.x - (bot as any).position.x;
-      const dy = (targetFood as any).position.y - (bot as any).position.y;
+      const tPos = getTargetPos(targetFood);
+      const dx = tPos.x - botX;
+      const dy = tPos.y - botY;
       const distSq = dx * dx + dy * dy;
 
       if (distSq > 0.001) {
@@ -159,8 +194,6 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
       }
     } else {
       // Wander Center bias
-      const botX = (bot as any).position.x;
-      const botY = (bot as any).position.y;
       const distCenterSq = botX * botX + botY * botY;
 
       if (distCenterSq > (MAP_RADIUS * 0.9) * (MAP_RADIUS * 0.9)) {

@@ -105,7 +105,9 @@ export const createInitialState = (level: number = 1): GameState => {
     result: null,
     // EIDOLON-V FIX: Replace string array with VFX ring buffer
     // vfxEvents: [], // Removed - replaced by VFXRingBuffer
-    vfxEvents: [], // EIDOLON-V FIX: Restored for VFX system compatibility
+    vfxEvents: Array.from({ length: 50 }, () => ({ type: 0, x: 0, y: 0, data: 0, id: '', seq: 0 })),
+    vfxHead: 0,
+    vfxTail: 0,
     inputs: { space: false, w: false },
     inputEvents: [],
   };

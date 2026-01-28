@@ -15,6 +15,9 @@
 // TYPES
 // ============================================
 
+// EIDOLON-V FIX: Import TransformStore for Spatial Audio
+import { TransformStore } from '../engine/dod/ComponentStores';
+
 export interface AudioConfig {
   masterVolume: number;
   sfxVolume: number;
@@ -369,8 +372,36 @@ export class AudioEngine {
 
   // -------------------- SFX PLAYBACK --------------------
 
+  playSpatialSound(
+    soundId: string,
+    physicsIndex: number,
+    options: {
+      volume?: number,
+      pitch?: number
+    } = {}
+  ): void {
+    if (physicsIndex === -1 || physicsIndex === undefined) {
+      // Fallback if invalid index
+      this.play(soundId, options);
+      return;
+    }
+
+    // Read DIRECTLY from TransformStore (Float32Array)
+    // This ensures we play sound at the EXACT physics location, 
+    // not the potentially stale JS object position.
+    const idx = physicsIndex * 8; // TransformStore.STRIDE
+    const x = TransformStore.data[idx];
+    const y = TransformStore.data[idx + 1];
+
+    this.play(soundId, {
+      ...options,
+      position: { x, y }
+    });
+  }
+
   play(
     soundId: string,
+    // ...
     options: {
       position?: { x: number; y: number };
       volume?: number;
@@ -614,16 +645,28 @@ export class AudioEngine {
 
   // -------------------- CONVENIENCE METHODS --------------------
 
-  playEat(position?: { x: number; y: number }): void {
-    this.play('eat', { position, volume: 0.8 + Math.random() * 0.4 });
+  playEat(positionOrIndex?: { x: number; y: number } | number): void {
+    if (typeof positionOrIndex === 'number') {
+      this.playSpatialSound('eat', positionOrIndex, { volume: 0.8 + Math.random() * 0.4 });
+    } else {
+      this.play('eat', { position: positionOrIndex, volume: 0.8 + Math.random() * 0.4 });
+    }
   }
 
-  playKill(position?: { x: number; y: number }): void {
-    this.play('kill', { position });
+  playKill(positionOrIndex?: { x: number; y: number } | number): void {
+    if (typeof positionOrIndex === 'number') {
+      this.playSpatialSound('kill', positionOrIndex);
+    } else {
+      this.play('kill', { position: positionOrIndex });
+    }
   }
 
-  playHit(position?: { x: number; y: number }): void {
-    this.play('hit', { position, pitch: 0.9 + Math.random() * 0.2 });
+  playHit(positionOrIndex?: { x: number; y: number } | number): void {
+    if (typeof positionOrIndex === 'number') {
+      this.playSpatialSound('hit', positionOrIndex, { pitch: 0.9 + Math.random() * 0.2 });
+    } else {
+      this.play('hit', { position: positionOrIndex, pitch: 0.9 + Math.random() * 0.2 });
+    }
   }
 
   playDamage(amount: number): void {

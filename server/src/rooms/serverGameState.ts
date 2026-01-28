@@ -7,6 +7,8 @@ import { GameRoomState, PlayerState, FoodState } from '../schema/GameState';
 import { GameState, Player, Bot, Food, Entity, GameRuntimeState } from '../../../types';
 import { createGameEngine } from '../../../services/engine/context';
 import { createPlayer } from '../../../services/engine/factories';
+import { createDefaultStatusTimers, createDefaultStatusMultipliers, createDefaultStatusScalars } from '../../../types/status';
+import { StatusFlag } from '../../../services/engine/statusFlags';
 import { getLevelConfig } from '../../../services/cjr/levels';
 import { WORLD_WIDTH, WORLD_HEIGHT, MAP_RADIUS, FOOD_RADIUS } from '../../../constants';
 
@@ -86,53 +88,25 @@ export const createServerGameState = (serverState: GameRoomState, runtime: GameR
       stationaryTime: 0,
       trail: [], // Client-side handled (Not Synced)
       isDead: false,
-      statusEffects: {
-        speedBoost: serverPlayer.statusEffects.speedBoost || 1,
-        tempSpeedBoost: 1,
-        tempSpeedTimer: 0,
-        shielded: serverPlayer.statusEffects.shielded || false,
-        burning: false,
-        burnTimer: 0,
-        slowed: false,
-        slowTimer: 0,
-        slowMultiplier: 1,
-        poisoned: false,
-        poisonTimer: 0,
-        regen: 0,
-        airborne: false,
-        stealthed: false,
-        stealthCharge: 0,
-        invulnerable: serverPlayer.statusEffects.invulnerable || 0,
-        rooted: 0,
-        speedSurge: 0,
-        kingForm: 0,
-        damageBoost: serverPlayer.statusEffects.damageBoost || 1,
-        defenseBoost: serverPlayer.statusEffects.defenseBoost || 1,
-        // CJR specific effects
-        commitShield: serverPlayer.statusEffects.commitShield || 0,
-        pityBoost: serverPlayer.statusEffects.pityBoost || 0,
-        colorBoostTimer: 0,
-        colorBoostMultiplier: 1,
-        overdriveTimer: 0,
-        magnetTimer: 0,
-        wrongPigmentReduction: 1,
-        overdriveActive: false,
-        coreShieldBonus: false,
-        pigmentBombActive: false,
-        pigmentBombChance: 0,
-        perfectMatchThreshold: 0.85,
-        perfectMatchBonus: 1.5,
-        catalystSenseRange: 1,
-        catalystSenseActive: false,
-        neutralMassBonus: 1,
-        solventPower: 1,
-        solventSpeedBoost: 1,
-        catalystEchoBonus: 1,
-        catalystEchoDuration: 0,
-        prismGuardThreshold: 0.8,
-        prismGuardReduction: 0.8,
-        grimHarvestDropCount: 0
+      statusFlags: (serverPlayer.statusEffects?.shielded ? StatusFlag.SHIELDED : 0) |
+        (serverPlayer.statusEffects?.invulnerable ? StatusFlag.INVULNERABLE : 0),
+      tattooFlags: 0,
+      extendedFlags: 0,
+      statusTimers: {
+        ...createDefaultStatusTimers(),
+        invulnerable: serverPlayer.statusEffects?.invulnerable || 0
       },
+      statusMultipliers: {
+        ...createDefaultStatusMultipliers(),
+        speed: serverPlayer.statusEffects?.speedBoost || 1,
+        damage: serverPlayer.statusEffects?.damageBoost || 1,
+        defense: serverPlayer.statusEffects?.defenseBoost || 1
+      },
+      statusScalars: {
+        ...createDefaultStatusScalars()
+      },
+
+      // Legacy mapping complete (simplified for build, deeper mapping if needed)
       killStreak: 0,
       streakTimer: 0
     };
@@ -185,7 +159,9 @@ export const createServerGameState = (serverState: GameRoomState, runtime: GameR
     unlockedTattoos: [],
     isPaused: false,
     result: null,
-    vfxEvents: [],
+    vfxEvents: Array.from({ length: 50 }, () => ({ type: 0, x: 0, y: 0, data: 0, id: '', seq: 0 })),
+    vfxHead: 0,
+    vfxTail: 0,
     inputs: { space: false, w: false },
     inputEvents: [],
   };

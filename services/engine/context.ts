@@ -14,6 +14,10 @@ import { SpatialHashGrid, SpatialQueryResult } from '../spatial/SpatialHashGrid'
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
+import { EntityLookup } from './dod/ComponentStores';
+
+// --- Optimization: Persistent Spatial Grid ---
+// ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
 export class SpatialGrid implements ISpatialGrid {
   private grid: SpatialHashGrid;
 
@@ -35,42 +39,57 @@ export class SpatialGrid implements ISpatialGrid {
   }
 
   insert(entity: Entity) {
-    this.grid.addEntity(entity);
+    if (entity.physicsIndex !== undefined) {
+      this.grid.add(entity.physicsIndex, entity.isStatic);
+    }
   }
 
   insertStatic(entity: Entity) {
     entity.isStatic = true;
-    this.grid.addEntity(entity);
+    if (entity.physicsIndex !== undefined) {
+      this.grid.add(entity.physicsIndex, true);
+    }
   }
 
   removeStatic(entity: Entity) {
-    this.grid.removeEntity(entity);
+    if (entity.physicsIndex !== undefined) {
+      this.grid.remove(entity.physicsIndex);
+    }
   }
 
+  // Legacy Adapter: Returns Objects (Slow)
   getNearby(entity: Entity, maxDistance: number = 200): Entity[] {
     const result = this.grid.queryRadius(entity.position, maxDistance);
-    return result.entities;
+    const entities: Entity[] = [];
+    for (const idx of result.indices) {
+      const obj = EntityLookup[idx];
+      if (obj) entities.push(obj);
+    }
+    return entities;
   }
 
-  // Zero-allocation query (optimally supported by native methods, but adapter proxies it)
+  // Legacy Adapter: Zero-allocation query (optimally supported by native methods, but adapter proxies it)
+  // WARNING: This is now "Slow-allocation" because we must look up objects. 
+  // Optimized Consumers should use `grid.queryRadiusInto` with indices directly.
   getNearbyInto(entity: Entity, outArray: Entity[], maxDistance: number = 200): number {
-    // The new grid allocates array in queryRadius. 
-    // To strictly support zero-alloc here, we would need to add queryInto to SpatialHashGrid.
-    // For now, we accept the allocation overhead of the adapter OR modify SpatialHashGrid.
-    // Given step 4 constraints, let's just copy result.
-    const result = this.grid.queryRadius(entity.position, maxDistance);
+    // Temp array for indices
+    const indices: number[] = [];
+    this.grid.queryRadiusInto(entity.position.x, entity.position.y, maxDistance, indices);
+
     outArray.length = 0;
-    for (let i = 0; i < result.entities.length; i++) {
-      outArray.push(result.entities[i]);
+    for (const idx of indices) {
+      const obj = EntityLookup[idx];
+      if (obj) outArray.push(obj);
     }
-    return result.entities.length;
+    return outArray.length;
   }
 }
 
 // --- Optimization: Particle Pooling ---
 class ParticlePool implements IParticlePool {
   private pool: Particle[] = [];
-  private readonly MAX_POOL_SIZE = 100; // Prevent memory leaks
+  private readonly MAX_POOL_SIZE = 2000; // Increased pool for 'The Swarm'
+  private static nextId = 0; // EIDOLON-V FIX: Integer ID Counter
 
   get(x: number, y: number, color: string, speed: number): Particle {
     const p = this.pool.pop() || this.createNew();
@@ -93,13 +112,14 @@ class ParticlePool implements IParticlePool {
   release(particle: Particle) {
     // Only keep particles in pool if under limit
     if (this.pool.length < this.MAX_POOL_SIZE) {
+      particle.isDead = true; // Mark as dead just in case
       this.pool.push(particle);
     }
   }
 
   private createNew(): Particle {
     return {
-      id: Math.random().toString(),
+      id: (ParticlePool.nextId++).toString(), // EIDOLON-V FIX: Sequential ID (Fast)
       position: { x: 0, y: 0 },
       velocity: { x: 0, y: 0 },
       radius: 0,
@@ -124,7 +144,7 @@ export class GameEngine implements IGameEngine {
   constructor() {
     this.spatialGrid = new SpatialGrid();
     this.particlePool = new ParticlePool();
-    this.physicsWorld = new PhysicsWorld(500); // EIDOLON-V: Reduced, grows on demand
+    this.physicsWorld = new PhysicsWorld(); // EIDOLON-V: DOD Adapter manages capacity
   }
 }
 
@@ -156,4 +176,11 @@ export const getCurrentSpatialGrid = (): ISpatialGrid => {
     throw new Error('Spatial grid not bound to update loop');
   }
   return currentSpatialGrid;
+};
+
+export const getPhysicsWorld = (): PhysicsWorld => {
+  if (!currentEngine || !currentEngine.physicsWorld) {
+    throw new Error('PhysicsWorld not bound to update loop');
+  }
+  return currentEngine.physicsWorld;
 };

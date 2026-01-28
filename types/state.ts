@@ -74,7 +74,19 @@ export interface GameState {
     result: 'win' | 'lose' | null;
     // EIDOLON-V NOTE: vfxEvents giờ chỉ dùng cho Floating Texts (UI layer)
     // Các hiệu ứng nổ/particle dùng VFXRingBuffer và không lưu trong state
-    vfxEvents: string[];
+    // EIDOLON-V FIX: VFX Ring Buffer (Zero-GC)
+    // Fixed size array of reusable event objects
+    vfxEvents: {
+        type: number; // 0=None, 1=Commit, 2=Explosion
+        x: number;
+        y: number;
+        data: number; // Generic data (ringId, etc)
+        id: string;   // Entity ID
+        seq: number;  // Sequence number for syncing
+    }[];
+    vfxHead: number; // Write index
+    vfxTail: number; // Read index matches head if empty? No, head is next write.
+    // Actually we just need a rolling buffer. Readers track their own "lastReadSeq".
 
     /** @deprecated Use InputManager.state instead */
     inputs: {

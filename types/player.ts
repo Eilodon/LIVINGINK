@@ -2,87 +2,16 @@ import { Entity, Vector2 } from './entity';
 import { SizeTier, MutationTier } from './shared';
 export type { SizeTier, MutationTier };
 import { PigmentVec3, RingId, Emotion, ShapeId, TattooId } from '../services/cjr/cjrTypes';
+import { StatusTimers, StatusMultipliers, StatusScalars } from './status';
+// Note: Enums are numbers at runtime, importing them here only for type docs if needed,
+// but logic uses them. Interfaces don't import values.
 
 export function isPlayerOrBot(entity: Entity): entity is Player | Bot {
     return 'score' in entity;
 }
 
 // Status Effects Interface
-export interface StatusEffects {
-    speedBoost: number;
-    tempSpeedBoost: number;
-    tempSpeedTimer: number;
-    shielded: boolean;
-    burning: boolean;
-    burnTimer: number;
-    slowed: boolean;
-    slowTimer: number;
-    slowMultiplier: number;
-    poisoned: boolean;
-    poisonTimer: number;
-    regen: number;
-    airborne: boolean;
-    stealthed: boolean;
-    stealthCharge: number;
-    invulnerable: number;
-    rooted: number;
-    speedSurge: number;
-    kingForm: number;
-    damageBoost: number;
-    defenseBoost: number;
-    // New CJR buffs
-    commitShield?: number;
-    pityBoost?: number;
-    colorBoostTimer?: number;
-    colorBoostMultiplier?: number;
-    overdriveTimer?: number;
-    magnetTimer?: number;
-    // Tattoo Effects
-    wrongPigmentReduction?: number;
-    overdriveActive?: boolean;
-    coreShieldBonus?: boolean;
-    pigmentBombActive?: boolean;
-    pigmentBombChance?: number;
-    perfectMatchThreshold?: number;
-    perfectMatchBonus?: number;
-    catalystSenseRange?: number;
-    catalystSenseActive?: boolean;
-    neutralMassBonus?: number;
-    solventPower?: number;
-    solventSpeedBoost?: number;
-    catalystEchoBonus?: number;
-    catalystEchoDuration?: number;
-    prismGuardThreshold?: number;
-    prismGuardReduction?: number;
-    grimHarvestDropCount?: number;
-
-    // Tattoo Synergy Effects - Phase 2 Gameplay Depth
-    neutralPurification?: boolean;
-    purificationRadius?: number;
-    overdriveExplosive?: boolean;
-    explosiveSpeed?: number;
-    explosionRadius?: number;
-    goldenAttraction?: boolean;
-    catalystAttractionRadius?: number;
-    goldenMagneticForce?: number;
-    elementalBalance?: boolean;
-    solventShieldPower?: number;
-    shieldSolventSynergy?: boolean;
-    colorImmunity?: boolean;
-    chromaticImmunityDuration?: number;
-    catalystMasteryRadius?: number;
-    catalystGuarantee?: boolean;
-    neutralGodMode?: boolean;
-    kineticExplosion?: boolean;
-    explosionDamage?: number;
-    shieldPiercing?: boolean;
-    absoluteMastery?: boolean;
-    colorControl?: number;
-    temporalDistortion?: boolean;
-    timeManipulation?: number;
-    speedAmplifier?: number;
-    explosionTimeDilation?: number;
-}
+// Status effects moved to types/status.ts
 
 export interface Player extends Entity {
     // #region Identity & Core Stats
@@ -172,8 +101,19 @@ export interface Player extends Entity {
     // #endregion
 
     // #region Status Effects & Buffs
-    // TODO: EIDOLON-V - Extract to StatusEffects component in future ECS refactor
-    statusEffects: StatusEffects;
+    // EIDOLON-V: DOD Bitmask & Typed Structs (Strict Spec)
+    statusFlags: number; // StatusFlag
+    tattooFlags: number; // TattooFlag
+    extendedFlags: number; // ExtendedFlag
+
+    statusTimers: StatusTimers;
+    statusMultipliers: StatusMultipliers;
+    statusScalars: StatusScalars;
+
+    /** @deprecated Use split fields */
+    statusValues?: never;
+    /** @deprecated Use split fields */
+    statusEffects?: never;
     // #endregion
 }
 

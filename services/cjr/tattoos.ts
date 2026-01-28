@@ -6,6 +6,7 @@ import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { mixPigment, calcMatchPercent, pigmentToHex } from './colorMath';
 import { createFloatingText } from '../engine/effects';
 import { createParticle, createFood } from '../engine/factories';
+import { StatusFlag, TattooFlag } from '../engine/statusFlags';
 
 export interface TattooDefinition {
     id: TattooId;
@@ -27,13 +28,13 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Reduce impact of wrong pigments by 40%.',
         apply: (player: Player) => {
-            player.statusEffects.wrongPigmentReduction = 0.6; // 40% reduction
+            player.statusScalars.wrongPigmentReduction = 0.6; // 40% reduction
         },
         onConsume: (entity: Player | Bot, food: Food, state: GameState) => {
             if (food.kind === 'pigment' && food.pigment) {
                 const pigmentMatch = calcMatchPercent(food.pigment, entity.targetPigment);
                 if (pigmentMatch < 0.6) {
-                    // Handled in combat.ts logic via statusEffects.wrongPigmentReduction
+                    // Handled in combat.ts logic via statusScalars.wrongPigmentReduction
                 }
             }
         }
@@ -44,10 +45,10 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Skill triggers 3s fast-eat mode.',
         apply: (player: Player) => {
-            player.statusEffects.overdriveActive = true;
+            player.tattooFlags |= TattooFlag.OVERDRIVE_ACTIVE;
         },
         onSkill: (player: Player, state: GameState) => {
-            player.statusEffects.overdriveTimer = 3.0; // 3s boost to growth
+            player.statusTimers.overdrive = 3.0; // 3s boost to growth
             createFloatingText(player.position, 'Overdrive!', '#FF5722', 20, state);
         }
     },
@@ -57,13 +58,13 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Gain shield while holding core (Ring 3).',
         apply: (player: Player) => {
-            player.statusEffects.coreShieldBonus = true;
+            player.tattooFlags |= TattooFlag.CORE_SHIELD_BONUS;
         },
         onUpdate: (player: Player, dt: number, state: GameState) => {
             // If in Ring 3 and high match (holding), grant shield
             if (player.ring === 3 && player.matchPercent > 0.8) {
-                player.statusEffects.shielded = true;
-                player.statusEffects.commitShield = 0.1; // Refreshing shield
+                player.statusFlags |= StatusFlag.SHIELDED;
+                player.statusScalars.commitShield = 0.1; // Refreshing shield
             }
         }
     },
@@ -73,12 +74,12 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Getting hit splashes 30% of your color on enemy.',
         apply: (player: Player) => {
-            player.statusEffects.pigmentBombActive = true;
-            player.statusEffects.pigmentBombChance = 0.3;
+            player.tattooFlags |= TattooFlag.PIGMENT_BOMB_ACTIVE;
+            player.statusScalars.pigmentBombChance = 0.3;
         },
         onHit: (victim: Player | Bot, attacker: Player | Bot, state: GameState) => {
             if (victim.tattoos?.includes(TattooId.PigmentBomb)) {
-                const chance = victim.statusEffects.pigmentBombChance || 0.3;
+                const chance = victim.statusScalars.pigmentBombChance || 0.3;
                 if (Math.random() < chance && 'pigment' in attacker) {
                     const att = attacker as Player | Bot;
                     att.pigment = mixPigment(att.pigment, victim.pigment, 0.15);
@@ -95,12 +96,12 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Rare,
         description: 'Match ≥85% grants 50% extra mass and speed.',
         apply: (player: Player) => {
-            player.statusEffects.perfectMatchThreshold = 0.85;
-            player.statusEffects.perfectMatchBonus = 1.5;
+            player.statusScalars.perfectMatchThreshold = 0.85;
+            player.statusMultipliers.perfectMatch = 1.5;
         },
         onUpdate: (player: Player, dt: number, state: GameState) => {
             if (player.matchPercent >= 0.85) {
-                player.statusEffects.speedBoost = Math.max(player.statusEffects.speedBoost, 1.2);
+                player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed!, 1.2);
             }
         }
     },
@@ -110,8 +111,8 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Rare,
         description: 'Attract catalysts from 2x distance and highlight them.',
         apply: (player: Player) => {
-            player.statusEffects.catalystSenseRange = 2.0;
-            player.statusEffects.catalystSenseActive = true;
+            player.statusScalars.catalystSenseRange = 2.0;
+            player.tattooFlags |= TattooFlag.CATALYST_SENSE_ACTIVE;
         }
     },
     {
@@ -120,7 +121,7 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Rare,
         description: 'Neutral pickups give 25% extra mass.',
         apply: (player: Player) => {
-            player.statusEffects.neutralMassBonus = 1.25;
+            player.statusMultipliers.neutralMass = 1.25;
         }
     },
     {
@@ -129,8 +130,8 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Epic,
         description: 'Solvent cleanses 2x faster and provides brief speed boost.',
         apply: (player: Player) => {
-            player.statusEffects.solventPower = 2.0;
-            player.statusEffects.solventSpeedBoost = 1.2;
+            player.statusMultipliers.solventPower = 2.0;
+            player.statusScalars.solventSpeedBoost = 1.2;
         }
     },
     {
@@ -139,8 +140,8 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Catalysts last longer and grant extra mass.',
         apply: (player: Player) => {
-            player.statusEffects.catalystEchoBonus = 1.3;
-            player.statusEffects.catalystEchoDuration = 2.0;
+            player.statusMultipliers.catalystEcho = 1.3;
+            player.statusTimers.catalystEcho = 2.0;
         }
     },
     {
@@ -149,8 +150,8 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Rare,
         description: 'Match ≥80% reduces incoming damage by 20%.',
         apply: (player: Player) => {
-            player.statusEffects.prismGuardThreshold = 0.8;
-            player.statusEffects.prismGuardReduction = 0.8;
+            player.statusScalars.prismGuardThreshold = 0.8;
+            player.statusMultipliers.prismGuardReduction = 0.8;
         }
     },
     {
@@ -168,7 +169,7 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Epic,
         description: 'Killing enemies spawns neutral mass.',
         apply: (player: Player) => {
-            player.statusEffects.grimHarvestDropCount = 2;
+            player.statusScalars.grimHarvestDropCount = 2;
         }
     },
 
@@ -179,8 +180,8 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Common,
         description: 'Passive 15% speed boost. Dash is cheaper.',
         apply: (player: Player) => {
-            player.statusEffects.speedSurge = 1;
-            player.statusEffects.speedBoost = Math.max(player.statusEffects.speedBoost, 1.15);
+            player.statusScalars.speedSurge = 1;
+            player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed, 1.15);
             player.skillCooldownMultiplier = 1.5; // Faster recharge
         }
     },
@@ -190,7 +191,7 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Epic,
         description: 'Start with 3s invulnerability. Gain 50% defense.',
         apply: (player: Player) => {
-            player.statusEffects.invulnerable = 3.0; // Start invuln
+            player.statusTimers.invulnerable = 3.0; // Start invuln
             player.defense *= 1.5;
         }
     },
@@ -213,7 +214,7 @@ const TATTOOS: TattooDefinition[] = [
         description: 'Significantly increased pickup radius.',
         apply: (player: Player) => {
             player.magneticFieldRadius = 150;
-            player.statusEffects.magnetTimer = 9999;
+            player.statusTimers.magnet = 9999;
         }
     },
     {

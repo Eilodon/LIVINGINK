@@ -17,10 +17,15 @@ export const inputManager = {
         window.addEventListener('keyup', (e) => this.onKey(e.code, false));
     },
 
+    // --- Zero GC Optimization ---
+    // Float32Array [x, y]
+    sharedInputBuffer: new Float32Array(2),
+
     reset() {
         this.keys.clear();
         this.joystickVector = { x: 0, y: 0 };
         this.state = createDefaultInputState();
+        this.sharedInputBuffer.fill(0);
     },
 
     onKey(code: string, isDown: boolean) {
@@ -59,11 +64,13 @@ export const inputManager = {
 
     // --- Core Logic ---
     updateMoveVector() {
+        let jx = 0;
+        let jy = 0;
+
         // Ưu tiên Joystick nếu có input
         if (Math.abs(this.joystickVector.x) > 0.01 || Math.abs(this.joystickVector.y) > 0.01) {
-            // EIDOLON-V FIX: Normalize and clamp to prevent runaway vectors or NaN
-            let jx = this.joystickVector.x;
-            let jy = this.joystickVector.y;
+            jx = this.joystickVector.x;
+            jy = this.joystickVector.y;
 
             // NaN Check
             if (isNaN(jx)) jx = 0;
@@ -74,25 +81,28 @@ export const inputManager = {
                 jx /= len;
                 jy /= len;
             }
-
-            this.state.move = { x: jx, y: jy };
-            return;
-        }
-
-        // Fallback Keyboard (WASD / Arrows)
-        let dx = 0, dy = 0;
-        if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) dy -= 1;
-        if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) dy += 1;
-        if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) dx -= 1;
-        if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) dx += 1;
-
-        // Normalize
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len > 0) {
-            this.state.move = { x: dx / len, y: dy / len };
         } else {
-            this.state.move = { x: 0, y: 0 };
+            // Fallback Keyboard (WASD / Arrows)
+            if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) jy -= 1;
+            if (this.keys.has('ArrowDown') || this.keys.has('KeyS')) jy += 1;
+            if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) jx -= 1;
+            if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) jx += 1;
+
+            // Normalize
+            const len = Math.sqrt(jx * jx + jy * jy);
+            if (len > 0) {
+                jx /= len;
+                jy /= len;
+            }
         }
+
+        // EIDOLON-V FIX: Zero allocation update
+        this.state.move.x = jx;
+        this.state.move.y = jy;
+
+        // Sync to shared buffer
+        this.sharedInputBuffer[0] = jx;
+        this.sharedInputBuffer[1] = jy;
     },
 
     pushEvent(type: 'skill' | 'eject' | 'boost') {
@@ -107,13 +117,22 @@ export const inputManager = {
         return evts;
     },
 
-    // Engine gọi hàm này để lấy move vector
-    getMoveTarget(currentPos: { x: number, y: number }) {
+    // Engine gọi hàm này để tính target position mà KHÔNG tạo object mới
+    updateTargetPosition(currentPos: { x: number, y: number }, outTarget: { x: number, y: number }) {
         // Target = Current + Vector * Offset
         const OFFSET = 250;
-        return {
-            x: currentPos.x + this.state.move.x * OFFSET,
-            y: currentPos.y + this.state.move.y * OFFSET
-        };
+        // Use shared buffer for maximum speed/thread safety simulation
+        const mx = this.sharedInputBuffer[0];
+        const my = this.sharedInputBuffer[1];
+
+        outTarget.x = currentPos.x + mx * OFFSET;
+        outTarget.y = currentPos.y + my * OFFSET;
+    },
+
+    // Legacy support (DEPRECATED: Allocates)
+    getMoveTarget(currentPos: { x: number, y: number }) {
+        const t = { x: 0, y: 0 };
+        this.updateTargetPosition(currentPos, t);
+        return t;
     }
 };

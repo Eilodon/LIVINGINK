@@ -57,6 +57,9 @@ export class GameStateManager {
     this.eventListeners.forEach(cb => cb(event));
   }
 
+  // EIDOLON-V FIX: Reused objects for Zero GC
+  private tempMoveTarget = { x: 0, y: 0 };
+
   private constructor() {
     // Default to singletons
     this.inputManager = defaultInputManager;
@@ -106,7 +109,9 @@ export class GameStateManager {
 
       // Send Inputs
       const events = this.inputManager.popEvents();
-      const moveTarget = this.inputManager.getMoveTarget(state.player.position);
+
+      // EIDOLON-V FIX: Zero Allocation Input polling
+      this.inputManager.updateTargetPosition(state.player.position, this.tempMoveTarget);
 
       const actions = this.inputManager.state.actions;
       const networkInputs = {
@@ -114,7 +119,7 @@ export class GameStateManager {
         w: actions.w
       };
 
-      this.networkClient.sendInput(moveTarget, networkInputs, dt, events);
+      this.networkClient.sendInput(this.tempMoveTarget, networkInputs, dt, events);
     } else {
       // Singleplayer Logic
       // Singleplayer Logic

@@ -2,6 +2,7 @@ import { Player, GameState } from '../../types';
 import { TattooId } from './cjrTypes';
 import { createFloatingText } from '../engine/effects';
 import { createFood } from '../engine/factories';
+import { StatusFlag, TattooFlag } from '../engine/statusFlags';
 
 // Re-export needed types or define them here if not circular
 export interface TattooSynergy {
@@ -31,7 +32,11 @@ export const createSynergyVisualEffect = (player: Player, config: {
     pattern: 'fusion' | 'explosion' | 'spiral' | 'geometric';
     duration: number;
 }, state: GameState): void => {
-    state.vfxEvents.push(`synergy:${player.position.x}:${player.position.y}:${config.particleColor}:${config.pattern}`);
+    // EIDOLON-V: Push Synergy Event (Type 8)
+    // Encode config in 'id' string field
+    const { vfxSystem } = require('../vfx/vfxSystem');
+    const meta = `${config.particleColor}:${config.pattern}`;
+    vfxSystem.emitVFX(state, 8, player.position.x, player.position.y, 0, meta);
 };
 
 export const TATTOO_SYNERGIES: TattooSynergy[] = [
@@ -45,9 +50,9 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Neutral pickups now cleanse wrong pigments and provide bonus mass',
         tier: 'basic',
         effect: (player, state) => {
-            player.statusEffects.neutralPurification = true;
-            player.statusEffects.neutralMassBonus = 1.5;
-            player.statusEffects.purificationRadius = 150;
+            player.tattooFlags |= TattooFlag.NEUTRAL_PURIFICATION;
+            player.statusMultipliers.neutralMass = 1.5;
+            player.statusScalars.purificationRadius = 150;
             createSynergyVisualEffect(player, { particleColor: '#E1BEE7', particleCount: 30, pattern: 'fusion', duration: 2.0 }, state);
         },
         visualEffect: { particleColor: '#E1BEE7', particleCount: 30, pattern: 'fusion', duration: 2.0 },
@@ -61,9 +66,9 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Overdrive attacks create color explosions and gain speed',
         tier: 'basic',
         effect: (player, state) => {
-            player.statusEffects.overdriveExplosive = true;
-            player.statusEffects.explosiveSpeed = 1.3;
-            player.statusEffects.explosionRadius = 100;
+            player.tattooFlags |= TattooFlag.OVERDRIVE_EXPLOSIVE;
+            player.statusMultipliers.explosiveSpeed = 1.3;
+            player.statusScalars.explosionRadius = 100;
             createSynergyVisualEffect(player, { particleColor: '#FF6B35', particleCount: 40, pattern: 'explosion', duration: 1.5 }, state);
         },
         visualEffect: { particleColor: '#FF6B35', particleCount: 40, pattern: 'explosion', duration: 1.5 },
@@ -78,14 +83,14 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Perfect matches create golden magnetic fields that attract catalysts',
         tier: 'advanced',
         effect: (player, state) => {
-            player.statusEffects.goldenAttraction = true;
-            player.statusEffects.catalystAttractionRadius = 300;
-            player.statusEffects.goldenMagneticForce = 2.0;
+            player.tattooFlags |= TattooFlag.GOLDEN_ATTRACTION;
+            player.statusScalars.catalystAttractionRadius = 300;
+            player.statusMultipliers.goldenMagneticForce = 2.0;
             state.food.forEach(food => {
                 if (food.isDead || food.kind !== 'catalyst') return;
                 const dist = Math.hypot(food.position.x - player.position.x, food.position.y - player.position.y);
-                if (dist < player.statusEffects.catalystAttractionRadius!) {
-                    const force = player.statusEffects.goldenMagneticForce! * 50;
+                if (dist < player.statusScalars.catalystAttractionRadius!) {
+                    const force = player.statusMultipliers.goldenMagneticForce! * 50;
                     const dx = player.position.x - food.position.x;
                     const dy = player.position.y - food.position.y;
                     food.velocity.x += (dx / dist) * force;
@@ -105,9 +110,9 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Solvent creates protective shields while shields enhance solvent power',
         tier: 'advanced',
         effect: (player, state) => {
-            player.statusEffects.elementalBalance = true;
-            player.statusEffects.solventShieldPower = 2.5;
-            player.statusEffects.shieldSolventSynergy = true;
+            player.tattooFlags |= TattooFlag.ELEMENTAL_BALANCE;
+            player.statusScalars.solventShieldPower = 2.5;
+            player.tattooFlags |= TattooFlag.SHIELD_SOLVENT_SYNERGY;
             createSynergyVisualEffect(player, { particleColor: '#00BCD4', particleCount: 45, pattern: 'geometric', duration: 2.8 }, state);
         },
         visualEffect: { particleColor: '#00BCD4', particleCount: 45, pattern: 'geometric', duration: 2.8 },
@@ -121,10 +126,10 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Perfect guard window grants a stronger shield and a short speed burst',
         tier: 'advanced',
         effect: (player, state) => {
-            player.statusEffects.shielded = true;
-            player.statusEffects.commitShield = Math.max(player.statusEffects.commitShield || 0, 4.0);
-            player.statusEffects.tempSpeedBoost = Math.max(player.statusEffects.tempSpeedBoost || 1, 1.15);
-            player.statusEffects.tempSpeedTimer = Math.max(player.statusEffects.tempSpeedTimer || 0, 3.5);
+            player.statusFlags |= StatusFlag.SHIELDED;
+            player.statusScalars.commitShield = Math.max(player.statusScalars.commitShield || 0, 4.0);
+            player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed || 1, 1.15);
+            player.statusTimers.tempSpeed = Math.max(player.statusTimers.tempSpeed || 0, 3.5);
             createSynergyVisualEffect(player, { particleColor: '#F59E0B', particleCount: 40, pattern: 'geometric', duration: 2.2 }, state);
         },
         visualEffect: { particleColor: '#F59E0B', particleCount: 40, pattern: 'geometric', duration: 2.2 },
@@ -138,10 +143,10 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Perfect matches surge color focus and pull nearby catalysts',
         tier: 'advanced',
         effect: (player, state) => {
-            player.statusEffects.colorBoostMultiplier = Math.max(player.statusEffects.colorBoostMultiplier || 1, 1.8);
-            player.statusEffects.colorBoostTimer = Math.max(player.statusEffects.colorBoostTimer || 0, 4.0);
+            player.statusMultipliers.colorBoost = Math.max(player.statusMultipliers.colorBoost || 1, 1.8);
+            player.statusTimers.colorBoost = Math.max(player.statusTimers.colorBoost || 0, 4.0);
             player.magneticFieldRadius = Math.max(player.magneticFieldRadius || 0, 180);
-            player.statusEffects.magnetTimer = Math.max(player.statusEffects.magnetTimer || 0, 3.0);
+            player.statusTimers.magnet = Math.max(player.statusTimers.magnet || 0, 3.0);
             state.food.forEach(food => {
                 if (food.isDead || food.kind !== 'catalyst') return;
                 const dx = player.position.x - food.position.x;
@@ -167,10 +172,10 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Perfect matches grant temporary color immunity and massive catalyst attraction',
         tier: 'master',
         effect: (player, state) => {
-            player.statusEffects.colorImmunity = true;
-            player.statusEffects.chromaticImmunityDuration = 5.0;
-            player.statusEffects.perfectMatchBonus = 2.0;
-            player.statusEffects.catalystMasteryRadius = 500;
+            player.tattooFlags |= TattooFlag.COLOR_IMMUNITY;
+            player.statusTimers.chromaticImmunity = 5.0;
+            player.statusMultipliers.perfectMatch = 2.0;
+            player.statusScalars.catalystMasteryRadius = 500;
             createSynergyVisualEffect(player, { particleColor: '#9C27B0', particleCount: 80, pattern: 'geometric', duration: 4.0 }, state);
             createFloatingText(player.position, 'CHROMATIC MASTERY!', '#9C27B0', 28, state);
         },
@@ -185,9 +190,9 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Overdrive attacks through shields create massive kinetic explosions',
         tier: 'master',
         effect: (player, state) => {
-            player.statusEffects.kineticExplosion = true;
-            player.statusEffects.explosionDamage = 2.0;
-            player.statusEffects.shieldPiercing = true;
+            player.tattooFlags |= TattooFlag.KINETIC_EXPLOSION;
+            player.statusMultipliers.explosionDamage = 2.0;
+            player.tattooFlags |= TattooFlag.SHIELD_PIERCING;
             createSynergyVisualEffect(player, { particleColor: '#FF5722', particleCount: 100, pattern: 'explosion', duration: 3.5 }, state);
             createFloatingText(player.position, 'KINETIC EXPLOSION!', '#FF5722', 32, state);
         },
@@ -211,8 +216,8 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
                 drop.pigment = { r: 0.5, g: 0.5, b: 0.5 };
                 state.food.push(drop);
             }
-            player.statusEffects.tempSpeedBoost = Math.max(player.statusEffects.tempSpeedBoost || 1, 1.2);
-            player.statusEffects.tempSpeedTimer = Math.max(player.statusEffects.tempSpeedTimer || 0, 3.0);
+            player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed || 1, 1.2);
+            player.statusTimers.tempSpeed = Math.max(player.statusTimers.tempSpeed || 0, 3.0);
             createSynergyVisualEffect(player, { particleColor: '#EF4444', particleCount: 60, pattern: 'explosion', duration: 2.6 }, state);
         },
         visualEffect: { particleColor: '#EF4444', particleCount: 60, pattern: 'explosion', duration: 2.6 },
@@ -227,11 +232,11 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Unlock the full potential of color manipulation with god-like control',
         tier: 'legendary',
         effect: (player, state) => {
-            player.statusEffects.absoluteMastery = true;
-            player.statusEffects.colorControl = 1.0;
-            player.statusEffects.perfectMatchThreshold = 0.7;
-            player.statusEffects.catalystGuarantee = true;
-            player.statusEffects.neutralGodMode = true;
+            player.tattooFlags |= TattooFlag.ABSOLUTE_MASTERY;
+            player.statusScalars.colorControl = 1.0;
+            player.statusScalars.perfectMatchThreshold = 0.7;
+            player.tattooFlags |= TattooFlag.CATALYST_GUARANTEE;
+            player.tattooFlags |= TattooFlag.NEUTRAL_GOD_MODE;
             createSynergyVisualEffect(player, { particleColor: '#FFD700', particleCount: 150, pattern: 'geometric', duration: 5.0 }, state);
             createFloatingText(player.position, 'ABSOLUTE MASTERY!', '#FFD700', 36, state);
         },
@@ -246,10 +251,10 @@ export const TATTOO_SYNERGIES: TattooSynergy[] = [
         description: 'Manipulate time itself with speed boosts and temporal effects',
         tier: 'legendary',
         effect: (player, state) => {
-            player.statusEffects.temporalDistortion = true;
-            player.statusEffects.timeManipulation = 0.5;
-            player.statusEffects.speedAmplifier = 3.0;
-            player.statusEffects.explosionTimeDilation = 2.0;
+            player.tattooFlags |= TattooFlag.TEMPORAL_DISTORTION;
+            player.statusScalars.timeManipulation = 0.5;
+            player.statusMultipliers.speedAmplifier = 3.0;
+            player.statusMultipliers.explosionTimeDilation = 2.0;
             createSynergyVisualEffect(player, { particleColor: '#E91E63', particleCount: 120, pattern: 'spiral', duration: 4.5 }, state);
             createFloatingText(player.position, 'TEMPORAL DISTORTION!', '#E91E63', 34, state);
         },

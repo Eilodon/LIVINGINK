@@ -21,26 +21,15 @@ export class FastMath {
   // EIDOLON-V FIX: Initialize sqrt lookup table
   private static initialize(): void {
     if (this.initialized) return;
-    
+
     for (let i = 0; i <= 10000; i++) {
       this.SQRT_LOOKUP[i] = Math.sqrt(i);
     }
     this.initialized = true;
   }
 
-  // EIDOLON-V FIX: Fast sqrt using lookup table
+  // EIDOLON-V FIX: Native Math.sqrt (JIT Optimized)
   static fastSqrt(value: number): number {
-    this.initialize();
-    
-    if (value <= 10000) {
-      const index = Math.floor(value);
-      const fraction = value - index;
-      if (index < 10000) {
-        return this.SQRT_LOOKUP[index] + 
-               (this.SQRT_LOOKUP[index + 1] - this.SQRT_LOOKUP[index]) * fraction;
-      }
-    }
-    
     return Math.sqrt(value);
   }
 
@@ -73,7 +62,7 @@ export class FastMath {
   static fastNormalize(v: Vector2): Vector2 {
     const lenSq = v.x * v.x + v.y * v.y;
     if (lenSq === 0) return { x: 0, y: 0 };
-    
+
     const invLen = 1 / this.fastSqrt(lenSq);
     return {
       x: v.x * invLen,
@@ -138,9 +127,9 @@ export class FastMath {
 export class CollisionSystem {
   // EIDOLON-V FIX: Circle-circle collision (squared distance)
   static circleCollision(
-    pos1: Vector2, 
-    radius1: number, 
-    pos2: Vector2, 
+    pos1: Vector2,
+    radius1: number,
+    pos2: Vector2,
     radius2: number
   ): boolean {
     const dx = pos1.x - pos2.x;
@@ -151,8 +140,8 @@ export class CollisionSystem {
 
   // EIDOLON-V FIX: Point-circle collision (squared distance)
   static pointCircleCollision(
-    point: Vector2, 
-    circlePos: Vector2, 
+    point: Vector2,
+    circlePos: Vector2,
     radius: number
   ): boolean {
     const dx = point.x - circlePos.x;
@@ -162,55 +151,55 @@ export class CollisionSystem {
 
   // EIDOLON-V FIX: Point-rectangle collision
   static pointRectCollision(
-    point: Vector2, 
-    rectPos: Vector2, 
+    point: Vector2,
+    rectPos: Vector2,
     rectSize: Vector2
   ): boolean {
-    return point.x >= rectPos.x && 
-           point.x <= rectPos.x + rectSize.x &&
-           point.y >= rectPos.y && 
-           point.y <= rectPos.y + rectSize.y;
+    return point.x >= rectPos.x &&
+      point.x <= rectPos.x + rectSize.x &&
+      point.y >= rectPos.y &&
+      point.y <= rectPos.y + rectSize.y;
   }
 
   // EIDOLON-V FIX: Circle-rectangle collision
   static circleRectCollision(
-    circlePos: Vector2, 
-    radius: number, 
-    rectPos: Vector2, 
+    circlePos: Vector2,
+    radius: number,
+    rectPos: Vector2,
     rectSize: Vector2
   ): boolean {
     const closestX = FastMath.clamp(circlePos.x, rectPos.x, rectPos.x + rectSize.x);
     const closestY = FastMath.clamp(circlePos.y, rectPos.y, rectPos.y + rectSize.y);
-    
+
     const dx = circlePos.x - closestX;
     const dy = circlePos.y - closestY;
-    
+
     return dx * dx + dy * dy <= radius * radius;
   }
 
   // EIDOLON-V FIX: Line-circle collision
   static lineCircleCollision(
-    lineStart: Vector2, 
-    lineEnd: Vector2, 
-    circlePos: Vector2, 
+    lineStart: Vector2,
+    lineEnd: Vector2,
+    circlePos: Vector2,
     radius: number
   ): boolean {
     const lineVec = { x: lineEnd.x - lineStart.x, y: lineEnd.y - lineStart.y };
     const toCircle = { x: circlePos.x - lineStart.x, y: circlePos.y - lineStart.y };
-    
+
     const lineLenSq = lineVec.x * lineVec.x + lineVec.y * lineVec.y;
     if (lineLenSq === 0) return this.pointCircleCollision(lineStart, circlePos, radius);
-    
+
     const t = FastMath.clamp(
       (toCircle.x * lineVec.x + toCircle.y * lineVec.y) / lineLenSq,
       0, 1
     );
-    
+
     const closestPoint = {
       x: lineStart.x + lineVec.x * t,
       y: lineStart.y + lineVec.y * t
     };
-    
+
     return this.pointCircleCollision(closestPoint, circlePos, radius);
   }
 }
@@ -219,9 +208,9 @@ export class CollisionSystem {
 export class SpatialOptimizer {
   // EIDOLON-V FIX: Fast circle intersection test
   static circlesIntersect(
-    pos1: Vector2, 
-    radius1: number, 
-    pos2: Vector2, 
+    pos1: Vector2,
+    radius1: number,
+    pos2: Vector2,
     radius2: number
   ): boolean {
     return CollisionSystem.circleCollision(pos1, radius1, pos2, radius2);
@@ -229,8 +218,8 @@ export class SpatialOptimizer {
 
   // EIDOLON-V FIX: Fast point in circle test
   static pointInCircle(
-    point: Vector2, 
-    circlePos: Vector2, 
+    point: Vector2,
+    circlePos: Vector2,
     radius: number
   ): boolean {
     return CollisionSystem.pointCircleCollision(point, circlePos, radius);
@@ -238,8 +227,8 @@ export class SpatialOptimizer {
 
   // EIDOLON-V FIX: Fast distance comparison
   static isWithinDistance(
-    pos1: Vector2, 
-    pos2: Vector2, 
+    pos1: Vector2,
+    pos2: Vector2,
     maxDistance: number
   ): boolean {
     const maxDistSq = maxDistance * maxDistance;
@@ -249,19 +238,19 @@ export class SpatialOptimizer {
 
   // EIDOLON-V FIX: Fast closest point on circle
   static closestPointOnCircle(
-    point: Vector2, 
-    circlePos: Vector2, 
+    point: Vector2,
+    circlePos: Vector2,
     radius: number
   ): Vector2 {
     const dx = point.x - circlePos.x;
     const dy = point.y - circlePos.y;
     const distSq = dx * dx + dy * dy;
-    
+
     if (distSq === 0) return circlePos;
-    
+
     const dist = FastMath.fastSqrt(distSq);
     const scale = radius / dist;
-    
+
     return {
       x: circlePos.x + dx * scale,
       y: circlePos.y + dy * scale
@@ -270,9 +259,9 @@ export class SpatialOptimizer {
 
   // EIDOLON-V FIX: Fast circle containment test
   static circleContainsCircle(
-    outerPos: Vector2, 
-    outerRadius: number, 
-    innerPos: Vector2, 
+    outerPos: Vector2,
+    outerRadius: number,
+    innerPos: Vector2,
     innerRadius: number
   ): boolean {
     const dx = outerPos.x - innerPos.x;

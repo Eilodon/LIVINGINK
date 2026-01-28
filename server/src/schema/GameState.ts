@@ -113,6 +113,19 @@ export class ProjectileState extends Schema {
 // MAIN GAME STATE
 // ============================================
 
+export class VFXEventState extends Schema {
+  @type('uint8') type: number = 0;
+  @type('float32') x: number = 0;
+  @type('float32') y: number = 0;
+  @type('float32') data: number = 0;
+  @type('string') id: string = '';
+  @type('uint32') seq: number = 0;
+}
+
+// ============================================
+// MAIN GAME STATE
+// ============================================
+
 export class GameRoomState extends Schema {
   // World info
   @type('float32') worldWidth: number = 3400;
@@ -126,7 +139,9 @@ export class GameRoomState extends Schema {
   @type({ map: ProjectileState }) projectiles = new MapSchema<ProjectileState>();
 
   // Events
-  @type(['string']) vfxEvents = new ArraySchema<string>();
+  // EIDOLON-V FIX: Ring Buffer for VFX
+  @type([VFXEventState]) vfxEvents = new ArraySchema<VFXEventState>();
+  @type('uint8') vfxHead: number = 0;
 
   // Leaderboard
   @type(['string']) leaderboard = new ArraySchema<string>();

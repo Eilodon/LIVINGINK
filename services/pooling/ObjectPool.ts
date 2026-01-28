@@ -113,6 +113,10 @@ export class Vector2Pool {
 }
 
 // EIDOLON-V FORGE: Entity Pool Manager
+import { entityManager } from '../engine/dod/EntityManager';
+import { StateStore, EntityLookup } from '../engine/dod/ComponentStores';
+import { EntityFlags } from '../engine/dod/EntityFlags';
+
 export class EntityPoolManager {
   private static instance: EntityPoolManager;
   private pools: Map<string, ObjectPool<any>> = new Map();
@@ -200,7 +204,16 @@ export class PooledEntityFactory {
       kind: 'normal',
       color: '#ffffff',
       trail: [],
+      physicsIndex: undefined as number | undefined, // DOD Index
       reset() {
+        // EIDOLON-V FIX: Release DOD Index
+        if (this.physicsIndex !== undefined) {
+          StateStore.clearFlag(this.physicsIndex, EntityFlags.ACTIVE);
+          EntityLookup[this.physicsIndex] = null;
+          entityManager.removeEntity(this.physicsIndex);
+          this.physicsIndex = undefined;
+        }
+
         this.id = '';
         this.position.x = 0;
         this.position.y = 0;
@@ -236,7 +249,16 @@ export class PooledEntityFactory {
       duration: 1000,
       color: '#ffffff',
       trail: [],
+      physicsIndex: undefined as number | undefined, // DOD Index
       reset() {
+        // EIDOLON-V FIX: Release DOD Index
+        if (this.physicsIndex !== undefined) {
+          StateStore.clearFlag(this.physicsIndex, EntityFlags.ACTIVE);
+          EntityLookup[this.physicsIndex] = null;
+          entityManager.removeEntity(this.physicsIndex);
+          this.physicsIndex = undefined;
+        }
+
         this.id = '';
         this.position.x = 0;
         this.position.y = 0;

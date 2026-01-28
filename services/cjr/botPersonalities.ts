@@ -1,7 +1,8 @@
-import { Bot, Player, GameState, Food } from '../../types';
+import { Bot, Player, GameState, Food, Entity } from '../../types';
 import { distance } from '../engine/math';
 import { RING_RADII } from '../../constants';
 import { getCurrentSpatialGrid } from '../engine/context';
+import { TransformStore } from '../engine/dod/ComponentStores';
 
 /**
  * BOT PERSONALITIES - PR15
@@ -21,16 +22,37 @@ interface PersonalityBehavior {
     update: (bot: Bot, state: GameState, dt: number) => void;
 }
 
+// Helper to get DOD position
+const getPos = (e: Entity) => {
+    if (e.physicsIndex !== undefined) {
+        const idx = e.physicsIndex * 8;
+        return { x: TransformStore.data[idx], y: TransformStore.data[idx + 1] };
+    }
+    return e.position;
+};
+
+// Helper for squared distance (no sqrt)
+const distSq = (p1: { x: number, y: number }, p2: { x: number, y: number }) => {
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return dx * dx + dy * dy;
+};
+
 // Utility: Find nearest entity of type
 const findNearest = (bot: Bot, entities: any[]): any | null => {
     let nearest: any = null;
-    let minDist = Infinity;
+    let minD = Infinity;
+
+    const botPos = getPos(bot);
 
     entities.forEach(e => {
         if (e.id === bot.id || e.isDead) return;
-        const d = distance(bot.position, e.position);
-        if (d < minDist && d < 800) { // Vision range
-            minDist = d;
+
+        const ePos = getPos(e);
+        const d2 = distSq(botPos, ePos);
+
+        if (d2 < minD && d2 < 800 * 800) { // Vision range squared
+            minD = d2;
             nearest = e;
         }
     });
@@ -44,6 +66,8 @@ const farmerBehavior: PersonalityBehavior = {
     description: 'Safe player, focuses on eating food and avoiding danger',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
+
         // 1. Check for nearby threats
         const nearby = getCurrentSpatialGrid().getNearby(bot);
         const threats = nearby.filter((e: any) =>
@@ -56,9 +80,11 @@ const farmerBehavior: PersonalityBehavior = {
         // 2. If threatened, flee!
         if (threats.length > 0) {
             const threat = threats[0] as Player | Bot;
+            const tPos = getPos(threat);
+
             const fleeDir = {
-                x: bot.position.x - threat.position.x,
-                y: bot.position.y - threat.position.y
+                x: botPos.x - tPos.x,
+                y: botPos.y - tPos.y
             };
             const mag = Math.hypot(fleeDir.x, fleeDir.y) || 0.001;
             bot.velocity.x = (fleeDir.x / mag) * 150;
@@ -70,9 +96,10 @@ const farmerBehavior: PersonalityBehavior = {
         // 3. Otherwise, forage for food
         const nearestFood = findNearest(bot, state.food);
         if (nearestFood) {
+            const fPos = getPos(nearestFood);
             const dir = {
-                x: nearestFood.position.x - bot.position.x,
-                y: nearestFood.position.y - bot.position.y
+                x: fPos.x - botPos.x,
+                y: fPos.y - botPos.y
             };
             const mag = Math.hypot(dir.x, dir.y) || 0.001;
             bot.velocity.x = (dir.x / mag) * 100;
@@ -92,23 +119,27 @@ const hunterBehavior: PersonalityBehavior = {
     description: 'Aggressive predator, hunts smaller enemies',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
+
         // 1. Find prey (smaller players/bots)
         const allPlayers = [state.player, ...state.bots].filter(p =>
             p && !p.isDead && p.id !== bot.id
         );
 
-        const prey = allPlayers.filter(p =>
-            p.radius < bot.radius * 0.8 && // Must be smaller
-            distance(p.position, bot.position) < 1000
-        );
+        const prey = allPlayers.filter(p => {
+            if (p.radius >= bot.radius * 0.8) return false;
+            const pPos = getPos(p);
+            return distSq(pPos, botPos) < 1000 * 1000;
+        });
 
         // 2. Chase nearest prey
         if (prey.length > 0) {
             const target = findNearest(bot, prey);
             if (target) {
+                const tPos = getPos(target);
                 const dir = {
-                    x: target.position.x - bot.position.x,
-                    y: target.position.y - bot.position.y
+                    x: tPos.x - botPos.x,
+                    y: tPos.y - botPos.y
                 };
                 const mag = Math.hypot(dir.x, dir.y) || 0.001;
                 bot.velocity.x = (dir.x / mag) * 120;
@@ -122,9 +153,10 @@ const hunterBehavior: PersonalityBehavior = {
         // 3. No prey? Eat food to grow
         const nearestFood = findNearest(bot, state.food);
         if (nearestFood) {
+            const fPos = getPos(nearestFood);
             const dir = {
-                x: nearestFood.position.x - bot.position.x,
-                y: nearestFood.position.y - bot.position.y
+                x: fPos.x - botPos.x,
+                y: fPos.y - botPos.y
             };
             const mag = Math.hypot(dir.x, dir.y) || 0.001;
             bot.velocity.x = (dir.x / mag) * 100;
@@ -140,23 +172,27 @@ const bullyBehavior: PersonalityBehavior = {
     description: 'Opportunist, attacks weakened enemies',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
+
         // 1. Find weak targets (low HP)
         const allPlayers = [state.player, ...state.bots].filter(p =>
             p && !p.isDead && p.id !== bot.id
         );
 
-        const weakTargets = allPlayers.filter(p =>
-            p.currentHealth < p.maxHealth * 0.4 && // < 40% HP
-            distance(p.position, bot.position) < 800
-        );
+        const weakTargets = allPlayers.filter(p => {
+            if (p.currentHealth >= p.maxHealth * 0.4) return false;
+            const pPos = getPos(p);
+            return distSq(pPos, botPos) < 800 * 800;
+        });
 
         // 2. Attack weak target
         if (weakTargets.length > 0) {
             const target = findNearest(bot, weakTargets);
             if (target) {
+                const tPos = getPos(target);
                 const dir = {
-                    x: target.position.x - bot.position.x,
-                    y: target.position.y - bot.position.y
+                    x: tPos.x - botPos.x,
+                    y: tPos.y - botPos.y
                 };
                 const mag = Math.hypot(dir.x, dir.y) || 0.001;
                 bot.velocity.x = (dir.x / mag) * 130;
@@ -178,21 +214,23 @@ const greedyBehavior: PersonalityBehavior = {
     description: 'Risk-taker, prioritizes special pickups and Candy Vein',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
+
         // 1. Check for special pickups (shield, candy_vein, catalyst)
-        const specialFood = state.food.filter(f =>
-            !f.isDead &&
-            f.kind !== 'pigment' &&
-            f.kind !== 'neutral' &&
-            distance(f.position, bot.position) < 1200
-        );
+        const specialFood = state.food.filter(f => {
+            if (f.isDead || f.kind === 'pigment' || f.kind === 'neutral') return false;
+            const fPos = getPos(f);
+            return distSq(fPos, botPos) < 1200 * 1200;
+        });
 
         // 2. Beeline for special pickup (ignore danger!)
         if (specialFood.length > 0) {
             const target = findNearest(bot, specialFood);
             if (target) {
+                const tPos = getPos(target);
                 const dir = {
-                    x: target.position.x - bot.position.x,
-                    y: target.position.y - bot.position.y
+                    x: tPos.x - botPos.x,
+                    y: tPos.y - botPos.y
                 };
                 const mag = Math.hypot(dir.x, dir.y) || 0.001;
                 // FAST pursuit
@@ -216,16 +254,17 @@ const tricksterBehavior: PersonalityBehavior = {
     description: 'Circles ring boundaries to lure fights near wave spawns',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
         const ringRadius = bot.ring === 1 ? RING_RADII.R2 : bot.ring === 2 ? RING_RADII.R3 : RING_RADII.CENTER * 1.5;
-        const angle = Math.atan2(bot.position.y, bot.position.x);
+        const angle = Math.atan2(botPos.y, botPos.x);
         const targetAngle = angle + 0.8;
         const target = {
             x: Math.cos(targetAngle) * ringRadius,
             y: Math.sin(targetAngle) * ringRadius
         };
         const dir = {
-            x: target.x - bot.position.x,
-            y: target.y - bot.position.y
+            x: target.x - botPos.x,
+            y: target.y - botPos.y
         };
         const mag = Math.hypot(dir.x, dir.y) || 0.001;
         bot.velocity.x = (dir.x / mag) * 120;
@@ -240,12 +279,14 @@ const rubberBehavior: PersonalityBehavior = {
     description: 'Targets other bots more than player, reducing pressure',
 
     update(bot, state, dt) {
+        const botPos = getPos(bot);
         const bots = state.bots.filter(b => b.id !== bot.id && !b.isDead);
         const targetBot = findNearest(bot, bots);
         if (targetBot) {
+            const tPos = getPos(targetBot);
             const dir = {
-                x: targetBot.position.x - bot.position.x,
-                y: targetBot.position.y - bot.position.y
+                x: tPos.x - botPos.x,
+                y: tPos.y - botPos.y
             };
             const mag = Math.hypot(dir.x, dir.y) || 0.001;
             bot.velocity.x = (dir.x / mag) * 120;

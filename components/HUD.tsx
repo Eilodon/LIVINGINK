@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, memo, useState } from 'react';
 import { GameState } from '../types';
 import { getColorHint } from '../services/cjr/colorMath';
-import { THRESHOLDS } from '../constants'; // EIDOLON-V FIX: Correct import
+import { THRESHOLDS } from '../constants';
+import { useGameDataBridge } from '../hooks/useGameDataBridge';
 
 interface HUDProps {
   gameStateRef: React.MutableRefObject<GameState | null>;
@@ -18,6 +19,9 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
   const percentCircleRef = useRef<SVGCircleElement>(null);
   const waveRef = useRef<HTMLDivElement>(null);
 
+  // EIDOLON-V FIX: The Blind HUD Fix
+  const { getStats } = useGameDataBridge(gameStateRef);
+
   // Cache to avoid DOM thrashing
   const cache = useRef({ score: -1, percent: -1, waveTime: -1 });
 
@@ -32,22 +36,25 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
         rafId = requestAnimationFrame(loop);
         return;
       }
-      const p = state.player;
+
+      // EIDOLON-V: Read from Bridge (Fast Path)
+      const stats = getStats();
+      const p = state.player; // Still needed for slow updates (pigment, ring) until we bridge those too
 
       // 1. Score
-      const s = Math.floor(p.score);
+      const s = Math.floor(stats.score);
       if (s !== cache.current.score) {
         if (scoreRef.current) scoreRef.current.textContent = s.toLocaleString();
         cache.current.score = s;
       }
 
       // 2. Match %
-      const pct = Math.floor(p.matchPercent * 100);
+      const pct = Math.floor(stats.matchPercent * 100);
       if (pct !== cache.current.percent) {
         cache.current.percent = pct;
         if (percentRef.current) percentRef.current.textContent = `${pct}%`;
         if (percentCircleRef.current) {
-          const offset = circumference - (p.matchPercent * circumference);
+          const offset = circumference - (stats.matchPercent * circumference);
           percentCircleRef.current.style.strokeDashoffset = `${offset}`;
           const color = pct >= 90 ? '#fbbf24' : (pct >= 50 ? '#3b82f6' : '#ef4444');
           percentCircleRef.current.style.stroke = color;

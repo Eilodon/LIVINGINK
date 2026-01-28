@@ -11,7 +11,8 @@ import {
   BotState,
   FoodState,
   ProjectileState,
-  PigmentVec3
+  PigmentVec3,
+  VFXEventState
 } from '../schema/GameState';
 import {
   WORLD_WIDTH,
@@ -29,6 +30,7 @@ import { getLevelConfig } from '../../../services/cjr/levels';
 import { vfxIntegrationManager } from '../../../services/vfx/vfxIntegration';
 // Import security validation
 import { serverValidator } from '../security/ServerValidator';
+import { BinaryPacker } from '../../../services/networking/BinaryPacker';
 // EIDOLON-V PHASE1: Import enhanced input validation
 import { InputValidator } from '../validation/InputValidator';
 
@@ -41,15 +43,21 @@ export class GameRoom extends Room<GameRoomState> {
 
   onCreate(options: any) {
     console.log('GameRoom created!', options);
-    
+
     // EIDOLON-V PHASE1: Validate room creation options
     const roomValidation = InputValidator.validateRoomOptions(options);
     if (!roomValidation.isValid) {
       console.error('Invalid room options:', roomValidation.errors);
       throw new Error(`Invalid room options: ${roomValidation.errors.join(', ')}`);
     }
-    
+
     this.setState(new GameRoomState());
+
+    // EIDOLON-V: Init VFX Buffer
+    for (let i = 0; i < 50; i++) {
+      this.state.vfxEvents.push(new VFXEventState());
+    }
+
     vfxIntegrationManager.setVFXEnabled(false);
 
     // Initialize World
@@ -89,16 +97,16 @@ export class GameRoom extends Room<GameRoomState> {
 
     this.onMessage('input', (client, message: any) => {
       if (!message) return;
-      
+
       // EIDOLON-V PHASE1: Validate input before processing
       const inputValidation = InputValidator.validateGameInput(message);
       if (!inputValidation.isValid) {
         console.warn(`Invalid input from ${client.sessionId}:`, inputValidation.errors);
         return; // Silently drop invalid input
       }
-      
+
       const sanitizedInput = inputValidation.sanitized || message;
-      
+
       this.inputsBySession.set(client.sessionId, {
         seq: sanitizedInput.seq || 0,
         targetX: sanitizedInput.targetX ?? 0,
@@ -111,7 +119,7 @@ export class GameRoom extends Room<GameRoomState> {
 
   onJoin(client: Client, options: { name?: string; shape?: string; pigment?: any }) {
     console.log(client.sessionId, 'joined!', options);
-    
+
     // EIDOLON-V PHASE1: Validate player options
     const playerValidation = InputValidator.validatePlayerOptions(options);
     if (!playerValidation.isValid) {
@@ -187,6 +195,13 @@ export class GameRoom extends Room<GameRoomState> {
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, 'left!');
+
+    // EIDOLON-V FIX: Clean up PhysicsWorld slot
+    const physicsWorld = this.simState.engine?.physicsWorld;
+    if (physicsWorld) {
+      physicsWorld.removeBody(client.sessionId);
+    }
+
     this.state.players.delete(client.sessionId);
     this.inputsBySession.delete(client.sessionId);
     this.simState.players = this.simState.players.filter(p => p.id !== client.sessionId);
@@ -208,6 +223,30 @@ export class GameRoom extends Room<GameRoomState> {
     this.applyInputsToSimState();
     updateGameState(this.simState, dtSec);
     this.syncSimStateToServer();
+
+    // EIDOLON-V: Broadcast Binary Transforms
+    this.broadcastBinaryTransforms();
+  }
+
+  private broadcastBinaryTransforms() {
+    // Gather dynamic entities
+    const updates: { id: string, x: number, y: number, vx: number, vy: number }[] = [];
+    const world = this.simState.engine.physicsWorld;
+
+    // We can iterate active players/bots directly from SimState or World
+    // World is cleaner if we had iterator, but SimState is authoritative logic
+    this.simState.players.forEach(p => {
+      updates.push({ id: p.id, x: p.position.x, y: p.position.y, vx: p.velocity.x, vy: p.velocity.y });
+    });
+    this.simState.bots.forEach(b => {
+      updates.push({ id: b.id, x: b.position.x, y: b.position.y, vx: b.velocity.x, vy: b.velocity.y });
+    });
+
+    if (updates.length > 0) {
+      const buffer = BinaryPacker.packTransforms(updates, this.state.gameTime);
+      // Broadcast as "bin" message or raw
+      this.broadcast("bin", new Uint8Array(buffer));
+    }
   }
 
   private applyInputsToSimState() {
@@ -267,10 +306,28 @@ export class GameRoom extends Room<GameRoomState> {
         this.state.players.set(player.id, serverPlayer);
       }
 
+      // EIDOLON-V FIX: Read from PhysicsWorld Arrays (DOD)
+      // Entities are now just ID holders. The Truth is in the Buffer.
+      let px = player.position.x;
+      let py = player.position.y;
+      let vx = player.velocity.x;
+      let vy = player.velocity.y;
+
+      // Access PhysicsWorld via Engine ref
+      const physicsWorld = this.simState.engine?.physicsWorld;
+      if (physicsWorld) {
+        // EIDOLON-V FIX: Use accessors
+        px = physicsWorld.getX(player.id);
+        py = physicsWorld.getY(player.id);
+        vx = physicsWorld.getVx(player.id);
+        vy = physicsWorld.getVy(player.id);
+      }
+
       // Validate position changes to prevent teleportation
+      // EIDOLON-V: Use real physics position (px, py)
       const positionValidation = serverValidator.validatePosition(
         player.id,
-        player.position,
+        { x: px, y: py },
         { x: serverPlayer.position.x, y: serverPlayer.position.y },
         1 / 60 // Assuming 60 FPS
       );
@@ -279,8 +336,8 @@ export class GameRoom extends Room<GameRoomState> {
         console.warn(`Invalid position from ${player.id}: ${positionValidation.reason}`);
         // Use corrected position
         if (positionValidation.correctedPosition) {
-          player.position.x = positionValidation.correctedPosition.x;
-          player.position.y = positionValidation.correctedPosition.y;
+          px = positionValidation.correctedPosition.x;
+          py = positionValidation.correctedPosition.y;
         }
       }
 
@@ -303,10 +360,11 @@ export class GameRoom extends Room<GameRoomState> {
       }
 
       // Apply validated state
-      serverPlayer.position.x = player.position.x;
-      serverPlayer.position.y = player.position.y;
-      serverPlayer.velocity.x = player.velocity.x;
-      serverPlayer.velocity.y = player.velocity.y;
+      // Apply validated state
+      serverPlayer.position.x = px;
+      serverPlayer.position.y = py;
+      serverPlayer.velocity.x = vx;
+      serverPlayer.velocity.y = vy;
       serverPlayer.radius = player.radius;
       serverPlayer.score = player.score;
       serverPlayer.currentHealth = player.currentHealth;

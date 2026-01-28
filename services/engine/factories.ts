@@ -19,13 +19,17 @@ import {
   Projectile,
   SizeTier,
   Vector2,
-} from '../../types'; // Note: OrbitingObject missing in types? I'll check types.ts again, might need to remove
+} from '../../types';
 import { getCurrentEngine } from './context';
 import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from './math';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
 import { pigmentToHex } from '../cjr/colorMath';
-import { pooledEntityFactory } from '../pooling/ObjectPool'; // EIDOLON-V FIX: Import pooling
-
+import { pooledEntityFactory } from '../pooling/ObjectPool';
+import { createDefaultStatusTimers, createDefaultStatusMultipliers, createDefaultStatusScalars } from '../../types/status';
+import { StatusFlag } from './statusFlags';
+import { entityManager } from './dod/EntityManager';
+import { TransformStore, PhysicsStore, StateStore, EntityLookup } from './dod/ComponentStores';
+import { EntityFlags } from './dod/EntityFlags';
 
 // Helper: Random Pigment
 export const randomPigment = (): PigmentVec3 => ({
@@ -41,6 +45,13 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
   const pigment = randomPigment();
   const id = Math.random().toString(36).substr(2, 9);
 
+  // EIDOLON-V: Players also need DOD indices if we want uniform handling
+  // But players are usually created once or infrequent.
+  // For now, focus on Food/Projectiles as per plan.
+  // Although, if Grid expects ALL entities to have indices...
+  // YES, Player needs an index too if it enters the grid.
+  const entId = entityManager.createEntity();
+
   const player: Player = {
     id,
     position,
@@ -49,6 +60,7 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
     color: `rgb(${pigment.r * 255},${pigment.g * 255},${pigment.b * 255})`,
     isDead: false,
     trail: [],
+    physicsIndex: entId, // Assign DOD Index
 
     name,
     score: 0,
@@ -60,7 +72,7 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
     spawnTime,
 
     pigment,
-    targetPigment: randomPigment(), // TODO: Set by Level Manager?
+    targetPigment: randomPigment(),
     matchPercent: 0,
     ring: 1,
     emotion: 'happy',
@@ -110,50 +122,40 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
     rewindHistory: [],
     stationaryTime: 0,
 
-    statusEffects: {
-      speedBoost: 1,
-      tempSpeedBoost: 1,
-      tempSpeedTimer: 0,
-      shielded: false,
-      burning: false,
-      burnTimer: 0,
-      slowed: false,
-      slowTimer: 0,
-      slowMultiplier: 1,
-      poisoned: false,
-      poisonTimer: 0,
-      regen: 0,
-      airborne: false,
-      stealthed: false,
-      stealthCharge: 0,
-      invulnerable: 3, // Start with shield
-      rooted: 0,
-      speedSurge: 0,
-      kingForm: 0,
-      damageBoost: 1,
-      defenseBoost: 1,
-      colorBoostTimer: 0,
-      colorBoostMultiplier: 1,
-      overdriveTimer: 0,
-      magnetTimer: 0,
-      catalystEchoBonus: 1,
-      catalystEchoDuration: 0,
-      prismGuardThreshold: 0.8,
-      prismGuardReduction: 0.8,
-      grimHarvestDropCount: 0,
-    },
+    statusFlags: StatusFlag.INVULNERABLE, // Start with shield
+    tattooFlags: 0,
+    extendedFlags: 0,
+    statusTimers: createDefaultStatusTimers(),
+    statusMultipliers: createDefaultStatusMultipliers(),
+    statusScalars: createDefaultStatusScalars(),
+
     killStreak: 0,
     streakTimer: 0,
     components: new Map(),
   };
 
+  // Override Defaults
+  player.statusMultipliers.speed = 1;
+  player.statusMultipliers.damage = 1;
+  player.statusMultipliers.defense = 1;
+  player.statusTimers.invulnerable = 3;
+
   player.components!.set('SynergyComponent', new SynergyComponent(player.id));
+
+  // Initialize DOD State
+  if (entId !== -1) {
+    TransformStore.set(entId, position.x, position.y, 0);
+    PhysicsStore.set(entId, 0, 0, 10, PLAYER_START_RADIUS); // Mass 10
+    StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.PLAYER);
+    EntityLookup[entId] = player;
+  }
 
   return player;
 };
 
 export const createBot = (id: string, spawnTime: number = 0): Bot => {
-  // TODO: Tương lai cần Bot Pooling. Hiện tại tối ưu tạm thời:
+  // TODO: Refactor Bot Creation to be less reliant on createPlayer
+  // But for now, we wrap it.
   const player = createPlayer(`Bot ${id.substr(0, 4)}`, 'circle', spawnTime);
 
   const bot: Bot = {
@@ -165,8 +167,12 @@ export const createBot = (id: string, spawnTime: number = 0): Bot => {
     personality: 'farmer',
   };
 
-  // EIDOLON-V FIX: Reset component map thay vì tạo mới nếu có thể
-  // (Ở đây tạo mới là bắt buộc vì player được tạo mới, nhưng hãy lưu ý điểm này cho phase sau)
+  // Update DOD flags
+  if (bot.physicsIndex !== undefined) {
+    StateStore.clearFlag(bot.physicsIndex, EntityFlags.PLAYER);
+    StateStore.setFlag(bot.physicsIndex, EntityFlags.BOT);
+    EntityLookup[bot.physicsIndex] = bot; // Update lookup to point to Bot wrapper
+  }
 
   return bot;
 };
@@ -179,6 +185,14 @@ export const createBoss = (spawnTime: number = 0): Bot => {
   boss.currentHealth = 2000;
   boss.isBoss = true;
   boss.personality = 'bully';
+
+  if (boss.physicsIndex !== undefined) {
+    // Update Physics Store radius/mass
+    const pIdx = boss.physicsIndex * 8;
+    PhysicsStore.data[pIdx + 3] = 500; // Mass
+    PhysicsStore.data[pIdx + 4] = 80;  // Radius
+  }
+
   return boss;
 };
 
@@ -190,6 +204,13 @@ export const createBotCreeps = (count: number): Bot[] => {
     creep.radius = 15;
     creep.isCreep = true;
     creep.pigment = { r: 0.5, g: 0.5, b: 0.5 }; // Neutral gray
+
+    if (creep.physicsIndex !== undefined) {
+      const pIdx = creep.physicsIndex * 8;
+      PhysicsStore.data[pIdx + 3] = 5; // Mass
+      PhysicsStore.data[pIdx + 4] = 15; // Radius
+    }
+
     creeps.push(creep);
   }
   return creeps;
@@ -200,11 +221,16 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food => {
   const foodPool = pooledEntityFactory.createPooledFood();
   const food = foodPool.acquire();
 
+  // EIDOLON-V FIX: Allocate DOD Index
+  const entId = entityManager.createEntity();
+  food.physicsIndex = entId; // Note: Need to add physicsIndex to Food type if missing (it IS in Entity interface)
+
   const pigment = randomPigment();
+  const startPos = pos || randomPosInRing(1);
 
   // Setup pooled food object
   food.id = Math.random().toString();
-  food.position = pos || randomPosInRing(1);
+  food.position = startPos;
   food.velocity = { x: 0, y: 0 };
   food.radius = FOOD_RADIUS;
   food.color = pigmentToHex(pigment);
@@ -213,7 +239,15 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food => {
   food.isEjected = isEjected;
   food.kind = 'pigment';
   food.pigment = pigment;
-  food.trail.length = 0; // Clear trail array
+  food.trail.length = 0;
+
+  // Initialize DOD State
+  if (entId !== -1) {
+    TransformStore.set(entId, startPos.x, startPos.y, 0);
+    PhysicsStore.set(entId, 0, 0, 1, FOOD_RADIUS); // Mass 1
+    StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.FOOD);
+    EntityLookup[entId] = food;
+  }
 
   return food;
 };
@@ -237,24 +271,38 @@ export const createProjectile = (
   const projectilePool = pooledEntityFactory.createPooledProjectile();
   const projectile = projectilePool.acquire();
 
+  // EIDOLON-V FIX: Allocate DOD Index
+  const entId = entityManager.createEntity();
+  projectile.physicsIndex = entId;
+
   // Calculate velocity toward target
   const dx = target.x - position.x;
   const dy = target.y - position.y;
   const dist = Math.hypot(dx, dy);
   const speed = 300;
+  const vx = dist > 0 ? (dx / dist) * speed : 0;
+  const vy = dist > 0 ? (dy / dist) * speed : 0;
 
   // Setup pooled projectile object
   projectile.id = Math.random().toString();
   projectile.position = { ...position };
-  projectile.velocity = dist > 0 ? { x: (dx / dist) * speed, y: (dy / dist) * speed } : { x: 0, y: 0 };
+  projectile.velocity = { x: vx, y: vy };
   projectile.radius = 8;
   projectile.color = type === 'ice' ? '#88ccff' : type === 'web' ? '#888888' : '#ff4444';
   projectile.isDead = false;
-  projectile.trail.length = 0; // Clear trail array
+  projectile.trail.length = 0;
   projectile.ownerId = ownerId;
   projectile.damage = damage;
   projectile.type = type;
   projectile.duration = duration;
+
+  // Initialize DOD State
+  if (entId !== -1) {
+    TransformStore.set(entId, position.x, position.y, 0);
+    PhysicsStore.set(entId, vx, vy, 0.5, 8); // Mass 0.5
+    StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.PROJECTILE);
+    EntityLookup[entId] = projectile;
+  }
 
   return projectile;
 };

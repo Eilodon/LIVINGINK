@@ -32,21 +32,23 @@ export const updateWinCondition = (state: GameState, dt: number, levelConfig: an
         }
 
         if (potentialWinner) {
-            if (!potentialWinner.statusEffects.kingForm) potentialWinner.statusEffects.kingForm = 0;
-            potentialWinner.statusEffects.kingForm += dt;
+            if (!potentialWinner.statusScalars.kingForm) potentialWinner.statusScalars.kingForm = 0;
+            potentialWinner.statusScalars.kingForm += dt;
 
             // Sync to Global Runtime for HUD
-            state.runtime.winCondition.timer = potentialWinner.statusEffects.kingForm;
+            state.runtime.winCondition.timer = potentialWinner.statusScalars.kingForm;
 
             const pulseInterval = 0.5;
-            if (potentialWinner.statusEffects.kingForm % pulseInterval < dt) {
-                state.vfxEvents.push(`pulse_${potentialWinner.id}`);
+            if (potentialWinner.statusScalars.kingForm % pulseInterval < dt) {
+                const { vfxSystem } = require('../vfx/vfxSystem');
+                // Type 6 = Pulse (Win warning)
+                vfxSystem.emitVFX(state, 6, potentialWinner.position.x, potentialWinner.position.y, 0, potentialWinner.id);
                 state.shakeIntensity = 5;
             }
 
             // Win Condition
             const reqTime = levelConfig.winHoldSeconds || 1.5;
-            if (potentialWinner.statusEffects.kingForm >= reqTime) {
+            if (potentialWinner.statusScalars.kingForm >= reqTime) {
                 state.result = 'win';
                 state.kingId = potentialWinner.id;
             }
@@ -55,8 +57,8 @@ export const updateWinCondition = (state: GameState, dt: number, levelConfig: an
             // Decay channel if not holding
             state.runtime.winCondition.timer = 0;
             for (const p of playersToCheck) {
-                if ((p.statusEffects.kingForm || 0) > 0) {
-                    p.statusEffects.kingForm = Math.max(0, (p.statusEffects.kingForm || 0) - dt * 2);
+                if ('statusScalars' in p && (p.statusScalars.kingForm || 0) > 0) {
+                    p.statusScalars.kingForm = Math.max(0, (p.statusScalars.kingForm || 0) - dt * 2);
                 }
             }
         }

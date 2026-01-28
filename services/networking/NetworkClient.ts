@@ -3,6 +3,12 @@ import * as Colyseus from 'colyseus.js';
 import type { Room } from 'colyseus.js';
 import type { GameState, Player, Bot, Food, Projectile, Vector2 } from '../../types';
 import type { PigmentVec3, ShapeId, Emotion, PickupKind, TattooId } from '../cjr/cjrTypes';
+import { createDefaultStatusTimers, createDefaultStatusMultipliers, createDefaultStatusScalars } from '../../types/status';
+import { StatusFlag } from '../engine/statusFlags';
+import { BinaryPacker } from './BinaryPacker';
+import { MovementSystem } from '../engine/dod/systems/MovementSystem';
+import { PhysicsSystem } from '../engine/dod/systems/PhysicsSystem';
+import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
 
 interface NetworkConfig {
   serverUrl: string;
@@ -123,6 +129,47 @@ export class NetworkClient {
     }
   }
 
+
+  private handleBinaryUpdate(buffer: any) {
+    // Buffer is likely Uint8Array or ArrayBuffer
+    const data = typeof buffer === 'object' && buffer.buffer ? buffer.buffer : buffer;
+    const result = BinaryPacker.unpackTransforms(data);
+
+    if (result) {
+      // Create a synthetic snapshot or merge into current interpolation buffer
+      // We need to map binary update to EntitySnapshot format
+      const players = new Map<string, EntitySnapshot>();
+      const bots = new Map<string, EntitySnapshot>();
+
+      // We don't know if id maps to player or bot easily without lookup.
+      // But applyEntityInterpolation handles map lookup.
+      // So we can put ALL in players map? No, applyInterpolation iterates "newer".
+      // We need to know which map to put them in.
+
+      // Optimization: Check existing maps
+      result.updates.forEach(u => {
+        const snap = { x: u.x, y: u.y, vx: u.vx, vy: u.vy, radius: 0 }; // radius unknown in pure bin
+        if (this.playerMap.has(u.id)) {
+          players.set(u.id, snap);
+        } else if (this.botMap.has(u.id)) {
+          bots.set(u.id, snap);
+        }
+      });
+
+      // Use the timestamp from packet
+      this.snapshots.push({
+        time: this.nowMs(), // Use local arrival time for smooth interpolation buffer? Or server time?
+        // Server time (result.timestamp) is authoritative but clocks differ. Needs offset.
+        // For now, using local arrival time is robust for interpolation buffer (jitter buffer).
+        players,
+        bots,
+        food: new Map() // Food not in binary yet
+      });
+
+      if (this.snapshots.length > 10) this.snapshots.shift();
+    }
+  }
+
   async disconnect() {
     if (this.room) {
       await this.room.leave();
@@ -164,6 +211,10 @@ export class NetworkClient {
       this.localState.gameTime = state.gameTime ?? this.localState.gameTime;
       this.pushSnapshot(state);
     });
+
+    this.room.onMessage('bin', (message: any) => {
+      this.handleBinaryUpdate(message);
+    });
   }
 
   private syncPlayers(serverPlayers: any) {
@@ -202,7 +253,13 @@ export class NetworkClient {
           emotion: sPlayer.emotion,
           shape: sPlayer.shape,
           tattoos: [...(sPlayer.tattoos ?? [])],
-          statusEffects: { ...sPlayer.statusEffects },
+          statusFlags: sPlayer.statusFlags || 0,
+          tattooFlags: 0, // Sync if available
+          extendedFlags: 0,
+          statusTimers: createDefaultStatusTimers(),
+          statusMultipliers: createDefaultStatusMultipliers(),
+          statusScalars: createDefaultStatusScalars(),
+
           // Defaults to avoid nulls
           lastHitTime: 0, lastEatTime: 0, matchStuckTime: 0, ring3LowMatchTime: 0, emotionTimer: 0,
           acceleration: 1, maxSpeed: 1, friction: 1, isInvulnerable: false,
@@ -279,29 +336,99 @@ export class NetworkClient {
 
   private reconcileLocalPlayer(localPlayer: Player, sPlayer: any) {
     const lastProcessed = sPlayer.lastProcessedInput || 0;
+
+    // Remove processed inputs
     this.pendingInputs = this.pendingInputs.filter(input => input.seq > lastProcessed);
 
-    const dx = localPlayer.position.x - sPlayer.position.x;
-    const dy = localPlayer.position.y - sPlayer.position.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Current State (Predicted) vs Server State (Authoritative)
+    // We want to verify if our prediction was correct.
+    // Ideally we resimulate FROM server state with pending inputs.
 
-    if (dist > this.reconcileThreshold) {
+    // 1. Reset to Server State
+    const serverPos = { x: sPlayer.position.x, y: sPlayer.position.y };
+
+    // Calculate Error before correction (for Teleport check vs Smooth Correction)
+    // But we need the 'Re-simulated' position to know the TRUE error.
+    // Error = CurrentLocal - (Server + ReplayedInputs).
+
+    // Clone server state for re-simulation
+    const resimPos = { x: sPlayer.position.x, y: sPlayer.position.y };
+    const resimVel = { x: sPlayer.velocity.x, y: sPlayer.velocity.y };
+
+    // 2. Re-simulate Pending Inputs
+    // We need access to PhysicsWorld for map constraints, but simplistic re-sim is okay if map is simple.
+    // However, we enabled 'integrateEntity' in PhysicsSystem for this.
+    // But PhysicsSystem writes to Stores. We shouldn't mess up global stores if possible, 
+    // OR we accept that Local Player IS in the store and we update it.
+
+    const world = this.localState?.engine.physicsWorld;
+    if (world && localPlayer.physicsIndex !== undefined) {
+      // Sync Server State to DOD
+      TransformStore.set(localPlayer.physicsIndex, serverPos.x, serverPos.y, 0, localPlayer.radius); // Rot?
+      PhysicsStore.set(localPlayer.physicsIndex, resimVel.x, resimVel.y, 1, localPlayer.radius);
+
+      // Replay Loop
+      for (const input of this.pendingInputs) {
+        // Apply Input -> Velocity
+        MovementSystem.applyInput(
+          { x: TransformStore.data[localPlayer.physicsIndex * 8], y: TransformStore.data[localPlayer.physicsIndex * 8 + 1] },
+          { x: PhysicsStore.data[localPlayer.physicsIndex * 8], y: PhysicsStore.data[localPlayer.physicsIndex * 8 + 1] }, // Object wrapper for ref? No, need to write back or pass object that writes back.
+          input.target,
+          { maxSpeed: localPlayer.maxSpeed, speedMultiplier: localPlayer.statusMultipliers.speed || 1 },
+          input.dt
+        );
+
+        // Wait, applyInput modifies the object passed.
+        // We need to write that object's Vel back to Store?
+        // Let's create a proxy object or just read/write manually.
+        // MovementSystem.applyInput takes {x,y} objects.
+        const pObj = { x: TransformStore.data[localPlayer.physicsIndex * 8], y: TransformStore.data[localPlayer.physicsIndex * 8 + 1] };
+        const vObj = { x: PhysicsStore.data[localPlayer.physicsIndex * 8], y: PhysicsStore.data[localPlayer.physicsIndex * 8 + 1] };
+
+        MovementSystem.applyInput(pObj, vObj, input.target, { maxSpeed: localPlayer.maxSpeed, speedMultiplier: localPlayer.statusMultipliers.speed || 1 }, input.dt);
+
+        // Write Vel back
+        PhysicsStore.data[localPlayer.physicsIndex * 8] = vObj.x;
+        PhysicsStore.data[localPlayer.physicsIndex * 8 + 1] = vObj.y;
+
+        // Integrate
+        PhysicsSystem.integrateEntity(localPlayer.physicsIndex, input.dt, 0.9); // Friction 0.9 hardcoded or read?
+      }
+
+      // Read final Re-simulated state
+      const finalX = TransformStore.data[localPlayer.physicsIndex * 8];
+      const finalY = TransformStore.data[localPlayer.physicsIndex * 8 + 1];
+      const finalVx = PhysicsStore.data[localPlayer.physicsIndex * 8];
+      const finalVy = PhysicsStore.data[localPlayer.physicsIndex * 8 + 1];
+
+      // Check divergence
+      const dx = localPlayer.position.x - finalX;
+      const dy = localPlayer.position.y - finalY;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq > this.reconcileThreshold * this.reconcileThreshold) {
+        // Error too large, Snap to Re-simulated
+        // Todo: Implement Smooth correction via visual offset
+        localPlayer.position.x = finalX;
+        localPlayer.position.y = finalY;
+        localPlayer.velocity.x = finalVx;
+        localPlayer.velocity.y = finalVy;
+      } else {
+        // Smoothly converge (Lerp)
+        // localPlayer.position.x += (finalX - localPlayer.position.x) * 0.1;
+        // localPlayer.position.y += (finalY - localPlayer.position.y) * 0.1;
+        // Actually, if error is small, just keep local (it's smoother).
+        // But we should drift towards correct.
+        localPlayer.position.x = finalX; // For now snap if prediction verified (it prevents drift)
+        localPlayer.position.y = finalY;
+        localPlayer.velocity.x = finalVx;
+        localPlayer.velocity.y = finalVy;
+      }
+
+    } else {
+      // Fallback if no physics world (shouldn't happen)
       localPlayer.position.x = sPlayer.position.x;
       localPlayer.position.y = sPlayer.position.y;
-      localPlayer.velocity.x = sPlayer.velocity.x;
-      localPlayer.velocity.y = sPlayer.velocity.y;
-
-      this.pendingInputs.forEach(input => {
-        const dx = input.target.x - localPlayer.position.x;
-        const dy = input.target.y - localPlayer.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 5) {
-          const speed = localPlayer.maxSpeed * (localPlayer.statusEffects?.speedBoost || 1);
-          // Simple physics replay
-          localPlayer.position.x += (dx / dist) * speed * input.dt * 10;
-          localPlayer.position.y += (dy / dist) * speed * input.dt * 10;
-        }
-      });
     }
   }
 
