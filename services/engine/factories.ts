@@ -38,8 +38,6 @@ export const randomPigment = (): PigmentVec3 => ({
   b: Math.random(),
 });
 
-import { SynergyComponent } from '../components/SynergyComponent';
-
 import { ConfigStore } from './dod/ConfigStore';
 import { InputStore } from './dod/ComponentStores';
 import { pigmentToInt, intToHex, hexToInt } from '../cjr/colorMath'; // EIDOLON-V: Import color helper
