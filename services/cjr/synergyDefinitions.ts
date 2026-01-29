@@ -3,6 +3,7 @@ import { TattooId } from './cjrTypes';
 import { createFloatingText } from '../engine/effects';
 import { createFood } from '../engine/factories';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
+import { vfxSystem } from '../vfx/vfxSystem'; // EIDOLON-V: Static import
 
 // Re-export needed types or define them here if not circular
 export interface TattooSynergy {
@@ -33,8 +34,6 @@ export const createSynergyVisualEffect = (player: Player, config: {
     duration: number;
 }, state: GameState): void => {
     // EIDOLON-V: Push Synergy Event (Type 8)
-    // Encode config in 'id' string field
-    const { vfxSystem } = require('../vfx/vfxSystem');
     const meta = `${config.particleColor}:${config.pattern}`;
     vfxSystem.emitVFX(state, 8, player.position.x, player.position.y, 0, meta);
 };

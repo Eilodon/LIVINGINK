@@ -6,7 +6,7 @@
 
 import { GameState, Player } from '../../types';
 import { TattooId } from '../../services/cjr/cjrTypes';
-import { createInitialState, updateGameState, updateClientVisuals } from '../../services/engine';
+import { createInitialState, optimizedEngine } from '../../services/engine';
 import { createPlayer, createBot, createFood } from '../../services/engine/factories';
 import { applyTattoo } from '../../services/cjr/tattoos';
 import { calcMatchPercent } from '../../services/cjr/colorMath';
@@ -176,8 +176,8 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
 
             // Simulate game update (multiple frames to allow physics/logic to settle)
             for (let i = 0; i < 10; i++) {
-              updateGameState(this.gameState!, 1 / 60);
-              updateClientVisuals(this.gameState!, 1 / 60); // EIDOLON-V: Sync for Test
+              optimizedEngine.updateGameState(this.gameState!, 1 / 60);
+              optimizedEngine.updateClientVisuals(this.gameState!, 1 / 60); // EIDOLON-V: Sync for Test
             }
 
             // Check if player moved

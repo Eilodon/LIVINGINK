@@ -1,15 +1,9 @@
-/**
- * TATTOO SYNERGY SYSTEM - Strategic Depth (Simplified but Full Features)
- * 
- * Creating meaningful combinations between tattoos that unlock powerful effects
- * Each synergy feels deliberate and rewards strategic thinking
- */
-
 import { Player, GameState } from '../../types';
 import { TattooId } from './cjrTypes';
 import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags'; // EIDOLON-V: Import Flags
+import { vfxSystem } from '../vfx/vfxSystem'; // EIDOLON-V: Static import
 
 // ============================================
 // SYNERGY VISUAL EFFECTS HELPER
@@ -23,8 +17,6 @@ const createSynergyVisualEffect = (player: Player, config: {
 }, state: GameState): void => {
 
   // EIDOLON-V: Push Synergy Event (Type 8)
-  // We encode visual config into the 'id' field for now (Temporary until Enums)
-  const { vfxSystem } = require('../vfx/vfxSystem');
   const meta = `${config.particleColor}:${config.pattern}:${config.particleCount}:${config.duration}`;
   vfxSystem.emitVFX(state, 8, player.position.x, player.position.y, 0, meta);
 };

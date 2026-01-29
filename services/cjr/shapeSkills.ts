@@ -1,7 +1,9 @@
 import { Player, Bot, GameState, Vector2, Entity } from '../../types';
 import { ShapeId, TattooId } from './cjrTypes';
 import { StatusFlag } from '../engine/statusFlags';
-import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore, StatsStore } from '../engine/dod/ComponentStores';
+import { EntityStateBridge } from '../engine/dod/EntityStateBridge';
+import { vfxSystem } from '../vfx/vfxSystem';
 
 export interface ShapeSkillDef {
     name: string;
@@ -48,15 +50,13 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
             }
 
             const dashPower = 800;
-            // EIDOLON-V: Write back to Physics Store directly if possible, or entity (which syncs next frame? No, immediate sync is better)
-            // But we are in Logic Update, which happens AFTER Physics Pull.
-            // If we write to Entity, it will be Pushed to Physics next frame.
-            // BUT for immediate DASH, we want instant velocity.
-            // "Ghost Fire" issue is about reading. Writing to entity.velocity is fine if Pushed correctly.
-            // Wait, optimizedEngine.integratePhysics Pushes entity -> World.
-            // That happens Phase 1. Logic is Phase 4.
-            // So entity.velocity write here will be pushed NEXT FRAME.
-            // This is acceptable for Dash. The issue was Spawning at (0,0).
+            // EIDOLON-V: Write back to Physics Store directly
+            if (entity.physicsIndex !== undefined) {
+                const idx = entity.physicsIndex * 8;
+                PhysicsStore.data[idx] = dir.x * dashPower;
+                PhysicsStore.data[idx + 1] = dir.y * dashPower;
+            }
+            // Update entity object for UI interpolation (or legacy fallback)
             entity.velocity.x = dir.x * dashPower;
             entity.velocity.y = dir.y * dashPower;
 
@@ -67,7 +67,6 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
             entity.statusFlags |= StatusFlag.INVULNERABLE;
 
             // EIDOLON-V: Emit Dash Event (Type 2)
-            const { vfxSystem } = require('../vfx/vfxSystem');
             vfxSystem.emitVFX(state, 2, pos.x, pos.y, 0, entity.id);
         }
     },
@@ -97,11 +96,17 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
                     const dist = Math.sqrt(distSq) || 0.001;
                     const dir = { x: dx / dist, y: dy / dist };
 
+                    if (other.physicsIndex !== undefined) {
+                        const oIdx = other.physicsIndex * 8;
+                        PhysicsStore.data[oIdx] += dir.x * knockbackPower;
+                        PhysicsStore.data[oIdx + 1] += dir.y * knockbackPower;
+                    }
+
                     other.velocity.x += dir.x * knockbackPower;
                     other.velocity.y += dir.y * knockbackPower;
 
                     if ('currentHealth' in other) {
-                        other.currentHealth -= 10;
+                        EntityStateBridge.setCurrentHealth(other, other.currentHealth - 10);
                     }
                 }
             }
@@ -110,7 +115,6 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
             entity.statusScalars.commitShield = 2.0;
 
             // EIDOLON-V: Emit Shockwave Event (Type 3)
-            const { vfxSystem } = require('../vfx/vfxSystem');
             vfxSystem.emitVFX(state, 3, pos.x, pos.y, 0, entity.id);
         }
     },
@@ -121,12 +125,11 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
         description: 'Next attack deals 2.5x damage and ignores 50% defense',
         execute: (entity, state) => {
             const pos = getPos(entity);
-            entity.statusMultipliers.damage = 2.5;
+            EntityStateBridge.setDamageMultiplier(entity, 2.5);
             entity.armorPen = Math.min(1.0, entity.armorPen + 0.5);
             entity.statusScalars.speedSurge = 3.0;
 
             // EIDOLON-V: Emit Pierce Event (Type 4)
-            const { vfxSystem } = require('../vfx/vfxSystem');
             vfxSystem.emitVFX(state, 4, pos.x, pos.y, 0, entity.id);
         }
     },
@@ -137,14 +140,13 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
         description: 'Pull nearby pickups for 2s, +30% pickup value',
         execute: (entity, state) => {
             const pos = getPos(entity);
-            entity.magneticFieldRadius = 200;
+            EntityStateBridge.setMagnetRadius(entity, 200);
             entity.statusTimers.magnet = 2.0;
             entity.statusMultipliers.pity = 2.0;
 
             // Physics logic loop handled in engine/index.ts magnet section
 
             // EIDOLON-V: Emit Vortex Event (Type 5)
-            const { vfxSystem } = require('../vfx/vfxSystem');
             vfxSystem.emitVFX(state, 5, pos.x, pos.y, 0, entity.id);
         }
     }

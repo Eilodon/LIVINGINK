@@ -70,6 +70,48 @@ export class StatsStore {
         this.data[idx + 4] = defense;
         this.data[idx + 5] = damageMultiplier;
     }
+
+    // Setters
+    static setDefense(id: number, value: number) {
+        this.data[id * StatsStore.STRIDE + 4] = value;
+    }
+
+    static setDamageMultiplier(id: number, value: number) {
+        this.data[id * StatsStore.STRIDE + 5] = value;
+    }
+
+    static setCurrentHealth(id: number, value: number) {
+        this.data[id * StatsStore.STRIDE] = value;
+    }
+
+    static setMaxHealth(id: number, value: number) {
+        this.data[id * StatsStore.STRIDE + 1] = value;
+    }
+
+    // EIDOLON-V P2: Getter Methods (DOD Authority)
+    static getCurrentHealth(id: number): number {
+        return this.data[id * StatsStore.STRIDE];
+    }
+
+    static getMaxHealth(id: number): number {
+        return this.data[id * StatsStore.STRIDE + 1];
+    }
+
+    static getScore(id: number): number {
+        return this.data[id * StatsStore.STRIDE + 2];
+    }
+
+    static getMatchPercent(id: number): number {
+        return this.data[id * StatsStore.STRIDE + 3];
+    }
+
+    static getDefense(id: number): number {
+        return this.data[id * StatsStore.STRIDE + 4];
+    }
+
+    static getDamageMultiplier(id: number): number {
+        return this.data[id * StatsStore.STRIDE + 5];
+    }
 }
 
 export class SkillStore {
@@ -128,7 +170,7 @@ export * from './ConfigStore';
 import { ConfigStore } from './ConfigStore';
 
 export class InputStore {
-    // [targetX, targetY, isSkillActive, _pad]
+    // [targetX, targetY, isSkillActive, isEjectActive]
     // Stride = 4
     public static readonly STRIDE = 4;
     public static readonly data = new Float32Array(MAX_ENTITIES * InputStore.STRIDE);
@@ -159,6 +201,25 @@ export class InputStore {
         const idx = id * InputStore.STRIDE;
         if (this.data[idx + 2] === 1) {
             this.data[idx + 2] = 0;
+            return true;
+        }
+        return false;
+    }
+
+    static setEjectActive(id: number, active: boolean) {
+        const idx = id * InputStore.STRIDE;
+        this.data[idx + 3] = active ? 1 : 0;
+    }
+
+    static getEjectActive(id: number): boolean {
+        const idx = id * InputStore.STRIDE;
+        return this.data[idx + 3] === 1;
+    }
+
+    static consumeEjectInput(id: number): boolean {
+        const idx = id * InputStore.STRIDE;
+        if (this.data[idx + 3] === 1) {
+            this.data[idx + 3] = 0;
             return true;
         }
         return false;

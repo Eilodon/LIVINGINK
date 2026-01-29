@@ -23,6 +23,7 @@ import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { tattooSynergyManager } from '../cjr/tattooSynergies';
 
 import { resetContributionLog } from '../cjr/contribution';
+import { TattooEventManager } from '../cjr/tattooEvents'; // EIDOLON-V: Static import
 import { entityManager } from './dod/EntityManager'; // EIDOLON-V: DOD Manager
 
 import { pooledEntityFactory } from '../pooling/ObjectPool';
@@ -385,7 +386,6 @@ class OptimizedGameEngine {
     filterInPlace(state.bots, b => {
       if (b.isDead) {
         // EIDOLON-V FIX: Cleanup events/synergies to prevent ID reuse bugs
-        const { TattooEventManager } = require('../cjr/tattooEvents');
         TattooEventManager.triggerDeactivate(b.id);
         return false;
       }
@@ -425,136 +425,162 @@ class OptimizedGameEngine {
 
   // EIDOLON-V FIX: Main optimized update method (Pure DOD Loop)
   public updateGameState(state: GameState, dt: number): GameState {
-    // EIDOLON-V FIX: Bind engine and spatial grid at update time
-    bindEngine(state.engine);
-    this.spatialGrid = getCurrentSpatialGrid();
+    try {
+      // EIDOLON-V FIX: Bind engine and spatial grid at update time
+      bindEngine(state.engine);
+      this.spatialGrid = getCurrentSpatialGrid();
 
-    if (state.isPaused) return state;
+      if (state.isPaused) return state;
 
-    this.frameCount++;
+      this.frameCount++;
 
-    // 1. PHYSICS (Pure DOD)
-    PhysicsSystem.update(dt);
+      // 1. PHYSICS (Pure DOD)
+      PhysicsSystem.update(dt);
 
-    // 2. UPDATE GRID (DOD Iteration)
-    this.updateSpatialGridDOD();
+      // 2. UPDATE GRID (DOD Iteration)
+      this.updateSpatialGridDOD();
 
-    // 3. LOGIC (DOD Iteration)
-    const count = entityManager.count;
-    const flags = StateStore.flags;
+      // 3. LOGIC (DOD Iteration)
+      const count = entityManager.count;
+      const flags = StateStore.flags;
 
-    for (let i = 0; i < count; i++) {
-      if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
+      for (let i = 0; i < count; i++) {
+        if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
 
-      const isPlayer = (flags[i] & EntityFlags.PLAYER) !== 0;
-      const isBot = (flags[i] & EntityFlags.BOT) !== 0;
+        const isPlayer = (flags[i] & EntityFlags.PLAYER) !== 0;
+        const isBot = (flags[i] & EntityFlags.BOT) !== 0;
 
-      // A. MOVEMENT & LOGIC (Pure DOD)
-      if (isPlayer || isBot) {
-        // Sync Bot/Player Target to InputStore (Hybrid Bridge)
-        const obj = EntityLookup[i] as Player | Bot;
+        // A. MOVEMENT & LOGIC (Pure DOD)
+        if (isPlayer || isBot) {
+          // Sync Bot/Player Target to InputStore (Hybrid Bridge)
+          const obj = EntityLookup[i] as Player | Bot;
 
-        if (obj) {
-          if (isBot) {
-            // AI Runs on Object -> Writes to Store
-            updateAI(obj as Bot, state, dt);
-            // Sync Target to InputStore
-            const bot = obj as Bot;
-            if (bot.targetPosition) {
-              InputStore.setTarget(i, bot.targetPosition.x, bot.targetPosition.y);
+          if (obj) {
+            if (isBot) {
+              // AI Runs on Object -> Writes to Store
+              updateAI(obj as Bot, state, dt);
+              // Sync Target to InputStore
+              const bot = obj as Bot;
+              if (bot.targetPosition) {
+                InputStore.setTarget(i, bot.targetPosition.x, bot.targetPosition.y);
+              }
+            } else {
+              // Player Input: Sync InputManager target to Store
+              // (Assuming InputManager updates obj.targetPosition or we read it here)
+              const player = obj as Player;
+              if (player.targetPosition) {
+                InputStore.setTarget(i, player.targetPosition.x, player.targetPosition.y);
+              }
+
+              // Skill Input (read from InputStore)
+              if (InputStore.consumeSkillInput(i)) {
+                SkillSystem.handleInput(i, { space: true, target: player.targetPosition }, state);
+              }
             }
-          } else {
-            // Player Input: Sync InputManager target to Store
-            // (Assuming InputManager updates obj.targetPosition or we read it here)
-            const player = obj as Player;
-            if (player.targetPosition) {
-              InputStore.setTarget(i, player.targetPosition.x, player.targetPosition.y);
+
+            // Config ConfigStore (Radius/Damage) from Object if it changed?
+            // Doing this every frame is costly. Ideally only on change.
+            // For now, assume ConfigStore is authoritative or synced elsewhere.
+
+            // Visual Juice Decay (Object state)
+            if (obj.aberrationIntensity && obj.aberrationIntensity > 0) {
+              obj.aberrationIntensity -= dt * 3.0;
+              if (obj.aberrationIntensity < 0) obj.aberrationIntensity = 0;
             }
 
-            // Skill Input (read from InputStore)
-            if (InputStore.consumeSkillInput(i)) {
-              SkillSystem.handleInput(i, { space: true, target: player.targetPosition }, state);
-            }
+            // Stats Regen & Cooldowns
+            this.updateEntityTimers(i, obj, dt);
           }
 
-          // Config ConfigStore (Radius/Damage) from Object if it changed?
-          // Doing this every frame is costly. Ideally only on change.
-          // For now, assume ConfigStore is authoritative or synced elsewhere.
+          // CHẠY MOVEMENT (Pure DOD)
+          MovementSystem.update(i, dt);
 
-          // Visual Juice Decay (Object state)
-          if (obj.aberrationIntensity && obj.aberrationIntensity > 0) {
-            obj.aberrationIntensity -= dt * 3.0;
-            if (obj.aberrationIntensity < 0) obj.aberrationIntensity = 0;
+          // MAGNET (Pure DOD)
+          if (obj && isPlayer) { // Magnet logic usually for players/bots
+            this.updateMagnetLogic(obj as Player, state, dt);
           }
 
-          // Stats Regen & Cooldowns
-          this.updateEntityTimers(i, obj, dt);
-        }
-
-        // CHẠY MOVEMENT (Pure DOD)
-        MovementSystem.update(i, dt);
-
-        // MAGNET (Pure DOD)
-        if (obj && isPlayer) { // Magnet logic usually for players/bots
-          this.updateMagnetLogic(obj as Player, state, dt);
-        }
-
-        // COLLISION (Pure DOD Check -> Hybrid Resolve)
-        if (obj) {
-          this.checkUnitCollisions(obj as Player, state, dt);
-        }
-      }
-    }
-
-    // 4. CJR SYSTEMS (DOD Iteration)
-    for (let i = 0; i < count; i++) {
-      if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
-
-      if (flags[i] & (EntityFlags.PLAYER | EntityFlags.BOT)) {
-        const entity = EntityLookup[i] as Player | Bot;
-        if (entity) {
-          updateRingLogic(entity, dt, state.levelConfig, state);
-          updateEmotion(entity, dt);
-          if (flags[i] & EntityFlags.PLAYER) {
-            tattooSynergyManager.checkSynergies(entity as Player, state);
+          // COLLISION (Pure DOD Check -> Hybrid Resolve)
+          if (obj) {
+            this.checkUnitCollisions(obj as Player, state, dt);
           }
         }
       }
+
+      // 4. CJR SYSTEMS (DOD Iteration)
+      for (let i = 0; i < count; i++) {
+        if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
+
+        if (flags[i] & (EntityFlags.PLAYER | EntityFlags.BOT)) {
+          const entity = EntityLookup[i] as Player | Bot;
+          if (entity) {
+            updateRingLogic(entity, dt, state.levelConfig, state);
+            updateEmotion(entity, dt);
+            if (flags[i] & EntityFlags.PLAYER) {
+              tattooSynergyManager.checkSynergies(entity as Player, state);
+            }
+          }
+        }
+      }
+
+      // 5. PROJECTILES (Hybrid Loop for now, or convert to Index loop if ProjectileStore is ready)
+      // We can iterate indices for projectiles too.
+      this.updateProjectilesDOD(state, dt);
+
+      // 6. GLOBAL SYSTEMS
+      state.gameTime += dt;
+      if (state.gameTime > state.levelConfig.timeLimit && !state.result) {
+        state.result = 'lose';
+        state.isPaused = true;
+      }
+
+      updateWaveSpawner(state, dt);
+      updateBossLogic(state, dt);
+      updateDynamicBounty(state, dt);
+      updateWinCondition(state, dt, state.levelConfig);
+
+      this.checkTattooUnlock(state);
+      vfxIntegrationManager.update(state, dt);
+      tattooSynergyManager.updateSynergies(state, dt);
+
+      this.updateCamera(state);
+
+      // EIDOLON-V: DOD System Updates
+      SkillSystem.update(dt);
+      TattooSystem.update(dt);
+
+      const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
+      state.camera.x += shakeOffset.x;
+      state.camera.y += shakeOffset.y;
+
+      // Clean up dead
+      this.cleanupTransientEntities(state);
+
+      return state;
+    } catch (error) {
+      // EIDOLON-V P3: Error boundary for graceful recovery
+      console.error('[Engine] Critical error in updateGameState:', error);
+      this.emitErrorEvent(error);
+      return this.attemptRecovery(state);
     }
+  }
 
-    // 5. PROJECTILES (Hybrid Loop for now, or convert to Index loop if ProjectileStore is ready)
-    // We can iterate indices for projectiles too.
-    this.updateProjectilesDOD(state, dt);
-
-    // 6. GLOBAL SYSTEMS
-    state.gameTime += dt;
-    if (state.gameTime > state.levelConfig.timeLimit && !state.result) {
-      state.result = 'lose';
-      state.isPaused = true;
+  // EIDOLON-V P3: Emit error event for UI recovery
+  private emitErrorEvent(error: unknown): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent('engine-error', {
+        detail: { error, timestamp: Date.now() }
+      }));
+    } catch (e) {
+      // Silently fail if event dispatch fails
     }
+  }
 
-    updateWaveSpawner(state, dt);
-    updateBossLogic(state, dt);
-    updateDynamicBounty(state, dt);
-    updateWinCondition(state, dt, state.levelConfig);
-
-    this.checkTattooUnlock(state);
-    vfxIntegrationManager.update(state, dt);
-    tattooSynergyManager.updateSynergies(state, dt);
-
-    this.updateCamera(state);
-
-    // EIDOLON-V: DOD System Updates
-    SkillSystem.update(dt);
-    TattooSystem.update(dt);
-
-    const shakeOffset = vfxIntegrationManager.getScreenShakeOffset();
-    state.camera.x += shakeOffset.x;
-    state.camera.y += shakeOffset.y;
-
-    // Clean up dead
-    this.cleanupTransientEntities(state);
-
+  // EIDOLON-V P3: Attempt graceful recovery
+  private attemptRecovery(state: GameState): GameState {
+    console.warn('[Engine] Attempting graceful recovery...');
+    state.isPaused = true;
     return state;
   }
 

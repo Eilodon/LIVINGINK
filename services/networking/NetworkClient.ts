@@ -9,6 +9,13 @@ import { BinaryPacker } from './BinaryPacker';
 import { MovementSystem } from '../engine/dod/systems/MovementSystem';
 import { PhysicsSystem } from '../engine/dod/systems/PhysicsSystem';
 import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
+import { InputRingBuffer } from './InputRingBuffer';
+
+// EIDOLON-V P4: Module-level reusable vectors (zero allocation after init)
+const _serverPos = { x: 0, y: 0 };
+const _resimVel = { x: 0, y: 0 };
+const _replayTarget = { x: 0, y: 0 };
+const _replayInput = { seq: 0, targetX: 0, targetY: 0, space: false, w: false, dt: 0 };
 
 interface NetworkConfig {
   serverUrl: string;
@@ -48,13 +55,8 @@ export class NetworkClient {
   private botMap: Map<string, Bot> = new Map();
   private foodMap: Map<string, Food> = new Map();
 
-  // Client-Side Prediction
-  private pendingInputs: {
-    seq: number;
-    target: { x: number; y: number };
-    inputs: { space: boolean; w: boolean };
-    dt: number;
-  }[] = [];
+  // EIDOLON-V P4: Zero-Allocation Input Buffer
+  private pendingInputs = new InputRingBuffer(256);
   private inputSeq: number = 0;
 
   private reconcileThreshold = 20; // 20px allowance
@@ -359,23 +361,14 @@ export class NetworkClient {
   private reconcileLocalPlayer(localPlayer: Player, sPlayer: any) {
     const lastProcessed = sPlayer.lastProcessedInput || 0;
 
-    // Remove processed inputs
-    this.pendingInputs = this.pendingInputs.filter(input => input.seq > lastProcessed);
+    // EIDOLON-V P4: In-place filtering (zero allocation)
+    this.pendingInputs.filterProcessed(lastProcessed);
 
-    // Current State (Predicted) vs Server State (Authoritative)
-    // We want to verify if our prediction was correct.
-    // Ideally we resimulate FROM server state with pending inputs.
-
-    // 1. Reset to Server State
-    const serverPos = { x: sPlayer.position.x, y: sPlayer.position.y };
-
-    // Calculate Error before correction (for Teleport check vs Smooth Correction)
-    // But we need the 'Re-simulated' position to know the TRUE error.
-    // Error = CurrentLocal - (Server + ReplayedInputs).
-
-    // Clone server state for re-simulation
-    const resimPos = { x: sPlayer.position.x, y: sPlayer.position.y };
-    const resimVel = { x: sPlayer.velocity.x, y: sPlayer.velocity.y };
+    // EIDOLON-V P4: Reuse module-level vectors instead of creating new objects
+    _serverPos.x = sPlayer.position.x;
+    _serverPos.y = sPlayer.position.y;
+    _resimVel.x = sPlayer.velocity.x;
+    _resimVel.y = sPlayer.velocity.y;
 
     // 2. Re-simulate Pending Inputs
     // We need access to PhysicsWorld for map constraints, but simplistic re-sim is okay if map is simple.
@@ -386,22 +379,22 @@ export class NetworkClient {
     const world = this.localState?.engine.physicsWorld;
     if (world && localPlayer.physicsIndex !== undefined) {
       // Sync Server State to DOD
-      TransformStore.set(localPlayer.physicsIndex, serverPos.x, serverPos.y, 0, localPlayer.radius); // Rot?
-      PhysicsStore.set(localPlayer.physicsIndex, resimVel.x, resimVel.y, 1, localPlayer.radius);
+      TransformStore.set(localPlayer.physicsIndex, _serverPos.x, _serverPos.y, 0, localPlayer.radius);
+      PhysicsStore.set(localPlayer.physicsIndex, _resimVel.x, _resimVel.y, 1, localPlayer.radius);
 
-      // Replay Loop
-      for (const input of this.pendingInputs) {
-        // Apply Input -> Velocity (DOD)
+      // EIDOLON-V P4: Zero-allocation replay loop
+      this.pendingInputs.forEach((seq, targetX, targetY, space, w, dt) => {
+        _replayTarget.x = targetX;
+        _replayTarget.y = targetY;
+
         MovementSystem.applyInputDOD(
-          localPlayer.physicsIndex,
-          input.target,
+          localPlayer.physicsIndex!,
+          _replayTarget,
           { maxSpeed: localPlayer.maxSpeed, speedMultiplier: localPlayer.statusMultipliers.speed || 1 },
-          input.dt
+          dt
         );
-
-        // Integrate
-        PhysicsSystem.integrateEntity(localPlayer.physicsIndex, input.dt, 0.9);
-      }
+        PhysicsSystem.integrateEntity(localPlayer.physicsIndex!, dt, 0.9);
+      });
 
       // Read final Re-simulated state
       const finalX = TransformStore.data[localPlayer.physicsIndex * 8];
@@ -750,7 +743,10 @@ export class NetworkClient {
   sendInput(target: Vector2, inputs: { space: boolean; w: boolean }, dt: number, events: any[] = []) {
     if (!this.room) return;
     const seq = ++this.inputSeq;
-    this.pendingInputs.push({ seq, target: { ...target }, inputs: { ...inputs }, dt });
+
+    // EIDOLON-V P4: Zero-allocation input buffering
+    this.pendingInputs.push(seq, target.x, target.y, inputs.space, inputs.w, dt);
+
     this.room.send('input', {
       seq,
       targetX: target.x,

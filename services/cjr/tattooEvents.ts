@@ -5,6 +5,7 @@
 
 import { TattooDefinition, getTattooById } from './tattoos';
 import { Player, Bot, Food, GameState } from '../../types';
+import { tattooSynergyManager } from './tattooSynergies'; // EIDOLON-V: Static import
 
 export class TattooEventManager {
   static triggerConsume(entity: Player | Bot, food: Food, state: GameState) {
@@ -55,7 +56,6 @@ export class TattooEventManager {
    * EIDOLON-V FIX: Trigger cleanup when entity is deactivated
    */
   static triggerDeactivate(entityId: string) {
-    const { tattooSynergyManager } = require('./tattooSynergies');
     tattooSynergyManager.cleanupEntity(entityId);
   }
 }

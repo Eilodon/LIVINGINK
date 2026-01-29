@@ -109,6 +109,7 @@ export interface Player extends Entity {
 export interface Bot extends Player {
     aiState: 'wander' | 'chase' | 'flee' | 'forage';
     targetEntityId: string | null;
+    targetFoodPos?: Vector2; // EIDOLON-V P3: Added to eliminate monkey-patching
     aiReactionTimer: number;
     isCreep?: boolean;
     creepType?: string;

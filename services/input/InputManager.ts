@@ -2,6 +2,10 @@ import { InputState, createDefaultInputState } from '../../types/input';
 
 export type InputManager = typeof inputManager;
 
+// EIDOLON-V P3: Stored handler references for proper cleanup
+let keyDownHandler: ((e: KeyboardEvent) => void) | null = null;
+let keyUpHandler: ((e: KeyboardEvent) => void) | null = null;
+
 export const inputManager = {
     // State hiện tại (được Engine đọc mỗi tick)
     state: createDefaultInputState() as InputState,
@@ -11,10 +15,13 @@ export const inputManager = {
 
     init() {
         if (typeof window === 'undefined') return;
-        // Bind listeners
-        // Helper to bind context or just use arrow functions
-        window.addEventListener('keydown', (e) => this.onKey(e.code, true));
-        window.addEventListener('keyup', (e) => this.onKey(e.code, false));
+
+        // EIDOLON-V P3: Store handler references for proper cleanup
+        keyDownHandler = (e: KeyboardEvent) => this.onKey(e.code, true);
+        keyUpHandler = (e: KeyboardEvent) => this.onKey(e.code, false);
+
+        window.addEventListener('keydown', keyDownHandler);
+        window.addEventListener('keyup', keyUpHandler);
     },
 
     // --- Zero GC Optimization ---
@@ -28,12 +35,20 @@ export const inputManager = {
         this.sharedInputBuffer.fill(0);
     },
 
-    // EIDOLON ARCHITECT: Cleanup for HMR (Hot Module Reload)
+    // EIDOLON-V P3: Fixed cleanup using stored handler references
     dispose() {
         if (typeof window === 'undefined') return;
-        // Remove event listeners to prevent double registration on hot reload
-        window.removeEventListener('keydown', (e) => this.onKey(e.code, true));
-        window.removeEventListener('keyup', (e) => this.onKey(e.code, false));
+
+        // Use stored handler references - correctly removes the same handlers
+        if (keyDownHandler) {
+            window.removeEventListener('keydown', keyDownHandler);
+            keyDownHandler = null;
+        }
+        if (keyUpHandler) {
+            window.removeEventListener('keyup', keyUpHandler);
+            keyUpHandler = null;
+        }
+
         this.reset();
     },
 
@@ -43,12 +58,12 @@ export const inputManager = {
 
         // Skill Trigger (Space)
         if (code === 'Space') {
-            this.state.actions.space = isDown; // EIDOLON-V: use specific action
+            this.state.actions.space = isDown;
             if (isDown) this.pushEvent('skill');
         }
         // Eject Trigger (W)
         if (code === 'KeyW') {
-            this.state.actions.w = isDown; // EIDOLON-V: use specific action
+            this.state.actions.w = isDown;
             if (isDown) this.pushEvent('eject');
         }
     },
@@ -63,8 +78,6 @@ export const inputManager = {
     },
 
     setButton(btn: 'skill' | 'eject', isDown: boolean) {
-        // Map btn to generic action key if needed, or update actions directly
-        // Currently hardcoded mapping:
         if (btn === 'skill') this.state.actions.space = isDown;
         if (btn === 'eject') this.state.actions.w = isDown;
 
@@ -128,9 +141,7 @@ export const inputManager = {
 
     // Engine gọi hàm này để tính target position mà KHÔNG tạo object mới
     updateTargetPosition(currentPos: { x: number, y: number }, outTarget: { x: number, y: number }) {
-        // Target = Current + Vector * Offset
         const OFFSET = 250;
-        // Use shared buffer for maximum speed/thread safety simulation
         const mx = this.sharedInputBuffer[0];
         const my = this.sharedInputBuffer[1];
 

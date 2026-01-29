@@ -24,13 +24,18 @@ export default defineConfig({
   build: {
     target: 'esnext', // SOTA 2026: Optimize for modern browsers
     minify: 'esbuild',
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
     rollupOptions: {
       output: {
         manualChunks: {
-          'engine-core': ['pixi.js', 'colyseus.js'], // Split heavy engine deps
-          'ui-framework': ['react', 'react-dom'],    // Split UI deps
+          // EIDOLON-V P3: Better chunk splitting for faster initial load
+          'pixi-core': ['pixi.js'],           // PixiJS renderer
+          'colyseus': ['colyseus.js'],        // Networking
+          'ui-framework': ['react', 'react-dom'],
         }
       }
-    }
+    },
+    // EIDOLON-V P3: Increase warning limit since game engines are inherently large
+    chunkSizeWarningLimit: 700
   }
 });

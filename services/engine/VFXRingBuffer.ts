@@ -43,6 +43,24 @@ export class VFXRingBuffer {
   }
 
   /**
+   * Pop last event (LIFO) - Efficient for frame processing
+   */
+  pop(): VFXEvent | null {
+    if (this.head === 0) return null;
+
+    this.head--;
+    const index = this.head * this.EVENT_SIZE;
+
+    return {
+      x: this.data[index],
+      y: this.data[index + 1],
+      color: this.data[index + 2],
+      type: this.data[index + 3],
+      data: this.data[index + 4]
+    };
+  }
+
+  /**
    * Get all events since last read
    */
   getEvents(): VFXEvent[] {

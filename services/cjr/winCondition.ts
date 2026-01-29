@@ -1,6 +1,7 @@
 
 import { GameState, Player } from '../../types';
 import { THRESHOLDS, RING_RADII } from '../../constants';
+import { vfxSystem } from '../vfx/vfxSystem'; // EIDOLON-V: Static import
 
 export const updateWinCondition = (state: GameState, dt: number, levelConfig: any) => {
     // EIDOLON-V: Support explicitly defined Win Condition from Level Config
@@ -40,7 +41,6 @@ export const updateWinCondition = (state: GameState, dt: number, levelConfig: an
 
             const pulseInterval = 0.5;
             if (potentialWinner.statusScalars.kingForm % pulseInterval < dt) {
-                const { vfxSystem } = require('../vfx/vfxSystem');
                 // Type 6 = Pulse (Win warning)
                 vfxSystem.emitVFX(state, 6, potentialWinner.position.x, potentialWinner.position.y, 0, potentialWinner.id);
                 state.shakeIntensity = 5;

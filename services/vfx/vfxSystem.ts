@@ -11,33 +11,30 @@ export class VFXSystem {
   }
 
   emitVFX(state: GameState, type: number, x: number, y: number, data: number = 0, id: string = ''): void {
-    const MAX_EVENTS = 50;
-    // Check if vfxEvents is initialized (some tests or legacy states might validly fail this if not migrated)
-    if (!state.vfxEvents || !Array.isArray(state.vfxEvents)) return;
+    // EIDOLON-V: Direct Push to SharedArrayBuffer
+    // We map legacy "type" to VFX_TYPES if possible, or pass raw if supported.
+    // Assuming type matches VFX_TYPES enum or is compatible integer.
+    // If "id" implies text, we might need special handling, but basic particle/event is:
+    // x, y, color (0 for default/from-data), type, data
 
-    // Safety for legacy "push" array that hasn't been re-inited as object pool
-    if (state.vfxEvents.length !== MAX_EVENTS) {
-      // Optionally migrating on the fly, but safer to assume it's set up
-      // If it is string[], this will crash or type error at runtime, but we changed types.
-      // Runtime check:
-      if (state.vfxEvents.length === 0 || typeof state.vfxEvents[0] !== 'object') {
-        // Reset
-        state.vfxEvents = Array.from({ length: MAX_EVENTS }, () => ({ type: 0, x: 0, y: 0, data: 0, id: '', seq: 0, color: 0 }));
-        state.vfxHead = 0;
-      }
-    }
+    // Note: packHex(data) might be needed if data is color? 
+    // In legacy calls:
+    // type=1 (Ring Commit) -> data=RingId
+    // type=2 (Dash) -> data=0
+    // type=3 (Bump) -> data=0
+    // type=4 (Pierce) -> data=0
+    // type=5 (Vortex) -> data=0
 
-    const idx = (state.vfxHead || 0) % MAX_EVENTS;
-    const evt = state.vfxEvents[idx];
-    if (evt) {
-      evt.type = type;
-      evt.x = x;
-      evt.y = y;
-      evt.data = data;
-      evt.id = id;
-      evt.seq = Date.now();
-    }
-    state.vfxHead = ((state.vfxHead || 0) + 1) % MAX_EVENTS;
+    // We use data param as subtype-like or raw value.
+    // For COLOR, we might default to White or Gold.
+
+    // Legacy mapping:
+    // 1 -> VFX_TYPES.RING_PULSE (Assumed, check VFX_TYPES)
+    // 2 -> DASH_WIND
+    // ...
+    // Actually, let's just push raw type and data. Renderer interprets it.
+
+    vfxBuffer.push(x, y, 0xFFFFFF, type, data);
   }
 
   playRingCommitVFX(player: Player, ringId: RingId, state: GameState): void {

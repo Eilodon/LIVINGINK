@@ -7,6 +7,7 @@ import { mixPigment, calcMatchPercent, pigmentToHex, pigmentToInt } from './colo
 import { createFloatingText } from '../engine/effects';
 import { createParticle, createFood } from '../engine/factories';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
+import { EntityStateBridge } from '../engine/dod/EntityStateBridge';
 
 export interface TattooDefinition {
     id: TattooId;
@@ -101,7 +102,7 @@ const TATTOOS: TattooDefinition[] = [
         },
         onUpdate: (player: Player, dt: number, state: GameState) => {
             if (player.matchPercent >= 0.85) {
-                player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed!, 1.2);
+                EntityStateBridge.setSpeedMultiplier(player, Math.max(player.statusMultipliers.speed || 1, 1.2));
             }
         }
     },
@@ -181,7 +182,7 @@ const TATTOOS: TattooDefinition[] = [
         description: 'Passive 15% speed boost. Dash is cheaper.',
         apply: (player: Player) => {
             player.statusScalars.speedSurge = 1;
-            player.statusMultipliers.speed = Math.max(player.statusMultipliers.speed, 1.15);
+            EntityStateBridge.setSpeedMultiplier(player, Math.max(player.statusMultipliers.speed, 1.15));
             player.skillCooldownMultiplier = 1.5; // Faster recharge
         }
     },
@@ -192,7 +193,7 @@ const TATTOOS: TattooDefinition[] = [
         description: 'Start with 3s invulnerability. Gain 50% defense.',
         apply: (player: Player) => {
             player.statusTimers.invulnerable = 3.0; // Start invuln
-            player.defense *= 1.5;
+            EntityStateBridge.setDefense(player, player.defense * 1.5);
         }
     },
     {
@@ -213,7 +214,7 @@ const TATTOOS: TattooDefinition[] = [
         tier: MutationTier.Rare,
         description: 'Significantly increased pickup radius.',
         apply: (player: Player) => {
-            player.magneticFieldRadius = 150;
+            EntityStateBridge.setMagnetRadius(player, 150);
             player.statusTimers.magnet = 9999;
         }
     },

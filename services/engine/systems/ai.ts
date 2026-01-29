@@ -128,29 +128,26 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
     // 4. DECISION TREE (State Transition)
     // Convert Indices to State
     if (threatIndex !== -1 && closestThreatDistSq < 300 * 300) {
-      (bot as any).aiState = 'flee';
-      // We still store string ID for legacy systems? Or store Index?
-      // Let's lookup the ID just once.
+      bot.aiState = 'flee';
+      // Lookup the ID just once for legacy systems
       const threatObj = EntityLookup[threatIndex];
-      (bot as any).targetEntityId = threatObj ? threatObj.id : null;
+      bot.targetEntityId = threatObj ? threatObj.id : null;
 
       // Panic Skill
       if (closestThreatDistSq < 150 * 150) {
         applySkill(bot, undefined, state); // Legacy wrapper
       }
     } else if (targetEntityIndex !== -1 && closestPreyDistSq < 400 * 400) {
-      (bot as any).aiState = 'chase';
+      bot.aiState = 'chase';
       const targetObj = EntityLookup[targetEntityIndex];
-      (bot as any).targetEntityId = targetObj ? targetObj.id : null;
+      bot.targetEntityId = targetObj ? targetObj.id : null;
     } else if (targetFoodIndex !== -1) {
-      (bot as any).aiState = 'forage';
-      // Store target position to move towards, don't need ID
+      bot.aiState = 'forage';
+      // Store target position to move towards
       const fTIdx = targetFoodIndex * 8;
-      // Hack: Store target pos in a temp var on bot? 
-      // Or just move immediately below.
-      (bot as any).targetFoodPos = { x: tData[fTIdx], y: tData[fTIdx + 1] };
+      bot.targetFoodPos = { x: tData[fTIdx], y: tData[fTIdx + 1] };
     } else {
-      (bot as any).aiState = 'wander';
+      bot.aiState = 'wander';
     }
 
     // 5. EXECUTE MOVEMENT (DOD Force)
@@ -175,8 +172,8 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
         tx = (dx / dist) * speed;
         ty = (dy / dist) * speed;
       }
-    } else if (bot.aiState === 'forage' && (bot as any).targetFoodPos) {
-      const tPos = (bot as any).targetFoodPos;
+    } else if (bot.aiState === 'forage' && bot.targetFoodPos) {
+      const tPos = bot.targetFoodPos;
       const dx = tPos.x - botX;
       const dy = tPos.y - botY;
       const dist = Math.sqrt(dx * dx + dy * dy);

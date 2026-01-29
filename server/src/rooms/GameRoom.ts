@@ -23,7 +23,7 @@ import {
   FOOD_RADIUS
 } from '../constants';
 // Import shared game logic
-import { updateGameState, createInitialState } from '../../../services/engine/index';
+import { createInitialState, optimizedEngine } from '../../../services/engine/index';
 import { createPlayer } from '../../../services/engine/factories';
 import { GameRuntimeState, Player } from '../../../types';
 
@@ -231,7 +231,7 @@ export class GameRoom extends Room<GameRoomState> {
     this.state.gameTime += dtSec;
 
     this.applyInputsToSimState();
-    updateGameState(this.simState, dtSec);
+    optimizedEngine.updateGameState(this.simState, dtSec);
     this.syncSimStateToServer();
 
     // EIDOLON-V: Broadcast Binary Transforms

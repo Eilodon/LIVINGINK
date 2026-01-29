@@ -3,7 +3,6 @@
 
 import { GameState, Player, Bot, Food, Entity } from '../../types';
 import { createInitialState } from './index';
-import { updateClientVisuals } from './index';
 import { getCurrentSpatialGrid } from './context';
 import { FixedGameLoop } from './GameLoop'; // EIDOLON-V FIX: Import GameLoop
 import { optimizedEngine } from './OptimizedEngine';
@@ -12,6 +11,7 @@ import { mathPerformanceMonitor } from '../math/FastMath';
 import { performanceMonitor } from '../performance/PerformanceMonitor';
 
 // EIDOLON-V FIX: Dependency Injection
+import { BufferedInput } from '../input/BufferedInput';
 import { InputManager, inputManager as defaultInputManager } from '../input/InputManager';
 import { InputStore } from './dod/ComponentStores';
 import { NetworkClient, networkClient as defaultNetworkClient, NetworkStatus } from '../networking/NetworkClient';
@@ -46,6 +46,7 @@ export class GameStateManager {
   private currentConfig: GameSessionConfig | null = null;
 
   // EIDOLON-V FIX: Injected Dependencies
+  private bufferedInput: BufferedInput;
   private inputManager: InputManager;
   private networkClient: NetworkClient;
   private audioEngine: AudioEngine;
@@ -64,6 +65,7 @@ export class GameStateManager {
 
   private constructor() {
     // Default to singletons
+    this.bufferedInput = BufferedInput.getInstance();
     this.inputManager = defaultInputManager;
     this.networkClient = defaultNetworkClient;
     this.audioEngine = defaultAudioEngine;
@@ -107,7 +109,7 @@ export class GameStateManager {
 
     if (isMultiplayer) {
       // Multiplayer Logic
-      updateClientVisuals(state, dt);
+      optimizedEngine.updateClientVisuals(state, dt);
 
       // Send Inputs
       const events = this.inputManager.popEvents();
@@ -125,19 +127,30 @@ export class GameStateManager {
     } else {
       // Singleplayer Logic
       // EIDOLON-V: Pull from InputManager and sync to DOD InputStore
-      this.inputManager.popEvents();
+      // BƯỚC 1.3: KÍCH HOẠT "BUFFERED INPUT"
+      // Thay vì inputManager.updateTargetPosition(...), gọi bufferedInput.syncToStore(localPlayerIndex)
 
-      const move = this.inputManager.state.move;
-      if (move.x !== 0 || move.y !== 0) {
-        state.player.targetPosition.x = state.player.position.x + move.x * 200;
-        state.player.targetPosition.y = state.player.position.y + move.y * 200;
-      }
+      // Sync Input directly to DOD Store (Player Index = 0)
+      this.bufferedInput.syncToStore(0);
 
-      // Sync skill input to InputStore (player physicsIndex = 0)
-      if (this.inputManager.state.actions.space) {
-        InputStore.setSkillActive(0, true);
-        this.inputManager.state.actions.space = false; // Consume immediately
-      }
+      // Update logic target position from Store for compatibility
+      // Using helper:
+      const inputTarget = { x: 0, y: 0 };
+      InputStore.getTarget(0, inputTarget);
+
+      // Apply to State for legacy compatibility (if needed)
+      // OptimizedEngine uses store directly, but state.targetPosition might be used by UI?
+      state.player.targetPosition.x = inputTarget.x;
+      state.player.targetPosition.y = inputTarget.y;
+
+      // Note: Skill input is already in Store via syncToStore
+      // We don't need to manually check inputManager.state.actions.space anymore for engine logic
+      // But clearing it? InputStore.consumeSkillInput(0) will be called by Systems.
+
+      // Legacy support: if something else checks inputManager, we might leave it or remove it.
+      // Instruction says: "Kết quả: Input đi thẳng từ Bàn phím/Chuột -> Ring Buffer -> InputStore (DOD). Không qua Object trung gian."
+
+      // So we rely on Store.
 
       // Core physics/logic update
       optimizedEngine.updateGameState(state, dt);
@@ -186,7 +199,7 @@ export class GameStateManager {
   public updateClientVisuals(dt: number): void {
     if (!this.currentState) return;
 
-    updateClientVisuals(this.currentState, dt);
+    optimizedEngine.updateClientVisuals(this.currentState, dt);
   }
 
   // EIDOLON-V FIX: Centralized state access

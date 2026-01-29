@@ -8,6 +8,7 @@
 
 import { getPhysicsWorld } from './context';
 import { TransformStore } from './dod/ComponentStores';
+import { vfxBuffer } from './VFXRingBuffer';
 
 const STRIDE = 8;
 const X_OFFSET = 0;
@@ -69,6 +70,20 @@ export const getInterpolatedPosition = (
         x: prevX + (currX - prevX) * alpha,
         y: prevY + (currY - prevY) * alpha,
     };
+};
+
+/**
+ * Consume all pending VFX events from the ring buffer
+ * This should be called once per render frame by the visual system
+ */
+export const consumeVFXEvents = (
+    onEvent: (x: number, y: number, color: number, type: number, data: number) => void
+): void => {
+    while (true) {
+        const evt = vfxBuffer.pop();
+        if (!evt) break;
+        onEvent(evt.x, evt.y, evt.color, evt.type, evt.data || 0);
+    }
 };
 
 // Export types compatible with consumers

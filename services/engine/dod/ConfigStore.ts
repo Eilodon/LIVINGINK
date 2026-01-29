@@ -27,4 +27,25 @@ export class ConfigStore {
     static getSpeedMultiplier(id: number): number {
         return this.data[id * ConfigStore.STRIDE + 2];
     }
+
+    // Setters
+    static setMagneticRadius(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE] = value;
+    }
+
+    static setDamageMultiplier(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 1] = value;
+    }
+
+    static setSpeedMultiplier(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 2] = value;
+    }
+
+    static setPickupRange(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 3] = value;
+    }
+
+    static setVisionRange(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 4] = value;
+    }
 }

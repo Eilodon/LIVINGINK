@@ -40,15 +40,9 @@ import { gameStateManager } from './GameStateManager';
 // EIDOLON-V FIX: Export unified game state manager
 export { gameStateManager, optimizedEngine };
 
-// Legacy export for backward compatibility
-export const updateGameState = (state: GameState, dt: number): GameState => {
-  return optimizedEngine.updateGameState(state, dt);
-};
-
-export const updateClientVisuals = (state: GameState, dt: number): void => {
-  optimizedEngine.updateClientVisuals(state, dt);
-};
-
+// EIDOLON-V: Legacy exports REMOVED - import directly from OptimizedEngine
+// Use: optimizedEngine.updateGameState(state, dt)
+// Use: optimizedEngine.updateClientVisuals(state, dt)
 
 
 export const createInitialState = (level: number = 1): GameState => {
