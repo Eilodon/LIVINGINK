@@ -1,5 +1,4 @@
 import { Bot, Player, GameState, Food, Entity } from '../../types';
-import { distance } from '../engine/math';
 import { RING_RADII } from '../../constants';
 import { getCurrentSpatialGrid } from '../engine/context';
 import { TransformStore } from '../engine/dod/ComponentStores';

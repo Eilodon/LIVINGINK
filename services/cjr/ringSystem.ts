@@ -1,8 +1,7 @@
 
-import { distance } from '../engine/math';
 import { GameState, Player, Bot } from '../../types';
 import { RING_RADII, THRESHOLDS, COMMIT_BUFFS } from '../../constants';
-import { fastMath } from '../math/FastMath';
+import { fastMath, distance } from '../math/FastMath';
 import { StatusFlag } from '../engine/statusFlags';
 
 /**

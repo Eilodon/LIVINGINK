@@ -1,6 +1,6 @@
 
 import { GameState, Bot, Player } from '../../types';
-import { distance } from '../engine/math';
+import { distance } from '../math/FastMath';
 import { createFloatingText } from '../engine/effects';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../engine/VFXRingBuffer';
 

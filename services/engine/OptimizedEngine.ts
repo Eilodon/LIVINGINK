@@ -471,9 +471,9 @@ class OptimizedGameEngine {
               InputStore.setTarget(i, player.targetPosition.x, player.targetPosition.y);
             }
 
-            // Skill Input
-            if (player.inputs?.space) {
-              SkillSystem.handleInput(i, { space: player.inputs.space, target: player.targetPosition }, state);
+            // Skill Input (read from InputStore)
+            if (InputStore.consumeSkillInput(i)) {
+              SkillSystem.handleInput(i, { space: true, target: player.targetPosition }, state);
             }
           }
 

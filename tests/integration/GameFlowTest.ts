@@ -12,7 +12,7 @@ import { applyTattoo } from '../../services/cjr/tattoos';
 import { calcMatchPercent } from '../../services/cjr/colorMath';
 import { colorMixingSystem } from '../../server/src/systems/ColorMixingSystem';
 import { getCurrentSpatialGrid } from '../../services/engine/context';
-import { TransformStore } from '../../services/engine/dod/ComponentStores';
+import { TransformStore, InputStore } from '../../services/engine/dod/ComponentStores';
 
 export interface TestResult {
   testName: string;
@@ -270,8 +270,8 @@ ${passed ? '🎉 ALL TESTS PASSED!' : '⚠️  Some tests failed - review detail
         {
           name: 'Skill Cooldown',
           test: async () => {
-            // Activate skill
-            this.gameState!.player.inputs.space = true;
+            // Activate skill via InputStore (player is entity 0)
+            InputStore.setSkillActive(0, true);
             updateGameState(this.gameState!, 1 / 60);
             updateClientVisuals(this.gameState!, 1 / 60);
 

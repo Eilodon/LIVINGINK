@@ -1,7 +1,7 @@
 
 import { GameState, Food, PickupKind, PigmentVec3 } from '../../types';
 import { WAVE_CONFIG, RING_RADII } from '../../constants';
-import { randomRange } from '../engine/math';
+import { randomRange } from '../math/FastMath';
 
 export const updateWaveSpawner = (state: GameState, dt: number) => {
     // Check Wave Timers (assuming state.runtime.wave exists, defined in GameState)
