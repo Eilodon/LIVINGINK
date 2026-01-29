@@ -199,3 +199,31 @@ function OkLCH_to_sRGB(lch: { l: number, c: number, h: number }): PigmentVec3 {
     const b = lch.c * Math.sin(hRad);
     return OkLab_to_sRGB({ L: lch.l, a, b });
 }
+
+// ==========================================
+// [EIDOLON-V OPTIMIZATION] Fast Color Match
+// ==========================================
+/**
+ * Tính toán độ khớp màu cực nhanh dùng khoảng cách Euclid bình phương trên không gian RGB.
+ * Loại bỏ hoàn toàn Math.cbrt và OkLCH conversion tốn kém.
+ * Dùng cho vòng lặp vật lý/combat tần suất cao (60Hz).
+ */
+export const calcMatchPercentFast = (p1: PigmentVec3, p2: PigmentVec3): number => {
+    // 1. Tính delta RGB (Không cần convert sang Linear hay OkLab)
+    const dr = p1.r - p2.r;
+    const dg = p1.g - p2.g;
+    const db = p1.b - p2.b;
+
+    // 2. Khoảng cách bình phương (Squared Distance)
+    const distSq = dr * dr + dg * dg + db * db;
+
+    // 3. Ngưỡng sai số (Threshold)
+    // 0.3^2 = 0.09 cho rộng rãi
+    const thresholdSq = 0.09;
+
+    // 4. Early Exit (Tối ưu nhánh CPU)
+    if (distSq >= thresholdSq) return 0;
+
+    // 5. Score Linear Falloff (Không dùng Math.sqrt)
+    return 1.0 - (distSq / thresholdSq);
+};

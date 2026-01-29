@@ -3,7 +3,6 @@ import { SizeTier, MutationTier } from './shared';
 export type { SizeTier, MutationTier };
 import { PigmentVec3, RingId, Emotion, ShapeId, TattooId } from '../services/cjr/cjrTypes';
 import { StatusTimers, StatusMultipliers, StatusScalars } from './status';
-import { InputEvent } from './input'; // Import InputEvent chuẩn
 
 // EIDOLON-V: DOD Bridge
 // Player and Bot structs are "Hot Objects" synced from DOD Stores.
@@ -94,15 +93,6 @@ export interface Player extends Entity {
     // WARNING: Array of Objects. Limit size or use RingBuffer if Logic relies on it heavily.
     rewindHistory: { position: Vector2; health: number; time: number }[];
     stationaryTime: number;
-    // #endregion
-
-    // #region Input (Legacy Support)
-    /** @deprecated Use InputManager */
-    inputs?: { space: boolean; w: boolean };
-    /** @deprecated Use InputManager */
-    inputEvents?: InputEvent[]; // Strong typing
-    /** @deprecated Use InputManager */
-    inputSeq?: number;
     // #endregion
 
     // #region Status (DOD Synced)

@@ -8,7 +8,7 @@ import { applyGrowth, applyGrowthDOD } from './mechanics';
 import { TattooId } from '../../cjr/cjrTypes';
 import { StatusFlag, TattooFlag } from '../statusFlags';
 import { createDefaultStatusMultipliers, createDefaultStatusScalars, createDefaultStatusTimers } from '../../../types/status';
-import { mixPigment, calcMatchPercent, pigmentToInt, getSnapAlpha } from '../../cjr/colorMath';
+import { mixPigment, calcMatchPercentFast, pigmentToInt, getSnapAlpha } from '../../cjr/colorMath';
 import { triggerEmotion } from '../../cjr/emotions';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../VFXRingBuffer';
 import { StatsStore, TransformStore, PhysicsStore, StateStore, TattooStore, EntityLookup } from '../dod/ComponentStores';
@@ -69,7 +69,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
     case 'pigment':
       if (food.pigment) {
         const baseRatio = Math.min(0.2, 0.1 * (15 / Math.max(15, e.radius)));
-        const pigmentMatch = calcMatchPercent(food.pigment, e.targetPigment);
+        const pigmentMatch = calcMatchPercentFast(food.pigment, e.targetPigment);
         let snappedRatio = pigmentMatch >= 0.8 ? getSnapAlpha(e.matchPercent, baseRatio) : baseRatio;
         if (e.tattoos?.includes(TattooId.FilterInk) && pigmentMatch < 0.6) {
           if (!e.statusScalars) e.statusScalars = createDefaultStatusScalars();
@@ -85,7 +85,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
         e.pigment = mixPigment(e.pigment, food.pigment, ratio);
         e.color = pigmentToInt(e.pigment);
-        e.matchPercent = calcMatchPercent(e.pigment, e.targetPigment);
+        e.matchPercent = calcMatchPercentFast(e.pigment, e.targetPigment);
 
         // Sync MATCH back to StatsStore
         if (e.physicsIndex !== undefined) {
@@ -120,7 +120,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
       const neutral = { r: 0.5, g: 0.5, b: 0.5 };
       e.pigment = mixPigment(e.pigment, neutral, 0.15);
       e.color = pigmentToInt(e.pigment);
-      e.matchPercent = calcMatchPercent(e.pigment, e.targetPigment);
+      e.matchPercent = calcMatchPercentFast(e.pigment, e.targetPigment);
       break;
 
     case 'neutral':

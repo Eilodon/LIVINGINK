@@ -1,7 +1,7 @@
 
 import { GameState, PickupKind, Food } from '../../types';
 import { RING_RADII } from '../../constants';
-import { randomRange } from '../engine/math';
+import { randomRange } from '../math/FastMath';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../engine/VFXRingBuffer';
 
 export const updateDynamicBounty = (state: GameState, dt: number) => {

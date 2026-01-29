@@ -13,6 +13,7 @@ import { performanceMonitor } from '../performance/PerformanceMonitor';
 
 // EIDOLON-V FIX: Dependency Injection
 import { InputManager, inputManager as defaultInputManager } from '../input/InputManager';
+import { InputStore } from './dod/ComponentStores';
 import { NetworkClient, networkClient as defaultNetworkClient, NetworkStatus } from '../networking/NetworkClient';
 import { AudioEngine, audioEngine as defaultAudioEngine } from '../audio/AudioEngine';
 import { ShapeId } from '../cjr/cjrTypes';
@@ -123,19 +124,8 @@ export class GameStateManager {
       this.networkClient.sendInput(this.tempMoveTarget, networkInputs, dt, events);
     } else {
       // Singleplayer Logic
-      // Singleplayer Logic
-      // EIDOLON-V: Pull from InputManager
-      const events = this.inputManager.popEvents();
-      // Using deprecated inputEvents for now on Player, but populating from IM is correct 
-      // Ideally we stop pushing to player array and handle events directly here or in engine.
-      // For legacy compat, we push to player array if it exists
-      if (events.length > 0 && state.player.inputEvents) {
-        state.player.inputEvents.push(...events);
-      } else if (events.length > 0) {
-        // If array missing, define it or handle logic directly
-        // Currently safe to ignore or just log, as Engine likely checks IM in future
-        state.player.inputEvents = [...events];
-      }
+      // EIDOLON-V: Pull from InputManager and sync to DOD InputStore
+      this.inputManager.popEvents();
 
       const move = this.inputManager.state.move;
       if (move.x !== 0 || move.y !== 0) {
@@ -143,12 +133,10 @@ export class GameStateManager {
         state.player.targetPosition.y = state.player.position.y + move.y * 200;
       }
 
-      // Sync actions to player.inputs for backward compatibility
-      // But Engine should read from IM ideally. 
-      // Current legacy engines read player.inputs
-      if (state.player.inputs) {
-        state.player.inputs.space = this.inputManager.state.actions.space;
-        state.player.inputs.w = this.inputManager.state.actions.w;
+      // Sync skill input to InputStore (player physicsIndex = 0)
+      if (this.inputManager.state.actions.space) {
+        InputStore.setSkillActive(0, true);
+        this.inputManager.state.actions.space = false; // Consume immediately
       }
 
       // Core physics/logic update
@@ -328,10 +316,6 @@ export class GameStateManager {
       state.player.name = config.name;
       state.player.shape = config.shape;
       state.player.velocity = { x: 0, y: 0 };
-      // EIDOLON-V: Initialize legacy inputs if needed
-      if (state.player.inputs) {
-        state.player.inputs = { w: false, space: false };
-      }
     } else {
       console.error('CRITICAL: Player not found in initial state');
     }

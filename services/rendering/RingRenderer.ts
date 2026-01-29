@@ -1,48 +1,68 @@
-import { RING_RADII, COLOR_PALETTE_HEX as COLOR_PALETTE } from '../../constants';
+// EIDOLON-V: Ring Renderer for Canvas2D
+import { RING_RADII, CENTER_RADIUS, MAP_RADIUS } from '../../constants';
+import { COLOR_PALETTE_HEX } from '../../constants';
 
-// EIDOLON-V FIX: Centralized ring rendering logic
-// Eliminates code duplication between PixiGameCanvas and GameCanvas
-export interface RingRenderer {
-  drawRings: (context: any, time: number) => void;
-}
+export class Canvas2DRingRenderer {
+  private readonly colors = {
+    ...COLOR_PALETTE_HEX.rings,
+    center: '#fbbf24' // Gold/amber for center zone
+  };
 
-export class Canvas2DRingRenderer implements RingRenderer {
-  drawRings(ctx: CanvasRenderingContext2D, time: number) {
-    // Ring 1
-    ctx.strokeStyle = COLOR_PALETTE.rings.r1;
+  drawRings(ctx: CanvasRenderingContext2D, gameTime: number): void {
+    // Ring 1 (Outer) - Safe Zone
+    ctx.fillStyle = this.colors.r1 + '20'; // 20 = ~12% alpha
+    ctx.beginPath();
+    ctx.arc(0, 0, RING_RADII.R1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ring 2 (Middle) - Danger Zone
+    ctx.fillStyle = this.colors.r2 + '30';
+    ctx.beginPath();
+    ctx.arc(0, 0, RING_RADII.R2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ring 3 (Inner) - Combat Zone
+    ctx.fillStyle = this.colors.r3 + '40';
+    ctx.beginPath();
+    ctx.arc(0, 0, RING_RADII.R3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center Zone - High Reward
+    const pulse = Math.sin(gameTime * 2) * 0.1 + 0.9;
+    ctx.fillStyle = this.colors.center + Math.floor(pulse * 80).toString(16).padStart(2, '0');
+    ctx.beginPath();
+    ctx.arc(0, 0, CENTER_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw ring boundaries
+    ctx.strokeStyle = this.colors.r1;
     ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.3;
+    ctx.setLineDash([10, 10]);
+
+    // R1 boundary
     ctx.beginPath();
     ctx.arc(0, 0, RING_RADII.R1, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Ring 2
-    ctx.strokeStyle = COLOR_PALETTE.rings.r2;
-    ctx.lineWidth = 4;
-    ctx.globalAlpha = 0.5;
+    // R2 boundary
+    ctx.strokeStyle = this.colors.r2;
     ctx.beginPath();
     ctx.arc(0, 0, RING_RADII.R2, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Ring 3 with pulse
-    const pulse = Math.sin(time * 3) * 0.1;
-    ctx.strokeStyle = COLOR_PALETTE.rings.r3;
-    ctx.lineWidth = 6 + pulse * 4;
-    ctx.globalAlpha = 0.8;
+    // R3 boundary
+    ctx.strokeStyle = this.colors.r3;
     ctx.beginPath();
     ctx.arc(0, 0, RING_RADII.R3, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.globalAlpha = 1;
-  }
-}
+    // Center boundary
+    ctx.strokeStyle = this.colors.center;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, CENTER_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
 
-export class PixiRingRenderer implements RingRenderer {
-  drawRings(graphics: any, time: number) {
-    graphics.clear();
-    graphics.circle(0, 0, RING_RADII.R1).stroke({ width: 2, color: COLOR_PALETTE.rings.r1, alpha: 0.3 });
-    graphics.circle(0, 0, RING_RADII.R2).stroke({ width: 4, color: COLOR_PALETTE.rings.r2, alpha: 0.5 });
-    const pulse = Math.sin(time * 3) * 0.1;
-    graphics.circle(0, 0, RING_RADII.R3).stroke({ width: 6 + pulse * 4, color: COLOR_PALETTE.rings.r3, alpha: 0.8 });
+    ctx.setLineDash([]);
   }
 }

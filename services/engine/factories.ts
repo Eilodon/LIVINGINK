@@ -21,7 +21,7 @@ import {
   Vector2,
 } from '../../types';
 import { getCurrentEngine } from './context';
-import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from './math';
+import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from '../math/FastMath';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
 import { pigmentToHex } from '../cjr/colorMath';
 import { pooledEntityFactory } from '../pooling/ObjectPool';
@@ -37,8 +37,6 @@ export const randomPigment = (): PigmentVec3 => ({
   g: Math.random(),
   b: Math.random(),
 });
-
-import { SynergyComponent } from '../components/SynergyComponent';
 
 import { ConfigStore } from './dod/ConfigStore';
 import { InputStore } from './dod/ComponentStores';
@@ -183,9 +181,6 @@ export const createPlayer = (name: string, shape: ShapeId = 'circle', spawnTime:
   // Init Defaults
   player.statusTimers.invulnerable = 3;
   // player.components!.set('SynergyComponent', new SynergyComponent(player.id)); // LEGACY REMOVED
-
-  // Legacy Input
-  player.inputs = { space: false, w: false };
 
   // Register in Global Lookup
   EntityLookup[entId] = player;

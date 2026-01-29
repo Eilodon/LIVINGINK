@@ -1,18 +1,27 @@
-type HapticType = 'light' | 'medium' | 'heavy';
+// EIDOLON-V: Haptic Feedback Service
+// Provides vibration feedback on supported devices
 
-const HAPTIC_PATTERNS: Record<HapticType, number | number[]> = {
+type HapticPattern = 'light' | 'medium' | 'heavy' | 'selection' | 'success' | 'error';
+
+const patterns: Record<HapticPattern, number | number[]> = {
   light: 10,
   medium: 25,
-  heavy: [20, 10, 20],
+  heavy: 50,
+  selection: 15,
+  success: [20, 50, 20],
+  error: [50, 30, 50, 30, 50],
 };
 
-let lastHapticAt = 0;
-const HAPTIC_COOLDOWN_MS = 90;
+export const triggerHaptic = (pattern: HapticPattern = 'light'): void => {
+  if (!navigator.vibrate) return;
 
-export const triggerHaptic = (type: HapticType) => {
-  if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
-  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  if (now - lastHapticAt < HAPTIC_COOLDOWN_MS) return;
-  lastHapticAt = now;
-  navigator.vibrate(HAPTIC_PATTERNS[type]);
+  try {
+    navigator.vibrate(patterns[pattern] || 10);
+  } catch (e) {
+    // Silently fail - haptics are non-critical
+  }
+};
+
+export const isHapticsSupported = (): boolean => {
+  return 'vibrate' in navigator;
 };

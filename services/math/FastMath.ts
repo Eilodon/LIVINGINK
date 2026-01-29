@@ -297,3 +297,75 @@ export const fastMath = FastMath;
 export const collisionSystem = CollisionSystem;
 export const spatialOptimizer = SpatialOptimizer;
 export const mathPerformanceMonitor = MathPerformanceMonitor;
+
+// ============================================
+// LEGACY BRIDGE: Standalone functions (migrated from engine/math.ts)
+// ============================================
+import { CENTER_RADIUS, MAP_RADIUS, RING_RADII } from '../../constants';
+
+/** Euclidean distance between two points */
+export const distance = (v1: Vector2, v2: Vector2): number => {
+  const dx = v2.x - v1.x;
+  const dy = v2.y - v1.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
+
+/** Squared distance (faster, use for comparisons) */
+export const distSq = (v1: Vector2, v2: Vector2): number => {
+  const dx = v2.x - v1.x;
+  const dy = v2.y - v1.y;
+  return dx * dx + dy * dy;
+};
+
+/** Random number in range [min, max) */
+export const randomRange = (min: number, max: number): number =>
+  Math.random() * (max - min) + min;
+
+/** Random position within map bounds (circular map centered at origin) */
+export const randomPos = (): Vector2 => {
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(Math.random()) * (MAP_RADIUS - 200) + 100;
+  return {
+    x: Math.cos(angle) * r,
+    y: Math.sin(angle) * r,
+  };
+};
+
+/** Random position within a specific ring */
+export const randomPosInRing = (ring: 1 | 2 | 3): Vector2 => {
+  let minR = 0;
+  let maxR = 0;
+  if (ring === 1) {
+    minR = RING_RADII.R2;
+    maxR = RING_RADII.R1;
+  } else if (ring === 2) {
+    minR = RING_RADII.R3;
+    maxR = RING_RADII.R2;
+  } else {
+    minR = RING_RADII.CENTER;
+    maxR = RING_RADII.R3;
+  }
+
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(randomRange(minR * minR, maxR * maxR));
+  return {
+    x: Math.cos(angle) * r,
+    y: Math.sin(angle) * r,
+  };
+};
+
+/** Random position within center zone */
+export const randomPosInCenter = (): Vector2 => {
+  const angle = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(Math.random()) * (CENTER_RADIUS * 0.9);
+  return {
+    x: Math.cos(angle) * r,
+    y: Math.sin(angle) * r,
+  };
+};
+
+/** Normalize a vector to unit length */
+export const normalize = (v: Vector2): Vector2 => {
+  const len = Math.sqrt(v.x * v.x + v.y * v.y);
+  return len === 0 ? { x: 0, y: 0 } : { x: v.x / len, y: v.y / len };
+};

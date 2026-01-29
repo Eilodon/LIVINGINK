@@ -1,30 +1,28 @@
-/**
- * WebGLCheck.ts
- * Reliable detection for WebGL support to prevent PixiJS crashes on hardware without GPU acceleration.
- */
+// EIDOLON-V: WebGL Support Detection
+
+let _webglSupported: boolean | null = null;
 
 export const isWebGLSupported = (): boolean => {
-    try {
-        const canvas = document.createElement('canvas');
-        const gl =
-            canvas.getContext('webgl') ||
-            canvas.getContext('experimental-webgl') as WebGLRenderingContext;
+  if (_webglSupported !== null) return _webglSupported;
 
-        if (!gl) return false;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    _webglSupported = gl !== null;
+  } catch (e) {
+    _webglSupported = false;
+  }
 
-        // Hard check: Try to lose context or simple operation?
-        // Just checking for context existence is usually enough for "support",
-        // but some browsers return a context that fails immediately.
-        // Let's do a minimal sanity check.
-        const attributes = gl.getContextAttributes();
-        if (!attributes) return false;
+  return _webglSupported;
+};
 
-        // Optional: check for extensions if we needed specific ones, but for basic Pixi,
-        // just having the context is the gateway.
-
-        return true;
-    } catch (e) {
-        console.warn('WebGL detection failed:', e);
-        return false;
-    }
+export const getWebGLVersion = (): number => {
+  try {
+    const canvas = document.createElement('canvas');
+    if (canvas.getContext('webgl2')) return 2;
+    if (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) return 1;
+  } catch (e) {
+    // Ignore
+  }
+  return 0;
 };

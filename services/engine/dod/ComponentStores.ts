@@ -138,6 +138,31 @@ export class InputStore {
         this.data[idx] = x;
         this.data[idx + 1] = y;
     }
+
+    static getTarget(id: number, out: { x: number; y: number }) {
+        const idx = id * InputStore.STRIDE;
+        out.x = this.data[idx];
+        out.y = this.data[idx + 1];
+    }
+
+    static setSkillActive(id: number, active: boolean) {
+        const idx = id * InputStore.STRIDE;
+        this.data[idx + 2] = active ? 1 : 0;
+    }
+
+    static getSkillActive(id: number): boolean {
+        const idx = id * InputStore.STRIDE;
+        return this.data[idx + 2] === 1;
+    }
+
+    static consumeSkillInput(id: number): boolean {
+        const idx = id * InputStore.STRIDE;
+        if (this.data[idx + 2] === 1) {
+            this.data[idx + 2] = 0;
+            return true;
+        }
+        return false;
+    }
 }
 
 export function resetAllStores() {

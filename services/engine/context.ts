@@ -1,7 +1,7 @@
 import { GRID_CELL_SIZE } from '../../constants';
 import { IGameEngine, ISpatialGrid, IParticlePool } from '../../types/engine';
 import { Entity, Particle } from '../../types/entity';
-import { randomRange } from './math';
+import { randomRange } from '../math/FastMath';
 
 // --- Optimization: Persistent Spatial Grid ---
 // WE DO NOT DESTROY THE GRID EVERY FRAME. WE REUSE THE ARRAYS.

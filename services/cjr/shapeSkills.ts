@@ -1,6 +1,5 @@
 import { Player, Bot, GameState, Vector2, Entity } from '../../types';
 import { ShapeId, TattooId } from './cjrTypes';
-import { normalize, distance } from '../engine/math';
 import { StatusFlag } from '../engine/statusFlags';
 import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
 

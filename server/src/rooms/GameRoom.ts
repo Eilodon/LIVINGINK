@@ -25,7 +25,13 @@ import {
 // Import shared game logic
 import { updateGameState, createInitialState } from '../../../services/engine/index';
 import { createPlayer } from '../../../services/engine/factories';
-import { GameRuntimeState } from '../../../types';
+import { GameRuntimeState, Player } from '../../../types';
+
+// Server-side extension for Player with input tracking
+interface ServerPlayer extends Player {
+  _serverInputs?: { space: boolean; w: boolean };
+  _lastProcessedSeq?: number;
+}
 import { getLevelConfig } from '../../../services/cjr/levels';
 import { vfxIntegrationManager } from '../../../services/vfx/vfxIntegration';
 // Import security validation
@@ -255,17 +261,18 @@ export class GameRoom extends Room<GameRoomState> {
 
   private applyInputsToSimState() {
     this.simState.players.forEach(player => {
+      const serverPlayer = player as ServerPlayer;
       const input = this.inputsBySession.get(player.id);
       if (!input) {
-        player.inputs = { space: false, w: false };
+        serverPlayer._serverInputs = { space: false, w: false };
         return;
       }
 
       // Validate input before applying
       const lastInput = this.inputsBySession.get(player.id);
-      const serverPlayer = this.state.players.get(player.id);
+      const statePlayer = this.state.players.get(player.id);
 
-      if (serverPlayer) {
+      if (statePlayer) {
         // Sanitize input
         const sanitizedInput = serverValidator.sanitizeInput(input);
 
@@ -274,12 +281,11 @@ export class GameRoom extends Room<GameRoomState> {
           player.id,
           sanitizedInput,
           lastInput || null,
-          serverPlayer
+          statePlayer
         );
 
         if (!validation.isValid) {
           console.warn(`Invalid input from ${player.id}: ${validation.reason}`);
-          // Skip this input but don't disconnect the player
           return;
         }
 
@@ -292,8 +298,8 @@ export class GameRoom extends Room<GameRoomState> {
 
         // Apply validated input
         player.targetPosition = { x: sanitizedInput.targetX, y: sanitizedInput.targetY };
-        player.inputs = { space: sanitizedInput.space, w: sanitizedInput.w };
-        player.inputSeq = sanitizedInput.seq;
+        serverPlayer._serverInputs = { space: sanitizedInput.space, w: sanitizedInput.w };
+        serverPlayer._lastProcessedSeq = sanitizedInput.seq;
       }
     });
   }
@@ -364,11 +370,15 @@ export class GameRoom extends Room<GameRoomState> {
       }
 
       // Apply validated state
-      // Apply validated state
+      // [EIDOLON-V OPTIMIZATION] DISABLE SCHEMA SYNC FOR HIGH-FREQUENCY DATA
+      // Position & Velocity sent via broadcastBinaryTransforms (UDP-like).
+      // Disabled to avoid Colyseus deep compare & JSON patch overhead.
+      /* DISABLE START
       serverPlayer.position.x = px;
       serverPlayer.position.y = py;
       serverPlayer.velocity.x = vx;
       serverPlayer.velocity.y = vy;
+      DISABLE END */
       serverPlayer.radius = player.radius;
       serverPlayer.score = player.score;
       serverPlayer.currentHealth = player.currentHealth;
@@ -378,7 +388,7 @@ export class GameRoom extends Room<GameRoomState> {
       serverPlayer.emotion = player.emotion;
       serverPlayer.isDead = player.isDead;
       serverPlayer.skillCooldown = player.skillCooldown;
-      serverPlayer.lastProcessedInput = player.inputSeq || 0;
+      serverPlayer.lastProcessedInput = (player as ServerPlayer)._lastProcessedSeq || 0;
       serverPlayer.pigment.r = player.pigment.r;
       serverPlayer.pigment.g = player.pigment.g;
       serverPlayer.pigment.b = player.pigment.b;
@@ -397,10 +407,13 @@ export class GameRoom extends Room<GameRoomState> {
         serverBot.isBoss = !!bot.isBoss;
         this.state.bots.set(bot.id, serverBot);
       }
+      // [EIDOLON-V OPTIMIZATION] DISABLE BOT POSITION SYNC
+      /* DISABLE START
       serverBot.position.x = bot.position.x;
       serverBot.position.y = bot.position.y;
       serverBot.velocity.x = bot.velocity.x;
       serverBot.velocity.y = bot.velocity.y;
+      DISABLE END */
       serverBot.radius = bot.radius;
       serverBot.currentHealth = bot.currentHealth;
       serverBot.score = bot.score;
@@ -438,10 +451,13 @@ export class GameRoom extends Room<GameRoomState> {
         serverProj.type = proj.type;
         this.state.projectiles.set(proj.id, serverProj);
       }
+      // [EIDOLON-V OPTIMIZATION] DISABLE PROJECTILE POSITION SYNC
+      /* DISABLE START
       serverProj.x = proj.position.x;
       serverProj.y = proj.position.y;
       serverProj.vx = proj.velocity.x;
       serverProj.vy = proj.velocity.y;
+      DISABLE END */
       serverProj.damage = proj.damage;
     });
   }
