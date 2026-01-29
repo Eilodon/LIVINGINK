@@ -139,6 +139,12 @@ export class InputStore {
         this.data[idx + 1] = y;
     }
 
+    static getTarget(id: number, out: { x: number; y: number }) {
+        const idx = id * InputStore.STRIDE;
+        out.x = this.data[idx];
+        out.y = this.data[idx + 1];
+    }
+
     static setSkillActive(id: number, active: boolean) {
         const idx = id * InputStore.STRIDE;
         this.data[idx + 2] = active ? 1 : 0;
