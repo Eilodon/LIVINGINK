@@ -24,7 +24,7 @@ interface NetworkConfig {
 }
 
 const DEFAULT_CONFIG: NetworkConfig = {
-  serverUrl: 'ws://localhost:2567',
+  serverUrl: import.meta.env.VITE_GAME_SERVER_URL || 'ws://localhost:2567',
   reconnectAttempts: 5,
 };
 
