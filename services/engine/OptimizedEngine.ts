@@ -8,7 +8,7 @@ import { bindEngine, getCurrentSpatialGrid, getCurrentEngine } from './context';
 import { updateAI } from './systems/ai';
 import { applyProjectileEffect, resolveCombat, consumePickupDOD } from './systems/combat';
 import { applySkill } from './systems/skills';
-import { EntityFlags } from './dod/EntityFlags';
+import { EntityFlags, MAX_ENTITIES } from './dod/EntityFlags';
 import { updateRingLogic } from '../cjr/ringSystem';
 import { updateWaveSpawner, resetWaveTimers } from '../cjr/waveSpawner';
 import { updateWinCondition } from '../cjr/winCondition';
@@ -64,10 +64,11 @@ class OptimizedGameEngine {
     const grid = this.spatialGrid;
     grid.clearDynamic();
 
-    const count = entityManager.count;
+    // EIDOLON-V FIX: Use MAX_ENTITIES instead of entityManager.count
+    // entityManager.count can miss high indices when entities in the middle are removed
     const flags = StateStore.flags;
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < MAX_ENTITIES; i++) {
       // Filter: Active only
       if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
 
@@ -404,6 +405,12 @@ class OptimizedGameEngine {
       filterInPlace(state.food, f => {
         if (f.isDead) {
           grid.removeStatic(f);
+          // EIDOLON-V FIX: Release DOD index to prevent memory leak
+          if (f.physicsIndex !== undefined) {
+            EntityLookup[f.physicsIndex] = null;
+            StateStore.flags[f.physicsIndex] = 0; // Clear all flags
+            entityManager.removeEntity(f.physicsIndex);
+          }
           pooledEntityFactory.createPooledFood().release(f);
           return false;
         }
@@ -417,6 +424,12 @@ class OptimizedGameEngine {
     if (state.projectiles.length > 0) {
       filterInPlace(state.projectiles, p => {
         if (p.isDead) {
+          // EIDOLON-V FIX: Release DOD index to prevent memory leak
+          if (p.physicsIndex !== undefined) {
+            EntityLookup[p.physicsIndex] = null;
+            StateStore.flags[p.physicsIndex] = 0;
+            entityManager.removeEntity(p.physicsIndex);
+          }
           pooledEntityFactory.createPooledProjectile().release(p);
           return false;
         }
@@ -429,6 +442,12 @@ class OptimizedGameEngine {
       if (b.isDead) {
         // EIDOLON-V FIX: Cleanup events/synergies to prevent ID reuse bugs
         TattooEventManager.triggerDeactivate(b.id);
+        // EIDOLON-V FIX: Release DOD index to prevent memory leak
+        if (b.physicsIndex !== undefined) {
+          EntityLookup[b.physicsIndex] = null;
+          StateStore.flags[b.physicsIndex] = 0;
+          entityManager.removeEntity(b.physicsIndex);
+        }
         return false;
       }
       return true;
@@ -532,10 +551,10 @@ class OptimizedGameEngine {
       this.updateSpatialGridDOD();
 
       // 3. LOGIC (DOD Iteration)
-      const count = entityManager.count;
+      // EIDOLON-V FIX: Use MAX_ENTITIES - entityManager.count can miss entities
       const flags = StateStore.flags;
 
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < MAX_ENTITIES; i++) {
         if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
 
         const isPlayer = (flags[i] & EntityFlags.PLAYER) !== 0;
@@ -599,7 +618,7 @@ class OptimizedGameEngine {
       }
 
       // 4. CJR SYSTEMS (DOD Iteration)
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < MAX_ENTITIES; i++) {
         if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
 
         if (flags[i] & (EntityFlags.PLAYER | EntityFlags.BOT)) {
@@ -708,11 +727,11 @@ class OptimizedGameEngine {
   }
 
   private updateProjectilesDOD(state: GameState, dt: number): void {
-    const count = entityManager.count;
+    // EIDOLON-V FIX: Use MAX_ENTITIES - entityManager.count can miss entities
     const flags = StateStore.flags;
 
     // Use Index Loop for Projectiles
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < MAX_ENTITIES; i++) {
       if ((flags[i] & (EntityFlags.ACTIVE | EntityFlags.PROJECTILE)) !== (EntityFlags.ACTIVE | EntityFlags.PROJECTILE)) continue;
 
       // Projectile Update Logic

@@ -38,6 +38,10 @@ import { optimizedEngine } from './OptimizedEngine';
 import { gameStateManager } from './GameStateManager';
 import { createVFXEventPool } from './VFXRingBuffer';
 
+// EIDOLON-V FIX: Import DOD reset functions
+import { resetAllStores } from './dod/ComponentStores';
+import { entityManager } from './dod/EntityManager';
+
 // EIDOLON-V FIX: Export unified game state manager
 export { gameStateManager, optimizedEngine };
 
@@ -47,7 +51,11 @@ export { gameStateManager, optimizedEngine };
 
 
 export const createInitialState = (level: number = 1): GameState => {
-  // ... (Copy nguyên logic createInitialState cũ) ...
+  // EIDOLON-V FIX: Reset DOD stores and entity manager FIRST
+  // This prevents stale data from previous game sessions causing bugs
+  resetAllStores();
+  entityManager.reset();
+
   const engine = createGameEngine();
   bindEngine(engine);
   const player = createPlayer("Hero");
