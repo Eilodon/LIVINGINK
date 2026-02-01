@@ -176,6 +176,23 @@ async function main() {
       server: httpServer,
       pingInterval: 3000,
       pingMaxRetries: 3,
+      // EIDOLON-V P1: WebSocket origin validation
+      verifyClient: (info, callback) => {
+        const origin = info.origin || (info.req as any).headers?.origin;
+
+        // Allow no-origin (server-to-server, same-origin, or dev tools)
+        if (!origin) {
+          callback(true);
+          return;
+        }
+
+        if (allowedOrigins.includes(origin)) {
+          callback(true);
+        } else {
+          logger.warn('[WS] Origin rejected', { origin });
+          callback(false, 403, 'Origin not allowed');
+        }
+      },
     }),
   });
 

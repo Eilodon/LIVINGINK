@@ -5,6 +5,7 @@
 
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../events/EventRingBuffer';
 import { distanceSquared } from '../math/FastMath';
+import { PhysicsStore } from '../dod/ComponentStores';
 
 /**
  * Minimal entity interfaces
@@ -62,8 +63,15 @@ export const updateBossLogic = (
         // Move towards target
         const speed = 100;
         if (dist > 50) {
-            boss.velocity.x = (dx / dist) * speed;
-            boss.velocity.y = (dy / dist) * speed;
+            const vx = (dx / dist) * speed;
+            const vy = (dy / dist) * speed;
+
+            // EIDOLON-V P1: Sync to DOD if boss has physicsIndex
+            if (boss.physicsIndex !== undefined) {
+                PhysicsStore.setVelocity(boss.physicsIndex, vx, vy);
+            }
+            boss.velocity.x = vx;
+            boss.velocity.y = vy;
         }
 
         // Dash Attack Logic
@@ -72,8 +80,14 @@ export const updateBossLogic = (
 
         if (boss.bossAttackTimer <= 0) {
             // Dash!
-            boss.velocity.x *= 3;
-            boss.velocity.y *= 3;
+            const dashVx = boss.velocity.x * 3;
+            const dashVy = boss.velocity.y * 3;
+
+            if (boss.physicsIndex !== undefined) {
+                PhysicsStore.setVelocity(boss.physicsIndex, dashVx, dashVy);
+            }
+            boss.velocity.x = dashVx;
+            boss.velocity.y = dashVy;
             boss.bossAttackTimer = 5; // 5s cooldown
         }
     }
