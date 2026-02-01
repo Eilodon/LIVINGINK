@@ -10,10 +10,10 @@ import {
   Texture,
 } from 'pixi.js';
 import { GameState } from '../types';
-import { JELLY_VERTEX, JELLY_FRAGMENT, JellyShaderResources } from '../services/cjr/shaders';
+import { JELLY_VERTEX, JELLY_FRAGMENT, JellyShaderResources } from '../game/cjr/shaders';
 import { MAP_RADIUS, COLOR_PALETTE_HEX } from '../constants';
-import { getPhysicsWorld } from '../services/engine/context';
-import { TransformStore, PhysicsStore } from '../services/engine/dod/ComponentStores';
+import { getPhysicsWorld } from '../game/engine/context';
+import { TransformStore, PhysicsStore } from '../game/engine/dod/ComponentStores';
 
 const STRIDE = TransformStore.STRIDE;
 const X_OFFSET = 0;

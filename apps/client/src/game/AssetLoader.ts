@@ -1,4 +1,4 @@
-import { clientLogger } from './logging/ClientLogger';
+import { clientLogger } from '../core/logging/ClientLogger';
 
 // EIDOLON-V: Minimal Asset Loader Stub
 // Real asset loading handled by browser/bundler

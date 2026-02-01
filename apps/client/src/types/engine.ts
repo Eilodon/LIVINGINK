@@ -1,6 +1,6 @@
 // EIDOLON-V: Type-safe Game Engine Interface
 import { Entity, Particle } from './entity';
-import { PhysicsWorld } from '../services/engine/PhysicsWorld';
+import { PhysicsWorld } from '../game/engine/PhysicsWorld';
 
 // Define interface for the SpatialGrid adapter used in context.ts
 export interface ISpatialGrid {

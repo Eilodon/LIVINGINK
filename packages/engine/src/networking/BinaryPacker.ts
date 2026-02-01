@@ -1,6 +1,9 @@
 /**
- * BinaryPacker - Zero-allocation binary serialization
+ * BinaryPacker - Thread-safe zero-allocation binary serialization
  * Headless version for @cjr/engine (runs on both client and server)
+ * 
+ * EIDOLON-V P0: Uses Object Pool pattern to prevent race conditions
+ * while maintaining zero-allocation performance.
  */
 
 export const PacketType = {
@@ -10,10 +13,68 @@ export const PacketType = {
 
 export type PacketTypeValue = typeof PacketType[keyof typeof PacketType];
 
+// EIDOLON-V P0: Buffer pool entry for thread-safe packing
+interface BufferPoolEntry {
+  buffer: ArrayBuffer;
+  view: DataView;
+  u8: Uint8Array;
+  inUse: boolean;
+}
+
 export class BinaryPacker {
-  private static _buffer = new ArrayBuffer(4096 * 32); // 128KB buffer
-  private static _view = new DataView(BinaryPacker._buffer);
-  private static _u8 = new Uint8Array(BinaryPacker._buffer);
+  // EIDOLON-V P0: Buffer pool prevents race conditions
+  // 4 buffers = enough for concurrent pack calls without blocking
+  private static readonly POOL_SIZE = 4;
+  private static readonly BUFFER_SIZE = 4096 * 32; // 128KB per buffer
+
+  private static _pool: BufferPoolEntry[] = [];
+  private static _poolInitialized = false;
+
+  // Initialize pool on first use (lazy init)
+  private static initPool(): void {
+    if (this._poolInitialized) return;
+
+    for (let i = 0; i < this.POOL_SIZE; i++) {
+      const buffer = new ArrayBuffer(this.BUFFER_SIZE);
+      this._pool.push({
+        buffer,
+        view: new DataView(buffer),
+        u8: new Uint8Array(buffer),
+        inUse: false,
+      });
+    }
+    this._poolInitialized = true;
+  }
+
+  // EIDOLON-V P0: Checkout buffer from pool (round-robin)
+  private static checkoutBuffer(): BufferPoolEntry {
+    this.initPool();
+
+    // Find first available buffer
+    for (const entry of this._pool) {
+      if (!entry.inUse) {
+        entry.inUse = true;
+        return entry;
+      }
+    }
+
+    // Pool exhausted - create temporary buffer (graceful degradation)
+    const buffer = new ArrayBuffer(this.BUFFER_SIZE);
+    return {
+      buffer,
+      view: new DataView(buffer),
+      u8: new Uint8Array(buffer),
+      inUse: true,
+    };
+  }
+
+  // EIDOLON-V P0: Return buffer to pool
+  private static returnBuffer(entry: BufferPoolEntry): void {
+    // Only return if it's from the pool (not temp buffer)
+    if (this._pool.includes(entry)) {
+      entry.inUse = false;
+    }
+  }
 
   /**
    * Pack entity transforms into binary format
@@ -23,49 +84,56 @@ export class BinaryPacker {
     entities: { id: string; x: number; y: number; vx: number; vy: number }[],
     timestamp: number
   ): ArrayBuffer {
-    // EIDOLON-V P0: Overflow protection
-    // Header (7) + per entity: id_len (1) + id (~10 avg) + transforms (16) = ~27 bytes/entity
-    const maxSafeEntities = Math.floor((this._buffer.byteLength - 7) / 30);
-    if (entities.length > maxSafeEntities) {
-      console.error('[BinaryPacker] Buffer overflow prevented, truncating', {
-        count: entities.length,
-        max: maxSafeEntities
-      });
-      entities = entities.slice(0, maxSafeEntities);
-    }
+    // EIDOLON-V P0: Checkout buffer from pool (thread-safe)
+    const poolEntry = this.checkoutBuffer();
+    const { buffer, view, u8 } = poolEntry;
 
-    let offset = 0;
-    const view = this._view;
-    const u8 = this._u8;
-
-    // Header: Type (1) + Time (4) + Count (2)
-    u8[offset++] = PacketType.TRANSFORM_UPDATE;
-    view.setFloat32(offset, timestamp, true);
-    offset += 4;
-    view.setUint16(offset, entities.length, true);
-    offset += 2;
-
-    for (const ent of entities) {
-      // ID (Length + Bytes)
-      const idLen = ent.id.length;
-      u8[offset++] = idLen;
-      for (let i = 0; i < idLen; i++) {
-        u8[offset++] = ent.id.charCodeAt(i);
+    try {
+      // EIDOLON-V P0: Overflow protection
+      // Header (7) + per entity: id_len (1) + id (~10 avg) + transforms (16) = ~27 bytes/entity
+      const maxSafeEntities = Math.floor((buffer.byteLength - 7) / 30);
+      if (entities.length > maxSafeEntities) {
+        console.error('[BinaryPacker] Buffer overflow prevented, truncating', {
+          count: entities.length,
+          max: maxSafeEntities
+        });
+        entities = entities.slice(0, maxSafeEntities);
       }
 
-      // Transform (4x4 = 16 bytes)
-      view.setFloat32(offset, ent.x, true);
-      offset += 4;
-      view.setFloat32(offset, ent.y, true);
-      offset += 4;
-      view.setFloat32(offset, ent.vx, true);
-      offset += 4;
-      view.setFloat32(offset, ent.vy, true);
-      offset += 4;
-    }
+      let offset = 0;
 
-    // Return sliced copy (not shared buffer)
-    return this._buffer.slice(0, offset);
+      // Header: Type (1) + Time (4) + Count (2)
+      u8[offset++] = PacketType.TRANSFORM_UPDATE;
+      view.setFloat32(offset, timestamp, true);
+      offset += 4;
+      view.setUint16(offset, entities.length, true);
+      offset += 2;
+
+      for (const ent of entities) {
+        // ID (Length + Bytes)
+        const idLen = ent.id.length;
+        u8[offset++] = idLen;
+        for (let i = 0; i < idLen; i++) {
+          u8[offset++] = ent.id.charCodeAt(i);
+        }
+
+        // Transform (4x4 = 16 bytes)
+        view.setFloat32(offset, ent.x, true);
+        offset += 4;
+        view.setFloat32(offset, ent.y, true);
+        offset += 4;
+        view.setFloat32(offset, ent.vx, true);
+        offset += 4;
+        view.setFloat32(offset, ent.vy, true);
+        offset += 4;
+      }
+
+      // Return sliced copy (not shared buffer), then return pool entry
+      return buffer.slice(0, offset);
+    } finally {
+      // EIDOLON-V P0: Always return buffer to pool
+      this.returnBuffer(poolEntry);
+    }
   }
 
   /**
@@ -76,47 +144,54 @@ export class BinaryPacker {
     events: { type: number; entityId: string; data?: number; x?: number; y?: number }[],
     timestamp: number
   ): ArrayBuffer {
-    let offset = 0;
-    const view = this._view;
-    const u8 = this._u8;
+    // EIDOLON-V P0: Checkout buffer from pool (thread-safe)
+    const poolEntry = this.checkoutBuffer();
+    const { buffer, view, u8 } = poolEntry;
 
-    // Header
-    u8[offset++] = PacketType.EVENT_UPDATE;
-    view.setFloat32(offset, timestamp, true);
-    offset += 4;
-    u8[offset++] = events.length;
+    try {
+      let offset = 0;
 
-    for (const evt of events) {
-      // Event type
-      u8[offset++] = evt.type;
+      // Header
+      u8[offset++] = PacketType.EVENT_UPDATE;
+      view.setFloat32(offset, timestamp, true);
+      offset += 4;
+      u8[offset++] = events.length;
 
-      // Entity ID
-      const idLen = evt.entityId.length;
-      u8[offset++] = idLen;
-      for (let i = 0; i < idLen; i++) {
-        u8[offset++] = evt.entityId.charCodeAt(i);
+      for (const evt of events) {
+        // Event type
+        u8[offset++] = evt.type;
+
+        // Entity ID
+        const idLen = evt.entityId.length;
+        u8[offset++] = idLen;
+        for (let i = 0; i < idLen; i++) {
+          u8[offset++] = evt.entityId.charCodeAt(i);
+        }
+
+        // Data (f32)
+        view.setFloat32(offset, evt.data ?? 0, true);
+        offset += 4;
+
+        // Position (f32 x 2)
+        view.setFloat32(offset, evt.x ?? 0, true);
+        offset += 4;
+        view.setFloat32(offset, evt.y ?? 0, true);
+        offset += 4;
       }
 
-      // Data (f32)
-      view.setFloat32(offset, evt.data ?? 0, true);
-      offset += 4;
-
-      // Position (f32 x 2)
-      view.setFloat32(offset, evt.x ?? 0, true);
-      offset += 4;
-      view.setFloat32(offset, evt.y ?? 0, true);
-      offset += 4;
+      return buffer.slice(0, offset);
+    } finally {
+      // EIDOLON-V P0: Always return buffer to pool
+      this.returnBuffer(poolEntry);
     }
-
-    return this._buffer.slice(0, offset);
   }
 
-  // Pre-allocated buffers for zero-allocation unpacking
+  // EIDOLON-V P0: TextDecoder is read-only, safe to share
   private static _textDecoder = new TextDecoder('utf-8');
-  private static _idBuffer = new Uint8Array(64);
 
   /**
    * Zero-allocation transform unpacker using visitor pattern
+   * EIDOLON-V P0: Local idBuffer prevents race conditions
    */
   static unpackAndApply(
     buffer: ArrayBuffer,
@@ -124,6 +199,8 @@ export class BinaryPacker {
   ): number | null {
     const view = new DataView(buffer);
     const u8 = new Uint8Array(buffer);
+    // EIDOLON-V P0: Local buffer instead of shared state
+    const idBuffer = new Uint8Array(64);
     let offset = 0;
 
     // Validate packet type
@@ -138,9 +215,9 @@ export class BinaryPacker {
     for (let k = 0; k < count; k++) {
       const idLen = u8[offset++];
 
-      // Decode ID using pre-allocated buffer
-      this._idBuffer.set(u8.subarray(offset, offset + idLen));
-      const id = this._textDecoder.decode(this._idBuffer.subarray(0, idLen));
+      // Decode ID using local buffer
+      idBuffer.set(u8.subarray(offset, offset + idLen));
+      const id = this._textDecoder.decode(idBuffer.subarray(0, idLen));
       offset += idLen;
 
       const x = view.getFloat32(offset, true);
@@ -160,6 +237,7 @@ export class BinaryPacker {
 
   /**
    * Zero-allocation event unpacker
+   * EIDOLON-V P0: Local idBuffer prevents race conditions
    */
   static unpackEvents(
     buffer: ArrayBuffer,
@@ -167,6 +245,8 @@ export class BinaryPacker {
   ): number | null {
     const view = new DataView(buffer);
     const u8 = new Uint8Array(buffer);
+    // EIDOLON-V P0: Local buffer instead of shared state
+    const idBuffer = new Uint8Array(64);
     let offset = 0;
 
     const packetType = u8[offset++];
@@ -180,8 +260,8 @@ export class BinaryPacker {
       const type = u8[offset++];
 
       const idLen = u8[offset++];
-      this._idBuffer.set(u8.subarray(offset, offset + idLen));
-      const entityId = this._textDecoder.decode(this._idBuffer.subarray(0, idLen));
+      idBuffer.set(u8.subarray(offset, offset + idLen));
+      const entityId = this._textDecoder.decode(idBuffer.subarray(0, idLen));
       offset += idLen;
 
       const data = view.getFloat32(offset, true);

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { BinaryPacker, PacketType } from '../services/networking/BinaryPacker';
+import { BinaryPacker, PacketType } from '../game/networking/BinaryPacker';
 
 describe('BinaryPacker - Zero-Allocation Refactor', () => {
   describe('unpackAndApply - Callback API', () => {

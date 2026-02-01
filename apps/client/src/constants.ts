@@ -1,4 +1,4 @@
-import { PigmentVec3 } from './services/cjr/cjrTypes';
+import { PigmentVec3 } from './game/cjr/cjrTypes';
 
 // World Settings (Core Engine Constants)
 export const WORLD_WIDTH = 3400;

@@ -2,8 +2,8 @@ import { Vector2 } from './shared';
 import { IGameEngine } from './engine';
 import { Player, Bot, TattooChoice } from './player';
 import { Food, Particle, Projectile, FloatingText, DelayedAction } from './entity';
-import { LevelConfig } from '../services/cjr/levels';
-import { VFXEvent } from '../services/engine/VFXRingBuffer'; // Import struct chuẩn
+import { LevelConfig } from '../game/cjr/levels';
+import { VFXEvent } from '../game/engine/VFXRingBuffer'; // Import struct chuẩn
 
 export interface WaveRuntimeState {
   ring1: number;

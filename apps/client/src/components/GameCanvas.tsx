@@ -2,14 +2,14 @@ import React, { useRef, useEffect } from 'react';
 import { GameState, Entity, Player } from '../types';
 import { MAP_RADIUS, CENTER_RADIUS, WORLD_WIDTH, WORLD_HEIGHT } from '../constants';
 import { COLOR_PALETTE_HEX as COLOR_PALETTE, RING_RADII } from '../constants';
-import type { PigmentVec3 } from '../services/cjr/cjrTypes';
-import { intToHex } from '../services/cjr/colorMath'; // EIDOLON-V: Import color helper
+import type { PigmentVec3 } from '../game/cjr/cjrTypes';
+import { intToHex } from '../game/cjr/colorMath'; // EIDOLON-V: Import color helper
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
-import { Canvas2DRingRenderer } from '../services/rendering/RingRenderer';
-import { getInterpolatedPosition } from '../services/engine/RenderBridge';
+import { Canvas2DRingRenderer } from '../game/renderer/RingRenderer';
+import { getInterpolatedPosition } from '../game/engine/RenderBridge';
 // Note: We are gradually migrating to RenderTypes but keeping compatibility for now
-// import { EntityType, PickupType } from '../services/rendering/RenderTypes';
+// import { EntityType, PickupType } from '../game/renderer/RenderTypes';
 
 interface GameCanvasProps {
   gameStateRef: React.MutableRefObject<GameState | null>;

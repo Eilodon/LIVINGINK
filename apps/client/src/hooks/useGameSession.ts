@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GameState } from '../types';
-import { gameStateManager, GameEvent } from '../services/engine/GameStateManager';
-import { NetworkStatus } from '../services/networking/NetworkClient';
+import { gameStateManager, GameEvent } from '../game/engine/GameStateManager';
+import { NetworkStatus } from '../game/networking/NetworkClient';
 import {
   loadSettings,
   loadProgression,
@@ -9,7 +9,7 @@ import {
   defaultProgression,
   saveSettings,
   saveProgression,
-} from '../services/ui/storage';
+} from '../core/ui/storage';
 import {
   initialUiState,
   pushOverlay,
@@ -17,9 +17,9 @@ import {
   clearOverlays,
   UiState,
   Screen,
-} from '../services/ui/screenMachine';
-import { ShapeId } from '../services/cjr/cjrTypes';
-import { MatchmakingStatus } from '../services/meta/matchmaking';
+} from '../core/ui/screenMachine';
+import { ShapeId } from '../game/cjr/cjrTypes';
+import { MatchmakingStatus } from '../core/meta/matchmaking';
 
 // Define missing types locally or import if available
 export type TournamentQueueStatus = 'idle' | 'queued' | 'ready';

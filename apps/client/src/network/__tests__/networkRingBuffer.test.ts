@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { NetworkClient } from '../services/networking/NetworkClient';
+import { NetworkClient } from '../game/networking/NetworkClient';
 import type { GameState } from '../types';
 
 describe('NetworkClient - Ring Buffer Optimization', () => {

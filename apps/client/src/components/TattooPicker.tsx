@@ -1,7 +1,7 @@
 import React from 'react';
 import { MutationTier, TattooChoice } from '../types';
-import { TattooId } from '../services/cjr/cjrTypes';
-import { triggerHaptic } from '../services/haptics';
+import { TattooId } from '../game/cjr/cjrTypes';
+import { triggerHaptic } from '../game/haptics';
 
 interface TattooPickerProps {
   choices: TattooChoice[];

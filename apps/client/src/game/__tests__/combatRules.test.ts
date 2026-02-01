@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSizeInteraction, InteractionType } from '../services/combatRules';
+import { getSizeInteraction, InteractionType } from './combatRules';
 
 describe('getSizeInteraction', () => {
   it('consumes when ratio meets danger threshold', () => {

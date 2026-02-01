@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShapeId } from '../services/cjr/cjrTypes';
+import { ShapeId } from '../game/cjr/cjrTypes';
 
 interface MainMenuProps {
   level: number;

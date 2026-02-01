@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { GameState } from '../types';
-import { getColorHint } from '../services/cjr/colorMath';
+import { getColorHint } from '../game/cjr/colorMath';
 import { THRESHOLDS } from '../constants';
 import { useGameDataBridge } from '../hooks/useGameDataBridge';
 

@@ -1,7 +1,7 @@
 import { Entity, Vector2 } from './entity';
 import { SizeTier, MutationTier } from './shared';
 export type { SizeTier, MutationTier };
-import { PigmentVec3, RingId, Emotion, ShapeId, TattooId } from '../services/cjr/cjrTypes';
+import { PigmentVec3, RingId, Emotion, ShapeId, TattooId } from '../game/cjr/cjrTypes';
 import { StatusTimers, StatusMultipliers, StatusScalars } from './status';
 
 // EIDOLON-V: DOD Bridge

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import type { TournamentQueueState, TournamentParticipant } from '../../services/meta/tournaments';
+import type { TournamentQueueState, TournamentParticipant } from '../../core/meta/tournaments';
 import { useZeroRenderTimer } from '../../hooks/useZeroRenderTimer';
 
 type TournamentInfo = {

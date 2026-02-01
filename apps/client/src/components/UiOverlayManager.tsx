@@ -1,11 +1,11 @@
 import React from 'react';
 import { GameState } from '../types';
-import { UiState, popOverlay, pushOverlay } from '../services/ui/screenMachine';
+import { UiState, popOverlay, pushOverlay } from '../core/ui/screenMachine';
 import PauseOverlay from './overlays/PauseOverlay';
 import SettingsOverlay from './overlays/SettingsOverlay';
 import TutorialOverlay from './overlays/TutorialOverlay';
 import TattooPicker from './TattooPicker';
-import { applyTattoo } from '../services/cjr/tattoos';
+import { applyTattoo } from '../game/cjr/tattoos';
 
 interface UiOverlayManagerProps {
   overlays: UiState['overlays'];

@@ -1,6 +1,6 @@
 import { MutableRefObject, useCallback, useRef } from 'react';
 import { GameState, Player } from '../types';
-import { StatsStore } from '../services/engine/dod/ComponentStores';
+import { StatsStore } from '../game/engine/dod/ComponentStores';
 
 export interface BridgedStats {
   score: number;

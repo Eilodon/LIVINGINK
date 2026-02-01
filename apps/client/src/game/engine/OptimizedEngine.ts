@@ -27,7 +27,7 @@ import { TattooEventManager } from '../cjr/tattooEvents'; // EIDOLON-V: Static i
 import { entityManager } from './dod/EntityManager'; // EIDOLON-V: DOD Manager
 
 import { pooledEntityFactory } from '../pooling/ObjectPool';
-import { filterInPlace } from '../utils/arrayUtils';
+import { filterInPlace } from '../core/utils/arrayUtils';
 import {
   TransformStore,
   PhysicsStore,
@@ -42,7 +42,7 @@ import { EntityLookup } from './dod/ComponentStores';
 import { SkillSystem } from './dod/systems/SkillSystem';
 import { TattooSystem } from './dod/systems/TattooSystem';
 import { ConfigStore } from './dod/ConfigStore';
-import { networkTransformBuffer } from '../networking/NetworkTransformBuffer';
+import { networkTransformBuffer } from './networking/NetworkTransformBuffer';
 import { clientEngineBridge } from './ClientEngineBridge';
 
 // EIDOLON-V FIX: Batch processing removed in favor of Pure DOD Iteration

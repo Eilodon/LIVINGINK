@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useGameSession } from './hooks/useGameSession';
-import { inputManager } from './services/input/InputManager';
+import { inputManager } from './game/input/InputManager';
 import { ScreenManager } from './components/ScreenManager';
-import { AssetLoader } from './services/AssetLoader';
-import { clientLogger } from './services/logging/ClientLogger';
-import { mobileOptimizer } from './services/mobile/MobileOptimizer';
+import { AssetLoader } from './game/AssetLoader';
+import { clientLogger } from './core/logging/ClientLogger';
+import { mobileOptimizer } from './game/mobile/MobileOptimizer';
 import { useScreenReaderAnnouncer } from './hooks/useScreenReaderAnnouncer';
-import { gameStateManager } from './services/engine/GameStateManager';
+import { gameStateManager } from './game/engine/GameStateManager';
 
-import { audioEngine } from './services/audio/AudioEngine';
+import { audioEngine } from './game/audio/AudioEngine';
 
 const App: React.FC = () => {
   const session = useGameSession();
@@ -68,9 +68,9 @@ const App: React.FC = () => {
   return (
     <div className="app-shell select-none relative w-full h-full bg-ink-950 overflow-hidden">
       {/* EIDOLON-V: Screen reader announcements for accessibility */}
-      <div 
-        role="status" 
-        aria-live="polite" 
+      <div
+        role="status"
+        aria-live="polite"
         aria-atomic="true"
         className="sr-only absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0"
       >

@@ -1,7 +1,7 @@
 import { entityManager } from './dod/EntityManager';
 import { TransformStore, PhysicsStore, StateStore } from './dod/ComponentStores';
 import { EntityFlags } from './dod/EntityFlags';
-import { networkTransformBuffer } from '../networking/NetworkTransformBuffer';
+import { networkTransformBuffer } from './networking/NetworkTransformBuffer';
 
 export class PhysicsWorld {
   // Adapter properties

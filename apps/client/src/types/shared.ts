@@ -5,7 +5,7 @@ import type {
   ShapeId,
   PickupKind,
   TattooId,
-} from '../services/cjr/cjrTypes';
+} from '../game/cjr/cjrTypes';
 
 export type { PigmentVec3, RingId, PickupKind, TattooId };
 export type { Emotion, ShapeId };

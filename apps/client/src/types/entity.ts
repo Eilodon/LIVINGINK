@@ -37,7 +37,7 @@ export interface Entity {
   lastCellHash?: number;
 }
 
-import { PickupKind, PigmentVec3 } from '../services/cjr/cjrTypes';
+import { PickupKind, PigmentVec3 } from '../game/cjr/cjrTypes';
 
 export interface Food extends Entity {
   value: number;

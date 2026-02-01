@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { colorblindMode, ColorblindConfig } from '../services/accessibility/ColorblindMode';
+import { colorblindMode, ColorblindConfig } from '../core/accessibility/ColorblindMode';
 import './ColorblindOverlay.css';
 
 interface ColorblindOverlayProps {

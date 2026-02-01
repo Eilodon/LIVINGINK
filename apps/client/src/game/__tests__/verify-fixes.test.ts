@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EntityFlags, MAX_ENTITIES } from '../services/engine/dod/EntityFlags';
-import { entityManager } from '../services/engine/dod/EntityManager';
+import { EntityFlags, MAX_ENTITIES } from './engine/dod/EntityFlags';
+import { entityManager } from './engine/dod/EntityManager';
 import {
   resetAllStores,
   TransformStore,
@@ -13,11 +13,11 @@ import {
   StateStore,
   EntityLookup,
   InputStore,
-} from '../services/engine/dod/ComponentStores';
-import { createInitialState } from '../services/engine/index';
-import { createPlayer, createFood, createBot } from '../services/engine/factories';
-import { MovementSystem } from '../services/engine/dod/systems/MovementSystem';
-import { PhysicsSystem } from '../services/engine/dod/systems/PhysicsSystem';
+} from './engine/dod/ComponentStores';
+import { createInitialState } from './engine/index';
+import { createPlayer, createFood, createBot } from './engine/factories';
+import { MovementSystem } from './engine/dod/systems/MovementSystem';
+import { PhysicsSystem } from './engine/dod/systems/PhysicsSystem';
 
 describe('EntityFlags Fix Verification', () => {
   it('DEAD and OBSTACLE should have different bit values', () => {

@@ -11,8 +11,8 @@ import BootScreen from './screens/BootScreen';
 import GameCanvas from './GameCanvas';
 import { UiOverlayManager } from './UiOverlayManager';
 import { useGameSession } from '../hooks/useGameSession';
-import { isWebGLSupported } from '../services/graphics/WebGLCheck';
-import { inputManager } from '../services/input/InputManager';
+import { isWebGLSupported } from '../game/renderer/WebGLCheck';
+import { inputManager } from '../game/input/InputManager';
 
 // Lazy load Pixi Canvas for performance
 const PixiGameCanvas = React.lazy(() => import('./PixiGameCanvas'));

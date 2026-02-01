@@ -1,6 +1,6 @@
 import React, { useRef, memo } from 'react';
-import { inputManager } from '../services/input/InputManager';
-import { triggerHaptic } from '../services/haptics';
+import { inputManager } from '../game/input/InputManager';
+import { triggerHaptic } from '../game/haptics';
 
 const MobileControls: React.FC = memo(() => {
   const stickRef = useRef<HTMLDivElement>(null);
