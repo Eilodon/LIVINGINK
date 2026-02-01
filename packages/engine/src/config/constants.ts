@@ -26,6 +26,28 @@ export const ACCELERATION_BASE = 1.0;
 export const FRICTION_BASE = 0.93;
 export const MAX_SPEED_BASE = 2.3;
 
+// EIDOLON-V P2: Centralized Physics Constants (replaces magic numbers)
+export const PHYSICS = {
+    // Integration
+    DT_MULTIPLIER: 60,        // Was: dt * 10 → now explicitly 60 units/sec base
+    FIXED_DT: 1 / 60,         // 60Hz fixed timestep
+    MAX_ACCUMULATOR: 0.25,    // Spiral of death cap
+
+    // Elastic Collision
+    ELASTIC_K: 5.0,           // Spring constant
+    ELASTIC_C: 0.2,           // Damping
+
+    // Boss
+    BOSS_SPEED: 100,          // Base boss movement speed
+    BOSS_DASH_MULTIPLIER: 3,  // Dash velocity multiplier
+    BOSS_ATTACK_COOLDOWN: 5,  // Seconds between attacks
+
+    // Network
+    TICK_RATE: 20,            // Server ticks per second
+    BINARY_BUFFER_SIZE: 131072, // 128KB
+    MAX_ENTITIES_PER_PACKET: 4000, // Safety cap
+} as const;
+
 export const FOOD_COUNT = 260;
 export const BOT_COUNT = 28;
 export const BOT_RESPAWN_TIME = 20;

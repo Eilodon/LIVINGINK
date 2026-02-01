@@ -277,6 +277,9 @@ export class GameRoom extends Room<GameRoomState> {
     // 3. Update Ring Logic (CJR specific)
     this.updateRingLogicForAll();
 
+    // EIDOLON-V P2: 3.5 Check for player deaths
+    this.checkPlayerDeaths();
+
     // 4. Sync DOD stores back to Colyseus schema
     this.syncDODToSchema();
 
@@ -474,14 +477,48 @@ export class GameRoom extends Room<GameRoomState> {
     this.freeEntityIndices.push(idx);
   }
 
+  // EIDOLON-V P2: Check all players for death condition
+  private checkPlayerDeaths(): void {
+    this.state.players.forEach((player, sessionId) => {
+      if (player.isDead) return;  // Already dead
+
+      const entityIndex = this.entityIndices.get(sessionId);
+      if (entityIndex === undefined) return;
+
+      // Read health from DOD store
+      const currentHealth = StatsStore.getCurrentHealth(entityIndex);
+
+      if (currentHealth <= 0) {
+        this.handlePlayerDeath(player, sessionId);
+      }
+    });
+  }
+
   private handlePlayerDeath(player: PlayerState, sessionId: string) {
-    // Respawn player at random position
+    const entityIndex = this.entityIndices.get(sessionId);
+
+    // Mark as dead briefly for respawn animation
+    player.isDead = true;
+
+    // Respawn after brief delay (synchronous for now)
     const angle = Math.random() * Math.PI * 2;
     const r = Math.random() * (MAP_RADIUS * 0.8);
-    player.position.x = Math.cos(angle) * r;
-    player.position.y = Math.sin(angle) * r;
-    player.radius = 15; // Reset size
-    player.currentHealth = 100; // Reset health
-    // Reset other properties as needed
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+
+    player.position.x = x;
+    player.position.y = y;
+    player.radius = PLAYER_START_RADIUS;
+    player.currentHealth = 100;
+    player.isDead = false;
+
+    // EIDOLON-V P2: Sync respawn to DOD stores
+    if (entityIndex !== undefined) {
+      TransformStore.setPosition(entityIndex, x, y);
+      PhysicsStore.setVelocity(entityIndex, 0, 0);
+      StatsStore.setCurrentHealth(entityIndex, 100);
+    }
+
+    logger.info('Player respawned', { sessionId, position: { x, y } });
   }
 }
