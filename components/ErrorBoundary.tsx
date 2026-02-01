@@ -3,6 +3,7 @@ import React from 'react';
 type ErrorBoundaryProps = {
   children: React.ReactNode;
   fallback?: React.ReactNode; // EIDOLON-V: Optional fallback instead of error screen
+  onReset?: () => void; // EIDOLON-V: Soft reset callback (avoids hard F5 reload)
 };
 
 type ErrorBoundaryState = {
@@ -39,11 +40,19 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
               {this.state.error.message}
             </pre>
             <div className="mt-4 flex gap-3">
+              {/* EIDOLON-V: Soft reset preferred over hard reload */}
               <button
                 className="px-4 py-2 rounded-lg bg-white text-black font-bold hover:bg-slate-200"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  this.setState({ error: null });
+                  if (this.props.onReset) {
+                    this.props.onReset();
+                  } else {
+                    window.location.reload();
+                  }
+                }}
               >
-                Reload
+                {this.props.onReset ? 'Return to Menu' : 'Reload'}
               </button>
               <button
                 className="px-4 py-2 rounded-lg bg-slate-800 text-slate-100 border border-slate-700 hover:bg-slate-700"

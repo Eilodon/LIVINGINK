@@ -25,7 +25,8 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
   const { getStats } = useGameDataBridge(gameStateRef);
 
   // Cache to avoid DOM thrashing
-  const cache = useRef({ score: -1, percent: -1, waveTime: -1, ring: -1, colorHint: '', isWinHold: false });
+  // EIDOLON-V: displayScore for smooth lerp animation
+  const cache = useRef({ score: -1, displayScore: 0, percent: -1, waveTime: -1, ring: -1, colorHint: '', isWinHold: false });
 
   useEffect(() => {
     let rafId: number;
@@ -43,11 +44,18 @@ const HUD: React.FC<HUDProps> = memo(({ gameStateRef }) => {
       const stats = getStats();
       const p = state.player; // Still needed for slow updates (pigment, ring) until we bridge those too
 
-      // 1. Score
-      const s = Math.floor(stats.score);
-      if (s !== cache.current.score) {
-        if (scoreRef.current) scoreRef.current.textContent = s.toLocaleString();
-        cache.current.score = s;
+      // 1. Score (EIDOLON-V: Smooth Lerp Animation)
+      const targetScore = Math.floor(stats.score);
+      // Lerp factor 0.1 = smooth interpolation over ~10 frames
+      cache.current.displayScore += (targetScore - cache.current.displayScore) * 0.1;
+
+      // Only update DOM if rounded value changed (avoids sub-pixel thrashing)
+      const displayInt = Math.round(cache.current.displayScore);
+      if (displayInt !== cache.current.score) {
+        cache.current.score = displayInt;
+        if (scoreRef.current) {
+          scoreRef.current.textContent = displayInt.toLocaleString();
+        }
       }
 
       // 2. Match %
