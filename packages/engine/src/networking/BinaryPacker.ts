@@ -23,6 +23,17 @@ export class BinaryPacker {
     entities: { id: string; x: number; y: number; vx: number; vy: number }[],
     timestamp: number
   ): ArrayBuffer {
+    // EIDOLON-V P0: Overflow protection
+    // Header (7) + per entity: id_len (1) + id (~10 avg) + transforms (16) = ~27 bytes/entity
+    const maxSafeEntities = Math.floor((this._buffer.byteLength - 7) / 30);
+    if (entities.length > maxSafeEntities) {
+      console.error('[BinaryPacker] Buffer overflow prevented, truncating', {
+        count: entities.length,
+        max: maxSafeEntities
+      });
+      entities = entities.slice(0, maxSafeEntities);
+    }
+
     let offset = 0;
     const view = this._view;
     const u8 = this._u8;
@@ -78,18 +89,18 @@ export class BinaryPacker {
     for (const evt of events) {
       // Event type
       u8[offset++] = evt.type;
-      
+
       // Entity ID
       const idLen = evt.entityId.length;
       u8[offset++] = idLen;
       for (let i = 0; i < idLen; i++) {
         u8[offset++] = evt.entityId.charCodeAt(i);
       }
-      
+
       // Data (f32)
       view.setFloat32(offset, evt.data ?? 0, true);
       offset += 4;
-      
+
       // Position (f32 x 2)
       view.setFloat32(offset, evt.x ?? 0, true);
       offset += 4;
@@ -167,7 +178,7 @@ export class BinaryPacker {
 
     for (let k = 0; k < count; k++) {
       const type = u8[offset++];
-      
+
       const idLen = u8[offset++];
       this._idBuffer.set(u8.subarray(offset, offset + idLen));
       const entityId = this._textDecoder.decode(this._idBuffer.subarray(0, idLen));

@@ -68,6 +68,9 @@ export class GameRoom extends Room<GameRoomState> {
   // EIDOLON-V: DOD Entity mapping (sessionId -> entityIndex)
   private entityIndices: Map<string, number> = new Map();
   private nextEntityIndex: number = 0;
+  // EIDOLON-V P0: Entity pool recycling with generation for safe ID reuse
+  private freeEntityIndices: number[] = [];
+  private entityGenerations: Uint16Array = new Uint16Array(MAX_ENTITIES);
 
   // Security & Physics constants
   private static readonly SECURITY_MAX_DT_SEC = 0.2;
@@ -121,89 +124,136 @@ export class GameRoom extends Room<GameRoomState> {
         return; // Silently drop invalid input
       }
 
-      const sanitizedInput = inputValidation.sanitized || (message as any); // Fallback if sanitary fails but valid? No, if valid, sanitized is set.
+      // EIDOLON-V P0: Never use unsafe fallback
+      if (!inputValidation.sanitized) return;
+      const sanitizedInput = inputValidation.sanitized as {
+        seq?: number; targetX?: number; targetY?: number; space?: boolean; w?: boolean
+      };
 
       this.inputsBySession.set(client.sessionId, {
-        seq: sanitizedInput?.seq || 0,
-        targetX: sanitizedInput?.targetX ?? 0,
-        targetY: sanitizedInput?.targetY ?? 0,
-        space: !!sanitizedInput?.space,
-        w: !!sanitizedInput?.w,
+        seq: sanitizedInput.seq || 0,
+        targetX: sanitizedInput.targetX ?? 0,
+        targetY: sanitizedInput.targetY ?? 0,
+        space: !!sanitizedInput.space,
+        w: !!sanitizedInput.w,
       });
     });
   }
 
   onJoin(client: Client, options: { name?: string; shape?: string; pigment?: any }) {
-    // Note: options here is typed by Colyseus usually as any, but we can enforce.
-    // Actually onJoin(client: Client, options?: any) is standard.
-    // We will cast options inside.
     logger.info('Client joined', { sessionId: client.sessionId, options });
 
-    // EIDOLON-V PHASE1: Validate player options
+    // Validate player options
     const playerValidation = InputValidator.validatePlayerOptions(options);
-    let validOptions: any = {}; // Use explicit any for internal logic if needed or properly typed.
+    let validOptions: { name?: string; shape?: string } = {};
 
     if (!playerValidation.isValid) {
       logger.warn(`Invalid player options from ${client.sessionId}`, {
         errors: playerValidation.errors,
       });
-      // Don't disconnect, just use defaults
-      validOptions = {};
     } else {
       validOptions = playerValidation.sanitized || {};
     }
 
+    // EIDOLON-V P0: Allocate DOD entity index with recycling
+    const entityIndex = this.allocateEntityIndex();
+    if (entityIndex === -1) {
+      logger.error('Entity pool exhausted - cannot add player', { sessionId: client.sessionId });
+      client.leave();
+      return;
+    }
+    this.entityIndices.set(client.sessionId, entityIndex);
+
+    // Create Colyseus state
     const player = new PlayerState();
     player.id = client.sessionId;
     player.sessionId = client.sessionId;
-    player.name = validOptions.name || `Jelly ${client.sessionId.substr(0, 4)}`;
+    player.name = validOptions.name || `Jelly ${client.sessionId.slice(0, 4)}`;
     player.shape = validOptions.shape || 'circle';
 
-    // Random Position
+    // Random Position (outer ring)
     const angle = Math.random() * Math.PI * 2;
     const r = Math.random() * (MAP_RADIUS * 0.8);
-    player.position.x = Math.cos(angle) * r;
-    player.position.y = Math.sin(angle) * r;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    player.position.x = x;
+    player.position.y = y;
 
-    // Use provided pigment or random
-    if (options.pigment) {
-      player.pigment.r = options.pigment.r || Math.random();
-      player.pigment.g = options.pigment.g || Math.random();
-      player.pigment.b = options.pigment.b || Math.random();
+    // Pigment setup
+    if (options?.pigment?.r !== undefined) {
+      player.pigment.r = Math.max(0, Math.min(1, options.pigment.r));
+      player.pigment.g = Math.max(0, Math.min(1, options.pigment.g));
+      player.pigment.b = Math.max(0, Math.min(1, options.pigment.b));
     } else {
       player.pigment.r = Math.random();
       player.pigment.g = Math.random();
       player.pigment.b = Math.random();
     }
 
-    // Target Pigment (Quest)
+    // Target Pigment (Quest color)
     player.targetPigment.r = Math.random();
     player.targetPigment.g = Math.random();
     player.targetPigment.b = Math.random();
 
+    // Calculate initial match percent
+    player.matchPercent = calcMatchPercentFast(
+      { r: player.pigment.r, g: player.pigment.g, b: player.pigment.b },
+      { r: player.targetPigment.r, g: player.targetPigment.g, b: player.targetPigment.b }
+    );
+
     this.state.players.set(client.sessionId, player);
 
-    // Add player to server engine
-    const dodIndex = this.serverEngine.addPlayer(client.sessionId, player.name, player.shape);
-    logger.info('Player added to engine', { sessionId: client.sessionId, dodIndex });
-  }
+    // Initialize DOD Component Stores
+    // Transform: [x, y, rotation, scale, prevX, prevY, prevRotation, _pad]
+    TransformStore.set(entityIndex, x, y, angle, 1.0);
 
-  // Initializer helper to ensure fields exist if createPlayer doesn't set them (it's in factory, wait, I need to check factory)
-  // Actually, I should update the factory or just init here if it's missing.
-  // But wait, createPlayer is in services/engine/factories.ts, I should check that file too.
-  // For now, I'll rely on the class property initializer if possible or update factory.
-  // Checking factories.ts is safer. I'll do that in next step.
+    // Physics: [vx, vy, vRotation, mass, radius, restitution, friction, _pad]
+    const mass = Math.PI * PLAYER_START_RADIUS * PLAYER_START_RADIUS;
+    PhysicsStore.set(entityIndex, 0, 0, mass, PLAYER_START_RADIUS, 0.5, 0.93);
+
+    // Stats: [currentHealth, maxHealth, score, matchPercent, defense, damageMultiplier, _pad, _pad]
+    StatsStore.set(entityIndex, 100, 100, 0, player.matchPercent, 1, 1);
+
+    // Input: [targetX, targetY, isSkillActive, isEjectActive]
+    InputStore.setTarget(entityIndex, x, y);
+
+    // Config: [maxSpeed, speedMultiplier, magnetRadius, _pad]
+    ConfigStore.setMaxSpeed(entityIndex, GameRoom.MAX_SPEED_BASE);
+    ConfigStore.setSpeedMultiplier(entityIndex, 1.0);
+
+    // Activate entity
+    StateStore.setFlag(entityIndex, EntityFlags.ACTIVE);
+
+    // Add to engine bridge for high-level logic
+    this.serverEngine.addPlayer(client.sessionId, player.name, player.shape);
+
+    logger.info('Player added to DOD engine', {
+      sessionId: client.sessionId,
+      entityIndex,
+      position: { x, y },
+      matchPercent: player.matchPercent.toFixed(2),
+    });
+  }
 
   onLeave(client: Client, consented: boolean) {
     logger.info('Client left', { sessionId: client.sessionId, consented });
 
-    // EIDOLON-V PHASE1: Cleanup Rate Limiter
+    // Cleanup Rate Limiter
     this.clientRates.delete(client.sessionId);
 
-    // EIDOLON-V FIX: Clean up PhysicsWorld slot
+    // EIDOLON-V P0: Cleanup DOD entity with proper release
+    const entityIndex = this.entityIndices.get(client.sessionId);
+    if (entityIndex !== undefined) {
+      this.releaseEntityIndex(entityIndex);
+      this.entityIndices.delete(client.sessionId);
+    }
+
+    // Remove from engine bridge
     this.serverEngine.removePlayer(client.sessionId);
 
+    // Remove from Colyseus state
     this.state.players.delete(client.sessionId);
+    this.inputsBySession.delete(client.sessionId);
   }
 
   onDispose() {
@@ -213,30 +263,168 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   update(dt: number) {
-    const dtSec = dt / 1000;
+    const dtSec = Math.min(dt / 1000, GameRoom.SECURITY_MAX_DT_SEC);
     this.lastUpdateDtSec = dtSec;
+
+    // 1. Apply client inputs to DOD InputStore
+    this.applyInputsToDOD();
+
+    // 2. Run DOD Physics Systems
+    PhysicsSystem.update(dtSec);
+    MovementSystem.updateAll(dtSec);
+    SkillSystem.update(dtSec);
+
+    // 3. Update Ring Logic (CJR specific)
+    this.updateRingLogicForAll();
+
+    // 4. Sync DOD stores back to Colyseus schema
+    this.syncDODToSchema();
+
+    // 5. Update game time
     this.state.gameTime += dtSec;
 
-    // TODO: Implement server tick with ServerEngineBridge
-    // For now, this is a placeholder that broadcasts player positions from schema
+    // 6. Broadcast binary transforms
     this.broadcastBinaryTransforms();
   }
 
+  private applyInputsToDOD() {
+    this.state.players.forEach((player, sessionId) => {
+      const entityIndex = this.entityIndices.get(sessionId);
+      if (entityIndex === undefined) return;
+
+      const input = this.inputsBySession.get(sessionId);
+      if (!input) return;
+
+      // Validate and clamp target position (anti-cheat)
+      const clampedX = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, input.targetX));
+      const clampedY = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, input.targetY));
+
+      // Apply to DOD InputStore
+      InputStore.setTarget(entityIndex, clampedX, clampedY);
+
+      // Handle skill input
+      if (input.space) {
+        InputStore.setSkillActive(entityIndex, true);
+      }
+
+      // Mark input as processed
+      player.lastProcessedInput = input.seq;
+    });
+  }
+
+  private updateRingLogicForAll() {
+    this.state.players.forEach((player, sessionId) => {
+      const entityIndex = this.entityIndices.get(sessionId);
+      if (entityIndex === undefined || player.isDead) return;
+
+      // Build ring entity interface
+      const ringEntity = {
+        physicsIndex: entityIndex,
+        position: {
+          x: TransformStore.getX(entityIndex),
+          y: TransformStore.getY(entityIndex),
+        },
+        velocity: {
+          x: PhysicsStore.getVelocityX(entityIndex),
+          y: PhysicsStore.getVelocityY(entityIndex),
+        },
+        ring: player.ring as 1 | 2 | 3,
+        matchPercent: player.matchPercent,
+        isDead: player.isDead,
+        statusScalars: {},
+        statusMultipliers: {},
+        statusTimers: {},
+      };
+
+      // Check ring transition
+      const result = checkRingTransition(ringEntity);
+
+      if (result.transitioned && result.newRing) {
+        player.ring = result.newRing;
+        logger.info('Player committed to deeper ring', {
+          sessionId,
+          fromRing: ringEntity.ring,
+          toRing: result.newRing,
+          matchPercent: player.matchPercent.toFixed(2),
+        });
+      }
+
+      // Sync position/velocity back from ring logic
+      if (ringEntity.physicsIndex !== undefined) {
+        TransformStore.setPosition(entityIndex, ringEntity.position.x, ringEntity.position.y);
+        PhysicsStore.setVelocity(entityIndex, ringEntity.velocity.x, ringEntity.velocity.y);
+      }
+    });
+  }
+
+  private syncDODToSchema() {
+    this.state.players.forEach((player, sessionId) => {
+      const entityIndex = this.entityIndices.get(sessionId);
+      if (entityIndex === undefined) return;
+
+      // Check if entity is still active
+      if (!StateStore.isActive(entityIndex)) {
+        if (!player.isDead) {
+          player.isDead = true;
+        }
+        return;
+      }
+
+      // Sync Transform -> Schema position
+      player.position.x = TransformStore.getX(entityIndex);
+      player.position.y = TransformStore.getY(entityIndex);
+
+      // Sync Physics -> Schema velocity
+      player.velocity.x = PhysicsStore.getVelocityX(entityIndex);
+      player.velocity.y = PhysicsStore.getVelocityY(entityIndex);
+
+      // Update radius from physics store
+      player.radius = PhysicsStore.getRadius(entityIndex);
+
+      // Server-side speed validation (anti-cheat)
+      const vx = player.velocity.x;
+      const vy = player.velocity.y;
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      const maxSpeed = GameRoom.MAX_SPEED_BASE * GameRoom.SPEED_VALIDATION_TOLERANCE;
+
+      if (speed > maxSpeed) {
+        // Log potential speed hack
+        logger.warn('Speed validation failed', {
+          sessionId,
+          speed: speed.toFixed(2),
+          maxAllowed: maxSpeed.toFixed(2),
+        });
+
+        // Clamp velocity
+        const scale = maxSpeed / speed;
+        player.velocity.x *= scale;
+        player.velocity.y *= scale;
+        PhysicsStore.setVelocity(entityIndex, player.velocity.x, player.velocity.y);
+      }
+    });
+  }
+
   private broadcastBinaryTransforms() {
-    // Gather dynamic entities from server state (not simState)
     const updates: { id: string; x: number; y: number; vx: number; vy: number }[] = [];
 
-    // Iterate Colyseus schema state directly
+    // Gather player transforms from DOD stores (authoritative)
     this.state.players.forEach((player, sessionId) => {
+      const entityIndex = this.entityIndices.get(sessionId);
+      if (entityIndex === undefined) return;
+
+      // Only include active entities
+      if (!StateStore.isActive(entityIndex)) return;
+
       updates.push({
         id: sessionId,
-        x: player.position.x,
-        y: player.position.y,
-        vx: player.velocity.x,
-        vy: player.velocity.y,
+        x: TransformStore.getX(entityIndex),
+        y: TransformStore.getY(entityIndex),
+        vx: PhysicsStore.getVelocityX(entityIndex),
+        vy: PhysicsStore.getVelocityY(entityIndex),
       });
     });
 
+    // Include bots
     this.state.bots.forEach((bot, id) => {
       updates.push({
         id,
@@ -249,45 +437,41 @@ export class GameRoom extends Room<GameRoomState> {
 
     if (updates.length > 0) {
       const buffer = BinaryPacker.packTransforms(updates, this.state.gameTime);
-      // Broadcast as "bin" message or raw
       this.broadcast('bin', new Uint8Array(buffer));
     }
   }
 
-  private applyInputsToSimState() {
-    // TODO: Apply inputs using ServerEngineBridge
-    // For now, just read from inputsBySession and update schema state directly
-    this.state.players.forEach((player, sessionId) => {
-      const input = this.inputsBySession.get(sessionId);
-      if (!input) return;
 
-      // Apply simple movement based on target position
-      const dx = input.targetX - player.position.x;
-      const dy = input.targetY - player.position.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist > 1) {
-        const speed = 200 * this.lastUpdateDtSec; // 200 units per second
-        const moveX = (dx / dist) * Math.min(speed, dist);
-        const moveY = (dy / dist) * Math.min(speed, dist);
-        
-        player.position.x += moveX;
-        player.position.y += moveY;
-        player.velocity.x = moveX / this.lastUpdateDtSec;
-        player.velocity.y = moveY / this.lastUpdateDtSec;
-      }
-    });
+  // EIDOLON-V P0: Allocate entity index with recycling
+  private allocateEntityIndex(): number {
+    // Prefer recycled indices
+    if (this.freeEntityIndices.length > 0) {
+      const idx = this.freeEntityIndices.pop()!;
+      this.entityGenerations[idx]++;  // Increment generation on reuse
+      return idx;
+    }
+
+    // Allocate new index if pool not exhausted
+    if (this.nextEntityIndex >= MAX_ENTITIES) {
+      return -1;  // Pool exhausted
+    }
+
+    return this.nextEntityIndex++;
   }
 
-  private syncSimStateToServer() {
-    // TODO: Sync from ServerEngineBridge to Colyseus schema
-    // For now, schema is authoritative
-    this.state.players.forEach((player) => {
-      const input = this.inputsBySession.get(player.sessionId);
-      if (input) {
-        player.lastProcessedInput = input.seq;
-      }
-    });
+  // EIDOLON-V P0: Release entity index for recycling with DOD store cleanup
+  private releaseEntityIndex(idx: number): void {
+    // Zero ALL DOD stores to prevent stale data reads
+    const stride8 = idx * 8;
+    TransformStore.data.fill(0, stride8, stride8 + 8);
+    PhysicsStore.data.fill(0, stride8, stride8 + 8);
+    StatsStore.data.fill(0, stride8, stride8 + 8);
+    StateStore.flags[idx] = 0;
+    InputStore.data.fill(0, idx * 4, idx * 4 + 4);
+    ConfigStore.data.fill(0, idx * 4, idx * 4 + 4);
+
+    // Return to free list
+    this.freeEntityIndices.push(idx);
   }
 
   private handlePlayerDeath(player: PlayerState, sessionId: string) {

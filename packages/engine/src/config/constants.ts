@@ -64,6 +64,14 @@ export const RING_RADII = {
     CENTER: 100,
 } as const;
 
+// EIDOLON-V OPTIMIZATION: Pre-computed squares for fast distance checks
+export const RING_RADII_SQ = {
+    R1: RING_RADII.R1 * RING_RADII.R1,
+    R2: RING_RADII.R2 * RING_RADII.R2,
+    R3: RING_RADII.R3 * RING_RADII.R3,
+    CENTER: RING_RADII.CENTER * RING_RADII.CENTER,
+} as const;
+
 // Match Thresholds
 export const THRESHOLDS = {
     ENTER_RING2: 0.5,

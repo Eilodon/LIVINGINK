@@ -4,7 +4,6 @@
  */
 
 import { automatedTestRunner } from './AutomatedTestRunner';
-import { gameFlowTest } from './integration/GameFlowTest';
 import { visualRegressionTest } from './e2e/VisualRegressionTest';
 
 /**
@@ -48,7 +47,8 @@ async function runSingleTestSuite(options: TestCLIOptions = {}): Promise<void> {
   switch (options.type) {
     case 'integration':
       console.log('🧪 Running Integration Tests...');
-      const integrationResult = await gameFlowTest.runCompleteTestSuite();
+      // Use vitest to run integration tests
+      const integrationResult = await automatedTestRunner.runCompleteTestSuite();
       outputResults(integrationResult, options.output, options.verbose);
       break;
 
