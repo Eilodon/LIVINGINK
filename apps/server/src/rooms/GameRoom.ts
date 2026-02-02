@@ -319,8 +319,11 @@ export class GameRoom extends Room<GameRoomState> {
       const entityIndex = this.entityIndices.get(sessionId);
       if (entityIndex === undefined) return;
 
+      // EIDOLON-V FIX: Atomic input consumption - get and delete immediately
+      // Prevents race condition where input gets overwritten mid-processing
       const input = this.inputsBySession.get(sessionId);
       if (!input) return;
+      this.inputsBySession.delete(sessionId); // Consume immediately
 
       // Validate and clamp target position (anti-cheat)
       const clampedX = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, input.targetX));

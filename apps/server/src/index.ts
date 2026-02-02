@@ -176,6 +176,7 @@ async function main() {
       server: httpServer,
       pingInterval: 3000,
       pingMaxRetries: 3,
+      maxPayload: 1024 * 1024, // EIDOLON-V: 1MB limit - prevents DoS via oversized messages
       // EIDOLON-V P1: WebSocket origin validation
       verifyClient: (info, callback) => {
         const origin = info.origin || (info.req as any).headers?.origin;

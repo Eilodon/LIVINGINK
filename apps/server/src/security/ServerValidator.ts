@@ -277,12 +277,21 @@ export class ServerValidator {
    * Rate limiting for player actions
    */
   private static actionTimestamps: Map<string, number[]> = new Map();
+  private static cleanupCounter = 0;
+  private static readonly CLEANUP_INTERVAL = 100; // Cleanup every 100 calls
 
   static validateActionRate(
     sessionId: string,
     actionType: string,
     maxActionsPerSecond: number = 10
   ): ValidationResult {
+    // EIDOLON-V FIX: Periodic cleanup to prevent memory leak
+    this.cleanupCounter++;
+    if (this.cleanupCounter >= this.CLEANUP_INTERVAL) {
+      this.cleanup();
+      this.cleanupCounter = 0;
+    }
+
     const now = Date.now();
     const key = `${sessionId}_${actionType}`;
 

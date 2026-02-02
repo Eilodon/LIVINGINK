@@ -2,6 +2,7 @@
 // Eliminates O(n²) complexity and reduces function call overhead
 
 import { GameState, Player, Bot, Food, Entity, Projectile } from '../../types';
+import { MAP_RADIUS } from '../../constants';
 import { gameStateManager } from './GameStateManager';
 import { bindEngine, getCurrentSpatialGrid, getCurrentEngine } from './context';
 
@@ -27,7 +28,7 @@ import { TattooEventManager } from '../cjr/tattooEvents'; // EIDOLON-V: Static i
 import { entityManager } from './dod/EntityManager'; // EIDOLON-V: DOD Manager
 
 import { pooledEntityFactory } from '../pooling/ObjectPool';
-import { filterInPlace } from '../core/utils/arrayUtils';
+import { filterInPlace } from '../../core/utils/arrayUtils';
 import {
   TransformStore,
   PhysicsStore,
@@ -154,10 +155,9 @@ class OptimizedGameEngine {
         // EIDOLON-V 2.1: Stats sync throttled (every 4 frames)
         if (syncStats && 'score' in ent) {
           const sIdx = idx * 8;
-          const unit = ent as any;
-          unit.currentHealth = sData[sIdx];
-          unit.score = sData[sIdx + 2];
-          unit.matchPercent = sData[sIdx + 3];
+          (ent as Player).currentHealth = sData[sIdx];
+          (ent as Player).score = sData[sIdx + 2];
+          (ent as Player).matchPercent = sData[sIdx + 3];
         }
 
         // Sync Dead Flag (still every frame for cleanup)
@@ -487,23 +487,6 @@ class OptimizedGameEngine {
         console.warn(`[DOD] Food ${food.id} missing physicsIndex`);
       }
     }
-
-    // ORIGINAL SYNC CODE (Disabled for aggressive mode):
-    // -----------------------------------------------------------------
-    // // Sync player position
-    // if (state.player && state.player.physicsIndex !== undefined) {
-    //   const tIdx = state.player.physicsIndex * 8;
-    //   state.player.position.x = TransformStore.data[tIdx];
-    //   state.player.position.y = TransformStore.data[tIdx + 1];
-    //   state.player.velocity.x = PhysicsStore.data[tIdx];
-    //   state.player.velocity.y = PhysicsStore.data[tIdx + 1];
-    //   state.player.radius = PhysicsStore.data[tIdx + 4];
-    //   state.player.score = StatsStore.data[tIdx + 2];
-    //   state.player.matchPercent = StatsStore.data[tIdx + 3];
-    // }
-    // // Sync bot positions...
-    // // Sync food positions...
-    // -----------------------------------------------------------------
   }
 
   private updateCamera(state: GameState): void {
@@ -528,7 +511,9 @@ class OptimizedGameEngine {
     if (state.tattooChoices) return;
 
     const player = state.player;
-    if (player.matchPercent >= 0.8 && (player as any).level >= 2) {
+    // EIDOLON-V FIX: Use type-safe property access with fallback
+    const playerLevel = (player as { level?: number }).level ?? 1;
+    if (player.matchPercent >= 0.8 && playerLevel >= 2) {
       state.tattooChoices = getTattooChoices(3);
     }
   }
@@ -575,7 +560,10 @@ class OptimizedGameEngine {
             updateAI(obj as Bot, state, dt);
             const bot = obj as Bot;
             if (bot.targetPosition) {
-              InputStore.setTarget(i, bot.targetPosition.x, bot.targetPosition.y);
+              // EIDOLON-V FIX: Clamp bot target to world bounds (anti-cheat)
+              const clampedX = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, bot.targetPosition.x));
+              const clampedY = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, bot.targetPosition.y));
+              InputStore.setTarget(i, clampedX, clampedY);
             }
           } else {
             const player = obj as Player;
@@ -699,7 +687,7 @@ class OptimizedGameEngine {
     return state;
   }
 
-  private updateEntityTimers(index: number, entityObj: Player | Bot, dt: number) {
+  private updateEntityTimers(index: number, entityObj: Player | Bot, dt: number): void {
     // 4. Stats Regen (DOD)
     const sIdx = index * StatsStore.STRIDE;
     let hp = StatsStore.data[sIdx];
