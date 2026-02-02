@@ -1,21 +1,21 @@
 /// <reference types="vite/client" />
 import * as Colyseus from 'colyseus.js';
 import type { Room } from 'colyseus.js';
-import type { GameState, Player, Bot, Food, Projectile, Vector2 } from '../../types';
-import type { PigmentVec3, ShapeId, Emotion, PickupKind, TattooId } from '../cjr/cjrTypes';
+import type { GameState, Player, Bot, Food, Projectile, Vector2 } from '../types';
+import type { PigmentVec3, ShapeId, Emotion, PickupKind, TattooId } from '../game/cjr/cjrTypes';
 import {
   createDefaultStatusTimers,
   createDefaultStatusMultipliers,
   createDefaultStatusScalars,
-} from '../../types/status';
-import { StatusFlag } from '../engine/statusFlags';
+} from '../types/status';
+import { StatusFlag } from '../game/engine/statusFlags';
 // EIDOLON-V PHASE3: Import BinaryPacker from @cjr/engine
 import { BinaryPacker } from '@cjr/engine/networking';
 import { MovementSystem } from '@cjr/engine/systems';
 import { PhysicsSystem } from '@cjr/engine/systems';
 import { TransformStore, PhysicsStore } from '@cjr/engine';
 import { InputRingBuffer } from './InputRingBuffer';
-import { clientLogger } from '../logging/ClientLogger';
+import { clientLogger } from '../game/logging/ClientLogger';
 
 // EIDOLON-V P4: Module-level reusable vectors (zero allocation after init)
 const _serverPos = { x: 0, y: 0 };
@@ -228,6 +228,17 @@ export class NetworkClient {
     // Reset ring buffer on disconnect
     this.snapshotHead = 0;
     this.snapshotCount = 0;
+
+    // EIDOLON-V P0 SECURITY: Clear entity maps to prevent memory leak
+    // Without this, stale Player/Bot/Food objects accumulate on reconnect cycles
+    this.playerMap.clear();
+    this.botMap.clear();
+    this.foodMap.clear();
+
+    // Reset connection state
+    this.connectionState = ConnectionState.DISCONNECTED;
+    this.reconnectAttemptCount = 0;
+
     this.emitStatus('offline');
   }
 

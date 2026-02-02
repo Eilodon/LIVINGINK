@@ -83,6 +83,30 @@ export class GameRoom extends Room<GameRoomState> {
   private readonly RATE_LIMIT_WINDOW = 1000;
   private readonly RATE_LIMIT_MAX = 60;
 
+  // EIDOLON-V P0 SECURITY: Entity handle validation to prevent ABA problem
+  // Composite handle: (generation << 16) | index
+  private makeEntityHandle(index: number): number {
+    const gen = this.entityGenerations[index];
+    return (gen << 16) | index;
+  }
+
+  // Validate entity handle is still valid (not recycled)
+  private isValidEntityHandle(handle: number): boolean {
+    const index = handle & 0xFFFF;
+    const expectedGen = handle >> 16;
+
+    if (index < 0 || index >= MAX_ENTITIES) return false;
+
+    const currentGen = this.entityGenerations[index];
+    return currentGen === expectedGen;
+  }
+
+  // Extract index from handle (only if valid)
+  private getIndexFromHandle(handle: number): number | null {
+    if (!this.isValidEntityHandle(handle)) return null;
+    return handle & 0xFFFF;
+  }
+
   onCreate(options: unknown) {
     logger.info('GameRoom created!', { options });
 

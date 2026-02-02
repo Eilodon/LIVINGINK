@@ -10,7 +10,7 @@
  * - Backend-agnostic API
  */
 
-import type { RenderEntity, Vec2, RGB } from './RenderTypes';
+import type { RenderEntity, Vec2, RGB } from '../RenderTypes';
 
 // Backend capability flags
 export const enum RenderCapability {

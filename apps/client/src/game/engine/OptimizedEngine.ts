@@ -42,7 +42,7 @@ import { EntityLookup } from './dod/ComponentStores';
 import { SkillSystem } from './dod/systems/SkillSystem';
 import { TattooSystem } from './dod/systems/TattooSystem';
 import { ConfigStore } from './dod/ConfigStore';
-import { networkTransformBuffer } from './networking/NetworkTransformBuffer';
+import { networkTransformBuffer } from '../../network/NetworkTransformBuffer';
 import { clientEngineBridge } from './ClientEngineBridge';
 
 // EIDOLON-V FIX: Batch processing removed in favor of Pure DOD Iteration
@@ -413,7 +413,7 @@ class OptimizedGameEngine {
 
     // Remove dead food
     if (state.food.length > 0) {
-      filterInPlace(state.food, f => {
+      filterInPlace(state.food, (f: Food) => {
         if (f.isDead) {
           grid.removeStatic(f);
           // EIDOLON-V FIX: Release DOD index to prevent memory leak
@@ -433,7 +433,7 @@ class OptimizedGameEngine {
     // This is now handled by updateProjectilesDOD setting DEAD flag
     // The actual removal from state.projectiles array might still be needed for rendering/legacy systems
     if (state.projectiles.length > 0) {
-      filterInPlace(state.projectiles, p => {
+      filterInPlace(state.projectiles, (p: Projectile) => {
         if (p.isDead) {
           // EIDOLON-V FIX: Release DOD index to prevent memory leak
           if (p.physicsIndex !== undefined) {
@@ -449,7 +449,7 @@ class OptimizedGameEngine {
     }
 
     // Remove dead entities
-    filterInPlace(state.bots, b => {
+    filterInPlace(state.bots, (b: Bot) => {
       if (b.isDead) {
         // EIDOLON-V FIX: Cleanup events/synergies to prevent ID reuse bugs
         TattooEventManager.triggerDeactivate(b.id);
@@ -463,8 +463,8 @@ class OptimizedGameEngine {
       }
       return true;
     });
-    filterInPlace(state.particles, p => p.life > 0);
-    filterInPlace(state.delayedActions, a => a.timer > 0);
+    filterInPlace(state.particles, (p: { life: number }) => p.life > 0);
+    filterInPlace(state.delayedActions, (a: { timer: number }) => a.timer > 0);
   }
 
   // EIDOLON-V FIX: AGGRESSIVE MODE - Telemetry only, sync disabled
@@ -541,6 +541,10 @@ class OptimizedGameEngine {
       this.spatialGrid = getCurrentSpatialGrid();
 
       if (state.isPaused) return state;
+
+      // EIDOLON-V P0 SECURITY: Clamp dt to prevent physics explosion on lag
+      // Max 100ms (10fps minimum), also prevents negative dt from clock issues
+      dt = Math.max(0.001, Math.min(dt, 0.1));
 
       this.frameCount++;
 

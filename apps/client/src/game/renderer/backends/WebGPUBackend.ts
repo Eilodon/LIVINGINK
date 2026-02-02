@@ -64,7 +64,7 @@ export class WebGPUBackend implements IRenderBackend {
             }
 
             this.context.configure({
-                device: this.device,
+                device: this.device!,
                 format: navigator.gpu.getPreferredCanvasFormat(),
                 alphaMode: 'opaque',
             });

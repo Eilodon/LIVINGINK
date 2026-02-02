@@ -16,6 +16,16 @@ export const PacketType = {
 
 export type PacketTypeValue = typeof PacketType[keyof typeof PacketType];
 
+// EIDOLON-V P0 SECURITY: Protocol versioning to detect client/server mismatch
+// Magic byte 0x43 ('C' for CJR) + version byte prevents crashes on protocol changes
+export const PROTOCOL_MAGIC = 0x43;
+export const PROTOCOL_VERSION = 1;
+
+// Helper to check protocol compatibility
+export function isValidProtocol(magic: number, version: number): boolean {
+  return magic === 0x43 && version <= PROTOCOL_VERSION;
+}
+
 // EIDOLON-V P0: Buffer pool entry for thread-safe packing
 interface BufferPoolEntry {
   buffer: ArrayBuffer;
