@@ -303,11 +303,14 @@ export class NetworkClient {
           position: { x: sPlayer.position.x, y: sPlayer.position.y },
           velocity: { x: sPlayer.velocity.x, y: sPlayer.velocity.y },
           radius: sPlayer.radius,
-          color: '#ffffff',
+          color: 0xffffff,
           isDead: sPlayer.isDead,
           name: sPlayer.name,
           score: sPlayer.score,
           kills: sPlayer.kills,
+          // EIDOLON-V P3-1: Added missing required properties
+          killStreak: 0,
+          streakTimer: 0,
           maxHealth: sPlayer.maxHealth,
           currentHealth: sPlayer.currentHealth,
           tier: 0 as any,
@@ -370,7 +373,9 @@ export class NetworkClient {
           },
           rewindHistory: [],
           stationaryTime: 0,
-        } as unknown as Player; // Cast for now
+          // EIDOLON-V P3-1: Type assertion safe because all required Player properties
+          // are explicitly set above. This is intentional - we merge server data with defaults.
+        } as Player;
 
         this.playerMap.set(sessionId, localPlayer);
         this.localState!.players.push(localPlayer);

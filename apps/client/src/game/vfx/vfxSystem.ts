@@ -5,9 +5,20 @@ import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../engine/VFXRingBuffer
 
 export class VFXSystem {
   private screenShake: ScreenShakeController;
+  // EIDOLON-V P3-2: Accessibility - global reduced motion flag
+  private _reducedMotion: boolean = false;
 
   constructor() {
     this.screenShake = new ScreenShakeController();
+  }
+
+  // EIDOLON-V P3-2: Set reduced motion preference
+  setReducedMotion(value: boolean): void {
+    this._reducedMotion = value;
+  }
+
+  get reducedMotion(): boolean {
+    return this._reducedMotion;
   }
 
   emitVFX(
@@ -18,6 +29,9 @@ export class VFXSystem {
     data: number = 0,
     id: string = ''
   ): void {
+    // EIDOLON-V P3-2: Skip VFX when reduced motion is enabled
+    if (this._reducedMotion) return;
+
     // EIDOLON-V: Direct Push to SharedArrayBuffer
     // We map legacy "type" to VFX_TYPES if possible, or pass raw if supported.
     // Assuming type matches VFX_TYPES enum or is compatible integer.
@@ -45,12 +59,16 @@ export class VFXSystem {
   }
 
   playRingCommitVFX(player: Player, ringId: RingId, state: GameState): void {
-    // 1 = Ring Commit
-    this.emitVFX(state, 1, player.position.x, player.position.y, ringId, player.id);
-
+    // EIDOLON-V P3-2: Always play audio even in reduced motion mode
     if (typeof window !== 'undefined') {
       audioEngine.play(`ring_commit_${ringId}`);
     }
+
+    // Skip visual effects if reduced motion
+    if (this._reducedMotion) return;
+
+    // 1 = Ring Commit
+    this.emitVFX(state, 1, player.position.x, player.position.y, ringId, player.id);
 
     const intensity = ringId === 3 ? 0.7 : ringId === 2 ? 0.5 : 0.3;
     this.screenShake.applyShake({ intensity, duration: 0.5, frequency: 20 });
@@ -73,10 +91,17 @@ export class VFXSystem {
   }
 
   updateEffects(state: GameState, dt: number): void {
-    this.screenShake.update(dt);
+    // EIDOLON-V P3-2: Skip shake update if reduced motion
+    if (!this._reducedMotion) {
+      this.screenShake.update(dt);
+    }
   }
 
   getScreenShakeOffset(): Vector2 {
+    // EIDOLON-V P3-2: Return zero offset if reduced motion
+    if (this._reducedMotion) {
+      return { x: 0, y: 0 };
+    }
     return this.screenShake.getCurrentOffset();
   }
 }

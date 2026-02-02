@@ -228,7 +228,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
   const ringRendererRef = useRef<Canvas2DRingRenderer | null>(null);
   const canvasRectRef = useRef<DOMRect | null>(null);
   const dprRef = useRef<number>(Math.min(window.devicePixelRatio || 1, 2));
-  
+
   // EIDOLON-V: Respect user's motion preferences
   const reducedMotion = useReducedMotion();
 
@@ -438,10 +438,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Particles (EIDOLON ARCHITECT: Already optimized - no transform needed)
-      for (let i = 0; i < state.particles.length; i++) {
-        const p = state.particles[i];
-        // Particles draw at absolute positions - no transform needed
-        drawParticle(ctx, p);
+      // EIDOLON-V P3-2: Skip particles for users with reduced motion preference
+      if (!reducedMotion) {
+        for (let i = 0; i < state.particles.length; i++) {
+          const p = state.particles[i];
+          // Particles draw at absolute positions - no transform needed
+          drawParticle(ctx, p);
+        }
       }
 
       // Floating Texts

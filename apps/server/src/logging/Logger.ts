@@ -17,6 +17,9 @@ export interface LogEntry {
   context?: unknown;
   userId?: string;
   sessionId?: string;
+  // EIDOLON-V P3-3: Added correlation ID for request tracing
+  correlationId?: string;
+  roomId?: string;
   ip?: string;
   error?: {
     name: string;
@@ -32,12 +35,25 @@ export class Logger {
   private logLevel = process.env.LOG_LEVEL
     ? LogLevel[process.env.LOG_LEVEL.toUpperCase() as keyof typeof LogLevel]
     : LogLevel.INFO;
+  // EIDOLON-V P3-3: JSON output mode for production (searchable logs)
+  private jsonMode = process.env.NODE_ENV === 'production' || process.env.LOG_JSON === 'true';
+  // EIDOLON-V P3-3: Current correlation ID for request scoping
+  private currentCorrelationId?: string;
 
   static getInstance(): Logger {
     if (!Logger.instance) {
       Logger.instance = new Logger();
     }
     return Logger.instance;
+  }
+
+  // EIDOLON-V P3-3: Trace management
+  setCorrelationId(id: string): void {
+    this.currentCorrelationId = id;
+  }
+
+  clearCorrelationId(): void {
+    this.currentCorrelationId = undefined;
   }
 
   // EIDOLON-V PHASE1: Core logging method
@@ -49,12 +65,14 @@ export class Logger {
       level,
       message,
       context,
+      // EIDOLON-V P3-3: Inject correlation ID if available
+      correlationId: this.currentCorrelationId,
       error: error
         ? {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          }
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        }
         : undefined,
     };
 
@@ -70,10 +88,17 @@ export class Logger {
     this.outputToConsole(logEntry);
   }
 
-  // EIDOLON-V PHASE1: Console output with colors
+  // EIDOLON-V PHASE1: Console output with colors OR JSON
   private outputToConsole(entry: LogEntry): void {
+    if (this.jsonMode) {
+      // EIDOLON-V P3-3: Production JSON format (One line per log for splitting systems)
+      console.log(JSON.stringify(entry));
+      return;
+    }
+
     const timestamp = new Date(entry.timestamp).toISOString();
     const levelStr = LogLevel[entry.level].padEnd(5);
+    const correlationStr = entry.correlationId ? ` [${entry.correlationId}]` : '';
     const contextStr = entry.context ? ` | ${JSON.stringify(entry.context)}` : '';
     const errorStr = entry.error ? ` | ${entry.error.message}` : '';
 
@@ -94,7 +119,7 @@ export class Logger {
     }
 
     const resetCode = '\x1b[0m';
-    const logMessage = `${colorCode}[${timestamp}] ${levelStr} | ${entry.message}${contextStr}${errorStr}${resetCode}`;
+    const logMessage = `${colorCode}[${timestamp}]${correlationStr} ${levelStr} | ${entry.message}${contextStr}${errorStr}${resetCode}`;
 
     switch (entry.level) {
       case LogLevel.ERROR:
