@@ -328,6 +328,128 @@ export class InputStore {
   }
 }
 
+// ============================================================================
+// PHASE 6: PIGMENT STORE (Color Math DOD)
+// ============================================================================
+// Stride = 8: [r, g, b, targetR, targetG, targetB, matchPercent, colorInt]
+// All values in [0..1] range for RGB, matchPercent in [0..1]
+// colorInt stores pre-computed 24-bit color for rendering
+
+export class PigmentStore {
+  public static readonly STRIDE = 8;
+  public static readonly data = new Float32Array(MAX_ENTITIES * PigmentStore.STRIDE);
+
+  // Offset constants
+  static readonly R = 0;
+  static readonly G = 1;
+  static readonly B = 2;
+  static readonly TARGET_R = 3;
+  static readonly TARGET_G = 4;
+  static readonly TARGET_B = 5;
+  static readonly MATCH = 6;
+  static readonly COLOR_INT = 7;
+
+  /**
+   * Initialize entity pigment with current and target colors
+   */
+  static init(id: number, r: number, g: number, b: number,
+    targetR: number, targetG: number, targetB: number): void {
+    if (!isValidEntityId(id)) return;
+    const idx = id * PigmentStore.STRIDE;
+
+    this.data[idx + PigmentStore.R] = r;
+    this.data[idx + PigmentStore.G] = g;
+    this.data[idx + PigmentStore.B] = b;
+    this.data[idx + PigmentStore.TARGET_R] = targetR;
+    this.data[idx + PigmentStore.TARGET_G] = targetG;
+    this.data[idx + PigmentStore.TARGET_B] = targetB;
+
+    // Compute initial match and color
+    this.updateMatch(id);
+    this.updateColorInt(id);
+  }
+
+  /**
+   * Mix pigment with another color (DOD version of mixPigment)
+   * Uses simple RGB lerp - fast path for high-frequency calls
+   */
+  static mix(id: number, addR: number, addG: number, addB: number, ratio: number): void {
+    if (!isValidEntityId(id)) return;
+    const idx = id * PigmentStore.STRIDE;
+
+    // Linear interpolation
+    this.data[idx + PigmentStore.R] += (addR - this.data[idx + PigmentStore.R]) * ratio;
+    this.data[idx + PigmentStore.G] += (addG - this.data[idx + PigmentStore.G]) * ratio;
+    this.data[idx + PigmentStore.B] += (addB - this.data[idx + PigmentStore.B]) * ratio;
+
+    // Clamp to [0,1]
+    this.data[idx + PigmentStore.R] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.R]));
+    this.data[idx + PigmentStore.G] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.G]));
+    this.data[idx + PigmentStore.B] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.B]));
+
+    // Update derived values
+    this.updateMatch(id);
+    this.updateColorInt(id);
+  }
+
+  /**
+   * Compute match percent using fast squared distance
+   */
+  static updateMatch(id: number): void {
+    const idx = id * PigmentStore.STRIDE;
+
+    const dr = this.data[idx + PigmentStore.R] - this.data[idx + PigmentStore.TARGET_R];
+    const dg = this.data[idx + PigmentStore.G] - this.data[idx + PigmentStore.TARGET_G];
+    const db = this.data[idx + PigmentStore.B] - this.data[idx + PigmentStore.TARGET_B];
+
+    const distSq = dr * dr + dg * dg + db * db;
+    const thresholdSq = 0.09; // 0.3^2
+
+    this.data[idx + PigmentStore.MATCH] = distSq >= thresholdSq
+      ? 0
+      : 1.0 - distSq / thresholdSq;
+  }
+
+  /**
+   * Compute 24-bit integer color for rendering
+   */
+  static updateColorInt(id: number): void {
+    const idx = id * PigmentStore.STRIDE;
+
+    const r = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.R] * 255)));
+    const g = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.G] * 255)));
+    const b = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.B] * 255)));
+
+    this.data[idx + PigmentStore.COLOR_INT] = (r << 16) | (g << 8) | b;
+  }
+
+  /**
+   * Get current pigment as object (for legacy compatibility)
+   */
+  static getPigment(id: number): { r: number; g: number; b: number } {
+    const idx = id * PigmentStore.STRIDE;
+    return {
+      r: this.data[idx + PigmentStore.R],
+      g: this.data[idx + PigmentStore.G],
+      b: this.data[idx + PigmentStore.B],
+    };
+  }
+
+  /**
+   * Get match percent directly
+   */
+  static getMatch(id: number): number {
+    return this.data[id * PigmentStore.STRIDE + PigmentStore.MATCH];
+  }
+
+  /**
+   * Get pre-computed color int for rendering
+   */
+  static getColorInt(id: number): number {
+    return this.data[id * PigmentStore.STRIDE + PigmentStore.COLOR_INT];
+  }
+}
+
 export function resetAllStores() {
   TransformStore.data.fill(0);
   PhysicsStore.data.fill(0);
@@ -338,6 +460,7 @@ export function resetAllStores() {
   ProjectileStore.data.fill(0);
   ConfigStore.data.fill(0); // EIDOLON-V: Reset Config
   InputStore.data.fill(0); // EIDOLON-V: Reset Input
+  PigmentStore.data.fill(0); // EIDOLON-V Phase 6: Reset Pigment
   StateStore.flags.fill(0);
   EntityLookup.fill(null);
 }

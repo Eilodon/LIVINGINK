@@ -20,12 +20,14 @@ import {
   StateStore,
   TattooStore,
   EntityLookup,
+  PigmentStore,
 } from '../dod/ComponentStores';
 import { EntityFlags } from '../dod/EntityFlags';
 import { audioEngine } from '../../audio/AudioEngine';
 
-// Pure DOD Logic for Consumption
-export const consumePickupDOD = (entityId: number, foodId: number, state: GameState) => {
+// EIDOLON-V PHASE 6: Pure DOD Logic for Consumption
+// Uses PigmentStore instead of EntityLookup - Zero Object Access!
+export const consumePickupDOD = (entityId: number, foodId: number, _state: GameState) => {
   // Safety checks
   const fFlags = StateStore.flags[foodId];
   if ((fFlags & EntityFlags.ACTIVE) === 0 || fFlags & EntityFlags.DEAD) return;
@@ -51,28 +53,45 @@ export const consumePickupDOD = (entityId: number, foodId: number, state: GameSt
   // Play Sound (Fire & Forget)
   audioEngine.playEat(entityId);
 
-  // VFX
+  // VFX - get color from PigmentStore instead of object
   const tIdx = entityId * 8;
-  // TODO: Get Color from somewhere. For now white explosion.
+  const entityColor = PigmentStore.getColorInt(entityId) || 0xffffff;
   vfxBuffer.push(
     TransformStore.data[tIdx],
     TransformStore.data[tIdx + 1],
-    0xffffff,
+    entityColor,
     VFX_TYPES.EXPLODE,
     6
   );
 
-  // LOGIC HEAVY LIFTING (Complex Food Types)
-  // Compromise: We lookup object for "Pigment" logic because porting Color Math to DOD is Phase 6.
-  // This is acceptable because eating is a "Rare Event" (not every frame).
-  const foodObj = EntityLookup[foodId] as Food;
-  const entityObj = EntityLookup[entityId] as Player | Bot;
+  // PHASE 6: Pure DOD Pigment Mixing
+  // Food pigment stored in PigmentStore at foodId index
+  const fPigIdx = foodId * PigmentStore.STRIDE;
+  const foodR = PigmentStore.data[fPigIdx + PigmentStore.R];
+  const foodG = PigmentStore.data[fPigIdx + PigmentStore.G];
+  const foodB = PigmentStore.data[fPigIdx + PigmentStore.B];
 
-  if (foodObj && entityObj) {
-    // Use legacy handler for Pigment mixing, Tattoos, etc.
-    // We already handled Score/Growth/Death in DOD above.
-    // We just need the "Effects" part.
-    handleLegacyFoodEffects(entityObj, foodObj, state);
+  // Only mix if food has pigment data (non-zero)
+  if (foodR !== 0 || foodG !== 0 || foodB !== 0) {
+    // Base ratio calculation (simplified from legacy)
+    const eRadius = PhysicsStore.data[entityId * 8 + 4] || 15;
+    const baseRatio = Math.min(0.2, 0.1 * (15 / Math.max(15, eRadius)));
+
+    // Mix pigment directly in DOD store
+    PigmentStore.mix(entityId, foodR, foodG, foodB, baseRatio);
+
+    // Sync match back to StatsStore for compatibility
+    StatsStore.data[eIdx + 3] = PigmentStore.getMatch(entityId);
+  }
+
+  // Legacy fallback for complex food types (catalyst, shield, solvent)
+  // These are rare events and acceptable to use EntityLookup
+  const foodObj = EntityLookup[foodId] as Food | null;
+  if (foodObj && foodObj.kind !== 'pigment' && foodObj.kind !== 'neutral') {
+    const entityObj = EntityLookup[entityId] as Player | Bot | null;
+    if (entityObj) {
+      handleLegacyFoodEffects(entityObj, foodObj, _state);
+    }
   }
 };
 
