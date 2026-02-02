@@ -2,7 +2,7 @@ import { MutationTier, Player, Bot, Food, GameState } from '../../types';
 import { TattooId } from './cjrTypes';
 import { COLOR_BALANCE } from './balance';
 import { vfxIntegrationManager } from '../vfx/vfxIntegration';
-import { mixPigment, calcMatchPercent, pigmentToHex, pigmentToInt } from './colorMath';
+import { mixPigment, calcMatchPercentFast, pigmentToHex, pigmentToInt } from './colorMath';
 import { createFloatingText } from '../engine/effects';
 import { createParticle, createFood } from '../engine/factories';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
@@ -32,7 +32,7 @@ const TATTOOS: TattooDefinition[] = [
     },
     onConsume: (entity: Player | Bot, food: Food, state: GameState) => {
       if (food.kind === 'pigment' && food.pigment) {
-        const pigmentMatch = calcMatchPercent(food.pigment, entity.targetPigment);
+        const pigmentMatch = calcMatchPercentFast(food.pigment, entity.targetPigment);
         if (pigmentMatch < 0.6) {
           // Handled in combat.ts logic via statusScalars.wrongPigmentReduction
         }
@@ -84,7 +84,7 @@ const TATTOOS: TattooDefinition[] = [
           const att = attacker as Player | Bot;
           att.pigment = mixPigment(att.pigment, victim.pigment, 0.15);
           att.color = pigmentToInt(att.pigment);
-          att.matchPercent = calcMatchPercent(att.pigment, att.targetPigment);
+          att.matchPercent = calcMatchPercentFast(att.pigment, att.targetPigment);
           createFloatingText(att.position, 'INKED!', '#ff66cc', 18, state);
         }
       }

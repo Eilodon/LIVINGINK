@@ -13,7 +13,7 @@ import {
   InputStore,
 } from '../dod/ComponentStores';
 import { EntityFlags } from '../dod/EntityFlags';
-import { applySkill } from './skills';
+import { SkillSystem } from '../dod/systems/SkillSystem';
 import { updateBotPersonality } from '../../cjr/botPersonalities';
 
 // EIDOLON-V: Reusable index buffer for sensing
@@ -136,9 +136,9 @@ export const updateAI = (bot: Bot, state: GameState, dt: number) => {
       const threatObj = EntityLookup[threatIndex];
       bot.targetEntityId = threatObj ? threatObj.id : null;
 
-      // Panic Skill
+      // Panic Skill - Direct DOD call (removed wrapper)
       if (closestThreatDistSq < 150 * 150) {
-        applySkill(bot, undefined, state); // Legacy wrapper
+        SkillSystem.handleInput(botId, { space: true, target: bot.targetPosition || { x: 0, y: 0 } }, state);
       }
     } else if (targetEntityIndex !== -1 && closestPreyDistSq < 400 * 400) {
       bot.aiState = 'chase';

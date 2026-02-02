@@ -75,6 +75,8 @@ export interface GameState {
   // UI Layer reads this array which is populated from VFXRingBuffer each frame
   // This decouples the ring buffer (Engine) from the React State (UI)
   vfxEvents: VFXEvent[];
-  vfxHead: number; // Deprecated if using full array replacement strategy
-  vfxTail: number; // Deprecated
+  /** @deprecated Kept for backward compatibility, use full array replacement instead */
+  vfxHead: number;
+  /** @deprecated Kept for backward compatibility, use full array replacement instead */
+  vfxTail: number;
 }

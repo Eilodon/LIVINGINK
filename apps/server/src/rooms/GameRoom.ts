@@ -408,9 +408,11 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   private broadcastBinaryTransforms() {
-    const updates: { id: string; x: number; y: number; vx: number; vy: number }[] = [];
+    // EIDOLON-V P1-2: Use indexed transforms for players (33% payload reduction)
+    const indexedUpdates: { index: number; x: number; y: number; vx: number; vy: number }[] = [];
+    const legacyUpdates: { id: string; x: number; y: number; vx: number; vy: number }[] = [];
 
-    // Gather player transforms from DOD stores (authoritative)
+    // Gather player transforms from DOD stores (authoritative) - use indexed format
     this.state.players.forEach((player, sessionId) => {
       const entityIndex = this.entityIndices.get(sessionId);
       if (entityIndex === undefined) return;
@@ -418,8 +420,8 @@ export class GameRoom extends Room<GameRoomState> {
       // Only include active entities
       if (!StateStore.isActive(entityIndex)) return;
 
-      updates.push({
-        id: sessionId,
+      indexedUpdates.push({
+        index: entityIndex,
         x: TransformStore.getX(entityIndex),
         y: TransformStore.getY(entityIndex),
         vx: PhysicsStore.getVelocityX(entityIndex),
@@ -427,9 +429,9 @@ export class GameRoom extends Room<GameRoomState> {
       });
     });
 
-    // Include bots
+    // Include bots - still using legacy format (bots don't have DOD indices yet)
     this.state.bots.forEach((bot, id) => {
-      updates.push({
+      legacyUpdates.push({
         id,
         x: bot.position.x,
         y: bot.position.y,
@@ -438,8 +440,15 @@ export class GameRoom extends Room<GameRoomState> {
       });
     });
 
-    if (updates.length > 0) {
-      const buffer = BinaryPacker.packTransforms(updates, this.state.gameTime);
+    // EIDOLON-V P1-2: Broadcast indexed transforms for players (optimized)
+    if (indexedUpdates.length > 0) {
+      const buffer = BinaryPacker.packTransformsIndexed(indexedUpdates, this.state.gameTime);
+      this.broadcast('binIdx', new Uint8Array(buffer));
+    }
+
+    // Legacy format for bots (until they're migrated to DOD)
+    if (legacyUpdates.length > 0) {
+      const buffer = BinaryPacker.packTransforms(legacyUpdates, this.state.gameTime);
       this.broadcast('bin', new Uint8Array(buffer));
     }
   }

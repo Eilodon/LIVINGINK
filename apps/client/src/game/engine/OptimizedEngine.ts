@@ -132,6 +132,15 @@ class OptimizedGameEngine {
 
       const idx = ent.physicsIndex;
       if (idx !== undefined) {
+        // EIDOLON-V P0-1 FIX: Validate entity is still ACTIVE in DOD store
+        // This prevents reading stale data from deallocated entities
+        if ((stateFlags[idx] & EntityFlags.ACTIVE) === 0) {
+          // Entity was removed from DOD but JS object still exists
+          // Mark as dead to trigger cleanup on next frame
+          ent.isDead = true;
+          continue;
+        }
+
         const tIdx = idx * 8;
 
         const pIdx = idx * 8;

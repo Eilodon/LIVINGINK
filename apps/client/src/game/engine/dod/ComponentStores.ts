@@ -8,6 +8,24 @@ if (MAX_ENTITIES * 8 > MAX_TYPED_ARRAY_SIZE) {
   );
 }
 
+// EIDOLON-V P0-2 FIX: Runtime bounds validation helper
+// Throws error immediately if id is out of bounds - fail fast principle
+function validateEntityId(id: number, caller: string): void {
+  if (__DEV__ && (id < 0 || id >= MAX_ENTITIES)) {
+    throw new RangeError(
+      `[DOD] ${caller}: Entity ID ${id} out of bounds [0, ${MAX_ENTITIES})`
+    );
+  }
+}
+
+// EIDOLON-V P0-2: Production-safe bounds check (returns false instead of throwing)
+function isValidEntityId(id: number): boolean {
+  return id >= 0 && id < MAX_ENTITIES;
+}
+
+// __DEV__ flag for development-only checks
+declare const __DEV__: boolean;
+
 export class TransformStore {
   // [x, y, rotation, scale, prevX, prevY, prevRotation, _pad]
   // Stride = 8
@@ -17,6 +35,11 @@ export class TransformStore {
   // Helper accessors
 
   static set(id: number, x: number, y: number, rotation: number, scale: number = 1.0) {
+    // EIDOLON-V P0-2 FIX: Bounds validation
+    if (!isValidEntityId(id)) {
+      console.error(`[DOD] TransformStore.set: Invalid entity ID ${id}`);
+      return;
+    }
     const idx = id * 8;
     this.data[idx] = x;
     this.data[idx + 1] = y;
@@ -27,7 +50,26 @@ export class TransformStore {
     this.data[idx + 5] = y;
     this.data[idx + 6] = rotation;
   }
+
+  // EIDOLON-V P0-2: Safe setters with bounds check
+  static setPosition(id: number, x: number, y: number): void {
+    if (!isValidEntityId(id)) return;
+    const idx = id * 8;
+    this.data[idx] = x;
+    this.data[idx + 1] = y;
+  }
+
+  static getX(id: number): number {
+    if (!isValidEntityId(id)) return 0;
+    return this.data[id * 8];
+  }
+
+  static getY(id: number): number {
+    if (!isValidEntityId(id)) return 0;
+    return this.data[id * 8 + 1];
+  }
 }
+
 
 export class PhysicsStore {
   // [vx, vy, vRotation, mass, radius, restitution, friction, _pad]
@@ -44,6 +86,11 @@ export class PhysicsStore {
     restitution: number = 0.5,
     friction: number = 0.9
   ) {
+    // EIDOLON-V P0-2 FIX: Bounds validation
+    if (!isValidEntityId(id)) {
+      console.error(`[DOD] PhysicsStore.set: Invalid entity ID ${id}`);
+      return;
+    }
     const idx = id * 8;
     this.data[idx] = vx;
     this.data[idx + 1] = vy;
@@ -53,22 +100,54 @@ export class PhysicsStore {
     this.data[idx + 5] = restitution;
     this.data[idx + 6] = friction;
   }
+
+  // EIDOLON-V P0-2: Safe velocity setter with bounds check
+  static setVelocity(id: number, vx: number, vy: number): void {
+    if (!isValidEntityId(id)) return;
+    const idx = id * 8;
+    this.data[idx] = vx;
+    this.data[idx + 1] = vy;
+  }
+
+  static getVelocityX(id: number): number {
+    if (!isValidEntityId(id)) return 0;
+    return this.data[id * 8];
+  }
+
+  static getVelocityY(id: number): number {
+    if (!isValidEntityId(id)) return 0;
+    return this.data[id * 8 + 1];
+  }
+
+  static getRadius(id: number): number {
+    if (!isValidEntityId(id)) return 0;
+    return this.data[id * 8 + 4];
+  }
 }
 
 export class StateStore {
   // Flags for type and status
   public static readonly flags = new Uint16Array(MAX_ENTITIES);
 
+  // EIDOLON-V P0-2 FIX: Bounds validation for all flag operations
   static setFlag(id: number, flag: EntityFlags) {
+    if (!isValidEntityId(id)) return;
     this.flags[id] |= flag;
   }
 
   static clearFlag(id: number, flag: EntityFlags) {
+    if (!isValidEntityId(id)) return;
     this.flags[id] &= ~flag;
   }
 
   static hasFlag(id: number, flag: EntityFlags): boolean {
+    if (!isValidEntityId(id)) return false;
     return (this.flags[id] & flag) === flag;
+  }
+
+  static isActive(id: number): boolean {
+    if (!isValidEntityId(id)) return false;
+    return (this.flags[id] & EntityFlags.ACTIVE) !== 0;
   }
 }
 

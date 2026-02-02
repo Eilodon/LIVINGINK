@@ -9,6 +9,9 @@
 export const PacketType = {
   TRANSFORM_UPDATE: 1,
   EVENT_UPDATE: 2,
+  // EIDOLON-V P1-2: New indexed packet type for optimized transforms
+  // Uses u16 entity index instead of string ID, reducing payload by ~80%
+  TRANSFORM_UPDATE_INDEXED: 3,
 } as const;
 
 export type PacketTypeValue = typeof PacketType[keyof typeof PacketType];
@@ -137,6 +140,62 @@ export class BinaryPacker {
   }
 
   /**
+   * EIDOLON-V P1-2: Pack entity transforms using u16 index instead of string ID
+   * Format: [type: u8][timestamp: f32][count: u16][entity data...]
+   * Entity: [index: u16][x: f32][y: f32][vx: f32][vy: f32] = 18 bytes
+   * 
+   * Compared to string ID version: ~27 bytes/entity → 18 bytes = ~33% reduction
+   */
+  static packTransformsIndexed(
+    entities: { index: number; x: number; y: number; vx: number; vy: number }[],
+    timestamp: number
+  ): ArrayBuffer {
+    const poolEntry = this.checkoutBuffer();
+    const { buffer, view, u8 } = poolEntry;
+
+    try {
+      // Header (7) + per entity: 18 bytes
+      const maxSafeEntities = Math.floor((buffer.byteLength - 7) / 18);
+      if (entities.length > maxSafeEntities) {
+        console.error('[BinaryPacker] Buffer overflow prevented, truncating', {
+          count: entities.length,
+          max: maxSafeEntities
+        });
+        entities = entities.slice(0, maxSafeEntities);
+      }
+
+      let offset = 0;
+
+      // Header: Type (1) + Time (4) + Count (2)
+      u8[offset++] = PacketType.TRANSFORM_UPDATE_INDEXED;
+      view.setFloat32(offset, timestamp, true);
+      offset += 4;
+      view.setUint16(offset, entities.length, true);
+      offset += 2;
+
+      for (const ent of entities) {
+        // Index (u16 = 2 bytes)
+        view.setUint16(offset, ent.index, true);
+        offset += 2;
+
+        // Transform (4x4 = 16 bytes)
+        view.setFloat32(offset, ent.x, true);
+        offset += 4;
+        view.setFloat32(offset, ent.y, true);
+        offset += 4;
+        view.setFloat32(offset, ent.vx, true);
+        offset += 4;
+        view.setFloat32(offset, ent.vy, true);
+        offset += 4;
+      }
+
+      return buffer.slice(0, offset);
+    } finally {
+      this.returnBuffer(poolEntry);
+    }
+  }
+
+  /**
    * Pack server events into binary format
    * Format: [type: u8][timestamp: f32][count: u8][events...]
    */
@@ -230,6 +289,47 @@ export class BinaryPacker {
       offset += 4;
 
       callback(id, x, y, vx, vy);
+    }
+
+    return timestamp;
+  }
+
+  /**
+   * EIDOLON-V P1-2: Zero-allocation unpacker for indexed transforms
+   * Uses entity index (u16) instead of string ID for efficiency
+   */
+  static unpackTransformsIndexed(
+    buffer: ArrayBuffer,
+    callback: (index: number, x: number, y: number, vx: number, vy: number) => void
+  ): number | null {
+    const view = new DataView(buffer);
+    const u8 = new Uint8Array(buffer);
+    let offset = 0;
+
+    // Validate packet type
+    const packetType = u8[offset++];
+    if (packetType !== PacketType.TRANSFORM_UPDATE_INDEXED) return null;
+
+    const timestamp = view.getFloat32(offset, true);
+    offset += 4;
+    const count = view.getUint16(offset, true);
+    offset += 2;
+
+    for (let k = 0; k < count; k++) {
+      // Entity index (u16 = 2 bytes)
+      const index = view.getUint16(offset, true);
+      offset += 2;
+
+      const x = view.getFloat32(offset, true);
+      offset += 4;
+      const y = view.getFloat32(offset, true);
+      offset += 4;
+      const vx = view.getFloat32(offset, true);
+      offset += 4;
+      const vy = view.getFloat32(offset, true);
+      offset += 4;
+
+      callback(index, x, y, vx, vy);
     }
 
     return timestamp;

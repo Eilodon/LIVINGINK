@@ -35,6 +35,16 @@ const DEFAULT_CONFIG: NetworkConfig = {
 
 export type NetworkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting' | 'error';
 
+// EIDOLON-V P1-3: Connection state machine for security
+export enum ConnectionState {
+  DISCONNECTED = 'DISCONNECTED',
+  CONNECTING = 'CONNECTING',
+  CONNECTED = 'CONNECTED',
+  RECONNECTING = 'RECONNECTING',
+  RATE_LIMITED = 'RATE_LIMITED',
+  ERROR = 'ERROR',
+}
+
 type EntitySnapshot = {
   x: number;
   y: number;
@@ -70,6 +80,13 @@ export class NetworkClient {
   private lastCredentials?: { name: string; shape: ShapeId };
   private isConnecting = false;
   private autoReconnect = true;
+  // EIDOLON-V P1-3: Connection security state
+  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  private reconnectAttemptCount = 0;
+  private lastInputTime = 0;
+  private inputCount = 0;
+  private readonly INPUT_RATE_LIMIT = 60; // Max inputs per second
+  private readonly INPUT_RATE_WINDOW = 1000; // 1 second window
   // EIDOLON ARCHITECT: Ring Buffer for Zero-Allocation Snapshot Management
   private static readonly SNAPSHOT_BUFFER_SIZE = 20;
   private snapshotBuffer: NetworkSnapshot[];
@@ -112,21 +129,41 @@ export class NetworkClient {
 
   async connectWithRetry(playerName: string, shape: ShapeId): Promise<boolean> {
     if (this.isConnecting) return false;
+    if (this.connectionState === ConnectionState.RATE_LIMITED) {
+      console.warn('[NetworkClient] Connection rate limited, please wait');
+      return false;
+    }
+
     this.isConnecting = true;
+    this.connectionState = ConnectionState.CONNECTING;
     this.lastCredentials = { name: playerName, shape };
     this.emitStatus('connecting');
 
     for (let attempt = 0; attempt < this.config.reconnectAttempts; attempt++) {
+      this.reconnectAttemptCount = attempt;
       const ok = await this.connect(playerName, shape);
       if (ok) {
         this.emitStatus('online');
+        this.connectionState = ConnectionState.CONNECTED;
         this.isConnecting = false;
+        this.reconnectAttemptCount = 0;
         return true;
       }
+
+      this.connectionState = ConnectionState.RECONNECTING;
       this.emitStatus('reconnecting');
-      await new Promise(resolve => setTimeout(resolve, 800 + attempt * 400));
+
+      // EIDOLON-V P1-3: Exponential backoff with jitter
+      const baseDelay = 500;
+      const maxDelay = 30000;
+      const exponentialDelay = Math.min(maxDelay, baseDelay * Math.pow(2, attempt));
+      const jitter = Math.random() * 0.3 * exponentialDelay; // 0-30% jitter
+      const delay = exponentialDelay + jitter;
+
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
+    this.connectionState = ConnectionState.ERROR;
     this.emitStatus('error');
     this.isConnecting = false;
     return false;
@@ -164,6 +201,22 @@ export class NetworkClient {
     });
 
     // Invalid packet - abort
+    if (timestamp === null) return;
+  }
+
+  // EIDOLON-V P1-2: Handle indexed binary transforms (optimized)
+  // Uses entity index instead of string ID for 33% payload reduction
+  private handleBinaryIndexedUpdate(buffer: any) {
+    const data = typeof buffer === 'object' && buffer.buffer ? buffer.buffer : buffer;
+
+    const timestamp = BinaryPacker.unpackTransformsIndexed(data, (index, x, y, vx, vy) => {
+      // EIDOLON-V P1-2: Direct DOD store write using entity index
+      if (this.localState?.engine.physicsWorld) {
+        // Queue transform update using index (bypasses string ID lookup)
+        this.localState.engine.physicsWorld.syncBodyByIndex(index, x, y, vx, vy);
+      }
+    });
+
     if (timestamp === null) return;
   }
 
@@ -213,6 +266,11 @@ export class NetworkClient {
 
     this.room.onMessage('bin', (message: any) => {
       this.handleBinaryUpdate(message);
+    });
+
+    // EIDOLON-V P1-2: Handle indexed binary transforms
+    this.room.onMessage('binIdx', (message: any) => {
+      this.handleBinaryIndexedUpdate(message);
     });
   }
 
@@ -754,6 +812,21 @@ export class NetworkClient {
     events: any[] = []
   ) {
     if (!this.room) return;
+
+    // EIDOLON-V P1-3: Client-side rate limiting to prevent input flood
+    const now = this.nowMs();
+    if (now - this.lastInputTime > this.INPUT_RATE_WINDOW) {
+      // Reset counter every second
+      this.inputCount = 0;
+      this.lastInputTime = now;
+    }
+
+    if (this.inputCount >= this.INPUT_RATE_LIMIT) {
+      // Silently drop input - rate limited
+      return;
+    }
+    this.inputCount++;
+
     const seq = ++this.inputSeq;
 
     // EIDOLON-V P4: Zero-allocation input buffering

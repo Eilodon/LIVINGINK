@@ -70,6 +70,15 @@ export class PhysicsWorld {
     }
   }
 
+  // EIDOLON-V P1-2: Sync using entity index directly (bypasses string lookup)
+  // Used by binIdx channel for optimized transforms
+  syncBodyByIndex(index: number, x: number, y: number, vx: number, vy: number) {
+    // Validate index exists in our mapping (security check)
+    if (this.indexToId.has(index)) {
+      networkTransformBuffer.queue(index, x, y, vx, vy);
+    }
+  }
+
   // Accessors
   getX(id: string): number {
     const idx = this.idToIndex.get(id);

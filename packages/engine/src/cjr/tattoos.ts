@@ -5,7 +5,7 @@
 
 import { TattooId, MutationTier, type PigmentVec3 } from './types';
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../events/EventRingBuffer';
-import { mixPigment, calcMatchPercent, pigmentToInt } from './colorMath';
+import { mixPigment, calcMatchPercentFast, pigmentToInt } from './colorMath';
 
 /**
  * Minimal entity interface for tattoo operations
@@ -79,7 +79,7 @@ const TATTOOS: TattooDefinition[] = [
         },
         onConsume: (entity, food) => {
             if (food.kind === 'pigment' && food.pigment) {
-                const pigmentMatch = calcMatchPercent(food.pigment, entity.targetPigment);
+                const pigmentMatch = calcMatchPercentFast(food.pigment, entity.targetPigment);
                 if (pigmentMatch < 0.6) {
                     // Handled via statusScalars.wrongPigmentReduction
                 }
@@ -136,7 +136,7 @@ const TATTOOS: TattooDefinition[] = [
                 if (Math.random() < chance && 'pigment' in attacker) {
                     attacker.pigment = mixPigment(attacker.pigment, victim.pigment, 0.15);
                     attacker.color = pigmentToInt(attacker.pigment);
-                    attacker.matchPercent = calcMatchPercent(attacker.pigment, attacker.targetPigment);
+                    attacker.matchPercent = calcMatchPercentFast(attacker.pigment, attacker.targetPigment);
                     // Emit floating text event
                     eventBuffer.push(
                         EngineEventType.FLOATING_TEXT,
