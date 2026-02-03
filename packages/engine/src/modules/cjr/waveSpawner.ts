@@ -3,8 +3,8 @@
  * Pure spawning logic - no state.engine dependency
  */
 
-import { WAVE_CONFIG, RING_RADII } from '../config/constants';
-import { randomRange } from '../math/FastMath';
+import { WAVE_CONFIG, RING_RADII } from '../../config/constants';
+import { randomRange } from '../../math/FastMath';
 import type { PigmentVec3, PickupKind } from './types';
 
 export interface IFood {

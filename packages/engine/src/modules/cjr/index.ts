@@ -1,7 +1,12 @@
 /**
- * @cjr/engine - CJR Module
+ * @eidolon/engine - CJR Module
  * Color Jelly Rush specific game logic
+ *
+ * This module implements IGameModule interface for pluggable game logic.
  */
+
+// CJR Module Class (IGameModule implementation)
+export { CJRModule, cjrModule, createCJRModule } from './CJRModule';
 
 // Types
 export * from './types';

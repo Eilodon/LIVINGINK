@@ -4,7 +4,7 @@
  */
 
 import { TattooId, MutationTier, type PigmentVec3 } from './types';
-import { eventBuffer, EngineEventType, TEXT_IDS } from '../events/EventRingBuffer';
+import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
 import { mixPigment, calcMatchPercentFast, pigmentToInt } from './colorMath';
 
 /**

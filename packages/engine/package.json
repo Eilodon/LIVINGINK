@@ -9,9 +9,13 @@
         "./events": "./src/events/index.ts",
         "./dod": "./src/dod/index.ts",
         "./systems": "./src/systems/index.ts",
-        "./cjr": "./src/cjr/index.ts",
         "./config": "./src/config/index.ts",
-        "./math": "./src/math/index.ts"
+        "./math": "./src/math/index.ts",
+        "./core": "./src/core/index.ts",
+        "./interfaces": "./src/interfaces/index.ts",
+        "./modules": "./src/modules/index.ts",
+        "./modules/cjr": "./src/modules/cjr/index.ts",
+        "./cjr": "./src/modules/cjr/index.ts"
     },
     "scripts": {
         "typecheck": "tsc --noEmit",

@@ -6,7 +6,7 @@
  * the "Twin State Paradox" and the need for syncDODToSchema.
  */
 
-import type { PigmentVec3 } from '../cjr/types';
+import type { PigmentVec3 } from '../modules/cjr/types';
 
 /**
  * Engine-facing player interface - mutation methods for direct state writes

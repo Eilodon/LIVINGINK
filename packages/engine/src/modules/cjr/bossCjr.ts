@@ -3,9 +3,9 @@
  * Pure boss AI and combat - VFX decoupled via eventBuffer
  */
 
-import { eventBuffer, EngineEventType, TEXT_IDS } from '../events/EventRingBuffer';
-import { distanceSquared } from '../math/FastMath';
-import { PhysicsStore } from '../dod/ComponentStores';
+import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
+import { distanceSquared } from '../../math/FastMath';
+import { PhysicsStore } from '../../dod/ComponentStores';
 
 /**
  * Minimal entity interfaces

@@ -6,7 +6,7 @@
  */
 
 import { PLAYER_START_RADIUS, FOOD_RADIUS } from '../config/constants';
-import type { PigmentVec3, ShapeId, PickupKind } from '../cjr/types';
+import type { PigmentVec3, ShapeId, PickupKind } from '../modules/cjr/types';
 
 /**
  * Random pigment generator

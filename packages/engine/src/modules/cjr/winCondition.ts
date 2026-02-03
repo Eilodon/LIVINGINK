@@ -3,8 +3,8 @@
  * Pure logic - VFX decoupled via eventBuffer
  */
 
-import { eventBuffer, EngineEventType, TEXT_IDS } from '../events/EventRingBuffer';
-import { THRESHOLDS } from '../config/constants';
+import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
+import { THRESHOLDS } from '../../config/constants';
 
 /**
  * Minimal entity interface for win condition

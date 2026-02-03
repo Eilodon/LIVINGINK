@@ -1,17 +1,18 @@
 /**
- * @cjr/engine - Engine Class
- * 
+ * @eidolon/engine - Engine Class
+ *
  * Main coordinator for the headless game engine.
  * Orchestrates systems update order.
+ *
+ * NOTE: This engine is game-agnostic. Game-specific logic (like wave spawning)
+ * should be handled by the game module (e.g., CJRModule) at the application level.
  */
 
 import { PhysicsSystem } from './systems/PhysicsSystem';
 import { MovementSystem } from './systems/MovementSystem';
 import { SkillSystem } from './systems/SkillSystem';
-import { updateWaveSpawner } from './cjr';
 import { eventBuffer } from './events/EventRingBuffer';
-import { resetAllStores, StateStore } from './dod/ComponentStores';
-import { EntityFlags } from './dod/EntityFlags';
+import { resetAllStores } from './dod/ComponentStores';
 
 export interface IEngineConfig {
     tickRate: number;
