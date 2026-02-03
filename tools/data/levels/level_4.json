@@ -1,0 +1,15 @@
+{
+  "id": 4,
+  "name": "Intro Boss",
+  "thresholds": { "ring2": 0.5, "ring3": 0.7, "win": 0.9 },
+  "winHoldSeconds": 1.3,
+  "timeLimit": 155,
+  "waveIntervals": { "ring1": 8.4, "ring2": 10.4, "ring3": 13.8 },
+  "burstSizes": { "ring1": 8, "ring2": 6, "ring3": 4 },
+  "spawnWeights": { "pigment": 0.64, "neutral": 0.24, "special": 0.12 },
+  "botCount": 8,
+  "boss": { "boss1Enabled": true, "boss2Enabled": false, "boss1Time": 72, "boss2Time": 130, "boss1Health": 520, "boss2Health": 600 },
+  "pity": { "stuckThreshold": 10, "duration": 4, "multiplier": 1.5 },
+  "ring3Debuff": { "enabled": false, "threshold": 0.7, "duration": 2, "speedMultiplier": 0.97 },
+  "rushWindowDuration": 5
+}

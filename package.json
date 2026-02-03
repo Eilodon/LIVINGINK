@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tools/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
@@ -13,7 +14,11 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,scss,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,scss,css}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md,scss,css}\"",
+    "tool:level": "cd tools/level-editor/ui && npm run dev",
+    "tool:inspector": "cd tools/packet-inspector && npm run dev",
+    "tool:state": "cd tools/state-viewer && npm run dev",
+    "tool:level-server": "cd tools/level-editor/server && npm run dev"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",

@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+declare const __DEV__: boolean;
 import * as Colyseus from 'colyseus.js';
 import type { Room } from 'colyseus.js';
 import type { GameState, Player, Bot, Food, Projectile, Vector2 } from '../types';
@@ -16,6 +17,8 @@ import { PhysicsSystem } from '@cjr/engine/systems';
 import { TransformStore, PhysicsStore } from '@cjr/engine';
 import { InputRingBuffer } from './InputRingBuffer';
 import { clientLogger } from '../game/logging/ClientLogger';
+// EIDOLON-V: Dev tooling
+import { PacketInterceptor } from '../dev/PacketInterceptor';
 
 // EIDOLON-V P4: Module-level reusable vectors (zero allocation after init)
 const _serverPos = { x: 0, y: 0 };
@@ -192,6 +195,9 @@ export class NetworkClient {
     // EIDOLON-V Phase 2: SSOT - Write ONLY to PhysicsWorld (DOD stores via buffer)
     // Objects are synced via syncBatchFromDOD at render time
     const data = typeof buffer === 'object' && buffer.buffer ? buffer.buffer : buffer;
+    if (import.meta.env.DEV) {
+      PacketInterceptor.getInstance().captureReceive(data);
+    }
 
     const timestamp = BinaryPacker.unpackAndApply(data, (id, x, y, vx, vy) => {
       // SSOT: Queue to PhysicsWorld ONLY (no direct object writes)
@@ -208,6 +214,9 @@ export class NetworkClient {
   // Uses entity index instead of string ID for 33% payload reduction
   private handleBinaryIndexedUpdate(buffer: any) {
     const data = typeof buffer === 'object' && buffer.buffer ? buffer.buffer : buffer;
+    if (import.meta.env.DEV) {
+      PacketInterceptor.getInstance().captureReceive(data);
+    }
 
     const timestamp = BinaryPacker.unpackTransformsIndexed(data, (index, x, y, vx, vy) => {
       // EIDOLON-V P1-2: Direct DOD store write using entity index
@@ -902,6 +911,17 @@ export class NetworkClient {
       skill: inputs.space,
       eject: inputs.w,
     });
+
+    if (import.meta.env.DEV) {
+      PacketInterceptor.getInstance().captureSend({
+        type: 'input',
+        seq,
+        targetX: target.x,
+        targetY: target.y,
+        skill: inputs.space,
+        eject: inputs.w,
+      });
+    }
   }
 
   getRoomId() {

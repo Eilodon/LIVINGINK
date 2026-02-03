@@ -285,3 +285,15 @@ export const getLevelConfig = (level: number): LevelConfig => {
     const clamped = Math.max(1, Math.min(10, Math.round(level)));
     return LEVELS[clamped - 1];
 };
+
+/**
+ * Update a level config at runtime (for hot reload)
+ * @internal Do not use directly - only for dev tools
+ */
+export const updateLevelConfig = (levelId: number, config: LevelConfig): void => {
+    const index = LEVELS.findIndex(l => l.id === levelId);
+    if (index !== -1) {
+        LEVELS[index] = config;
+        console.log(`[Engine] Level ${levelId} config updated`);
+    }
+};

@@ -1,0 +1,15 @@
+{
+  "id": 5,
+  "name": "Core Run I",
+  "thresholds": { "ring2": 0.5, "ring3": 0.7, "win": 0.9 },
+  "winHoldSeconds": 1.4,
+  "timeLimit": 150,
+  "waveIntervals": { "ring1": 8.1, "ring2": 10.2, "ring3": 13.2 },
+  "burstSizes": { "ring1": 8, "ring2": 6, "ring3": 4 },
+  "spawnWeights": { "pigment": 0.62, "neutral": 0.24, "special": 0.14 },
+  "botCount": 10,
+  "boss": { "boss1Enabled": true, "boss2Enabled": false, "boss1Time": 64, "boss2Time": 125, "boss1Health": 620, "boss2Health": 700 },
+  "pity": { "stuckThreshold": 11, "duration": 4, "multiplier": 1.48 },
+  "ring3Debuff": { "enabled": true, "threshold": 0.7, "duration": 2, "speedMultiplier": 0.97 },
+  "rushWindowDuration": 5
+}

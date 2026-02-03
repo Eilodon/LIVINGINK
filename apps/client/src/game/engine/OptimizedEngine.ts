@@ -48,6 +48,8 @@ import { TattooSystem } from './dod/systems/TattooSystem';
 import { ConfigStore } from './dod/ConfigStore';
 import { networkTransformBuffer } from '../../network/NetworkTransformBuffer';
 import { clientEngineBridge } from './ClientEngineBridge';
+// EIDOLON-V: Dev tooling
+import { StateBroadcaster } from '../../dev/StateBroadcaster';
 
 // EIDOLON-V FIX: Batch processing removed in favor of Pure DOD Iteration
 // Memory overhead reduced.
@@ -669,6 +671,11 @@ class OptimizedGameEngine {
 
       // Clean up dead
       this.cleanupTransientEntities(state);
+
+      // EIDOLON-V: Dev Tooling
+      if (import.meta.env.DEV) {
+        StateBroadcaster.getInstance().update();
+      }
 
       return state;
     } catch (error) {

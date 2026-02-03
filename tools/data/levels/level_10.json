@@ -1,0 +1,15 @@
+{
+  "id": 10,
+  "name": "Master Run",
+  "thresholds": { "ring2": 0.5, "ring3": 0.7, "win": 0.9 },
+  "winHoldSeconds": 1.5,
+  "timeLimit": 120,
+  "waveIntervals": { "ring1": 8.6, "ring2": 11.2, "ring3": 14.2 },
+  "burstSizes": { "ring1": 8, "ring2": 6, "ring3": 4 },
+  "spawnWeights": { "pigment": 0.6, "neutral": 0.25, "special": 0.15 },
+  "botCount": 15,
+  "boss": { "boss1Enabled": true, "boss2Enabled": false, "boss1Time": 45, "boss2Time": 92, "boss1Health": 900, "boss2Health": 1400 },
+  "pity": { "stuckThreshold": 14, "duration": 4, "multiplier": 1.35 },
+  "ring3Debuff": { "enabled": true, "threshold": 0.7, "duration": 2, "speedMultiplier": 0.95 },
+  "rushWindowDuration": 5
+}

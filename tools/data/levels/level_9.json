@@ -1,0 +1,15 @@
+{
+  "id": 9,
+  "name": "Rush III",
+  "thresholds": { "ring2": 0.5, "ring3": 0.7, "win": 0.9 },
+  "winHoldSeconds": 1.5,
+  "timeLimit": 127,
+  "waveIntervals": { "ring1": 8.5, "ring2": 11.0, "ring3": 14.1 },
+  "burstSizes": { "ring1": 8, "ring2": 6, "ring3": 4 },
+  "spawnWeights": { "pigment": 0.6, "neutral": 0.25, "special": 0.15 },
+  "botCount": 14,
+  "boss": { "boss1Enabled": true, "boss2Enabled": false, "boss1Time": 47, "boss2Time": 95, "boss1Health": 855, "boss2Health": 1295 },
+  "pity": { "stuckThreshold": 13, "duration": 4, "multiplier": 1.37 },
+  "ring3Debuff": { "enabled": true, "threshold": 0.7, "duration": 2, "speedMultiplier": 0.952 },
+  "rushWindowDuration": 5
+}

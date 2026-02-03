@@ -4,4 +4,4 @@
  */
 
 export * from './constants';
-export { LEVELS, getLevelConfig, type LevelConfig } from './levels';
+export { LEVELS, getLevelConfig, updateLevelConfig, type LevelConfig } from './levels';

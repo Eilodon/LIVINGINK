@@ -10,6 +10,10 @@ import { useScreenReaderAnnouncer } from './hooks/useScreenReaderAnnouncer';
 import { gameStateManager } from './game/engine/GameStateManager';
 
 import { audioEngine } from './game/audio/AudioEngine';
+// EIDOLON-V: Dev tooling
+import { initLevelHotReload } from './dev/LevelHotReload';
+import { PacketInterceptor } from './dev/PacketInterceptor';
+import { networkClient } from './network/NetworkClient';
 
 const App: React.FC = () => {
   const session = useGameSession();
@@ -26,6 +30,11 @@ const App: React.FC = () => {
         clientLogger.info('🚀 SYSTEM BOOT INITIATED');
         BufferedInput.init();
         mobileOptimizer.optimizeForMobile();
+        // EIDOLON-V: Dev Tooling Init
+        if (import.meta.env.DEV) {
+          initLevelHotReload();
+          PacketInterceptor.getInstance().install(networkClient);
+        }
 
         // EIDOLON-V FIX: REAL LOADING (Parallel)
         // Load assets, audio, and wait for basic network handshake if needed
