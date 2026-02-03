@@ -1,84 +1,106 @@
 /**
- * @cjr/engine - Game Constants
- * Pure constant definitions - no dependencies
+ * @eidolon/engine - Core Engine Constants
+ *
+ * EIDOLON-V PLATFORMIZATION:
+ * Pure engine constants - no game-specific logic.
+ * Game-specific constants should be in modules.
  */
 
-// World Settings (Core Engine Constants)
+// ============================================================
+// WORLD SETTINGS (Core Engine)
+// ============================================================
 export const WORLD_WIDTH = 3400;
 export const WORLD_HEIGHT = 3400;
 export const MAP_RADIUS = 1600;
-export const INITIAL_ZONE_RADIUS = 1600;
-export const CENTER_RADIUS = 320;
-export const GAME_DURATION = 150;
-export const SPAWN_PROTECTION_TIME = 5;
 export const GRID_CELL_SIZE = 300;
 
-// Entity Settings
+// ============================================================
+// ENTITY SETTINGS (Core Engine)
+// ============================================================
 export const PLAYER_START_RADIUS = 28;
-export const TIER_RADIUS_RANGE = 150;
 export const MAX_ENTITY_RADIUS = 155;
-export const GROWTH_DECAY_START = 70;
-export const GROWTH_DECAY_END = 155;
+export const FOOD_RADIUS = 7;
 
-// PHYSICS 4.0: NEURAL-LINK RESPONSIVENESS
+// ============================================================
+// PHYSICS CONSTANTS (Core Engine)
+// ============================================================
 export const TURN_SPEED_BASE = 0.25;
 export const ACCELERATION_BASE = 1.0;
 export const FRICTION_BASE = 0.93;
 export const MAX_SPEED_BASE = 2.3;
 
-// EIDOLON-V P2: Centralized Physics Constants (replaces magic numbers)
 export const PHYSICS = {
     // Integration
-    DT_MULTIPLIER: 60,        // Was: dt * 10 → now explicitly 60 units/sec base
-    FIXED_DT: 1 / 60,         // 60Hz fixed timestep
-    MAX_ACCUMULATOR: 0.25,    // Spiral of death cap
+    DT_MULTIPLIER: 60,          // Base units/sec
+    FIXED_DT: 1 / 60,           // 60Hz fixed timestep
+    MAX_ACCUMULATOR: 0.25,      // Spiral of death cap
 
-    // Elastic Collision
-    ELASTIC_K: 5.0,           // Spring constant
-    ELASTIC_C: 0.2,           // Damping
-
-    // Boss
-    BOSS_SPEED: 100,          // Base boss movement speed
-    BOSS_DASH_MULTIPLIER: 3,  // Dash velocity multiplier
-    BOSS_ATTACK_COOLDOWN: 5,  // Seconds between attacks
+    // Collision
+    ELASTIC_K: 5.0,             // Spring constant
+    ELASTIC_C: 0.2,             // Damping
 
     // Network
-    TICK_RATE: 20,            // Server ticks per second
+    TICK_RATE: 20,              // Server ticks per second
     BINARY_BUFFER_SIZE: 131072, // 128KB
-    MAX_ENTITIES_PER_PACKET: 4000, // Safety cap
+    MAX_ENTITIES_PER_PACKET: 4000,
 } as const;
 
+// ============================================================
+// GAME BALANCE (Core - can be overridden by modules)
+// ============================================================
+export const EAT_THRESHOLD_RATIO = 0.9;
+export const DANGER_THRESHOLD_RATIO = 1.1;
+export const SPAWN_PROTECTION_TIME = 5;
+export const GAME_DURATION = 150;
+
+// ============================================================
+// BOT/FOOD DEFAULTS (Can be overridden by module config)
+// ============================================================
 export const FOOD_COUNT = 260;
 export const BOT_COUNT = 28;
 export const BOT_RESPAWN_TIME = 20;
-export const FOOD_RADIUS = 7;
-export const TRAIL_LENGTH = 12;
 export const FOOD_GROWTH_MULTIPLIER = 0.08;
 export const KILL_GROWTH_MULTIPLIER = 0.16;
 
-// THE HOLY TRINITY RULES
-export const EAT_THRESHOLD_RATIO = 0.9;
-export const DANGER_THRESHOLD_RATIO = 1.1;
+// ============================================================
+// CJR-SPECIFIC CONSTANTS (DEPRECATED - use @cjr/engine/cjr)
+// These are re-exported for backward compatibility only
+// ============================================================
 
-// Mechanics
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const INITIAL_ZONE_RADIUS = 1600;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const CENTER_RADIUS = 320;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const TIER_RADIUS_RANGE = 150;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const GROWTH_DECAY_START = 70;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const GROWTH_DECAY_END = 155;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const TRAIL_LENGTH = 12;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const EJECT_MASS_COST = 8;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const EJECT_SPEED = 18;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const SKILL_COOLDOWN_BASE = 8;
-
-// Objective
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const RELIC_RESPAWN_TIME = 35;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const RELIC_VALUE = 25;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const RELIC_RADIUS = 18;
-
-// King Bounty
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const KING_DAMAGE_TAKEN_MULTIPLIER = 1.15;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const KING_DAMAGE_DEALT_MULTIPLIER = 0.9;
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const KING_BOUNTY_SCORE = 200;
-
-// Mutations
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const MUTATION_CHOICES = 3;
 
-// Ring Radii
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const RING_RADII = {
     R1: 1600,
     R2: 1000,
@@ -86,7 +108,7 @@ export const RING_RADII = {
     CENTER: 100,
 } as const;
 
-// EIDOLON-V OPTIMIZATION: Pre-computed squares for fast distance checks
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const RING_RADII_SQ = {
     R1: RING_RADII.R1 * RING_RADII.R1,
     R2: RING_RADII.R2 * RING_RADII.R2,
@@ -94,7 +116,7 @@ export const RING_RADII_SQ = {
     CENTER: RING_RADII.CENTER * RING_RADII.CENTER,
 } as const;
 
-// Match Thresholds
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const THRESHOLDS = {
     ENTER_RING2: 0.5,
     ENTER_RING3: 0.7,
@@ -103,7 +125,7 @@ export const THRESHOLDS = {
     INTO_RING3: 0.7,
 } as const;
 
-// Commit Buffs
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const COMMIT_BUFFS = {
     SHIELD_DURATION: 2.0,
     SPEED_BOOST: 1.1,
@@ -120,7 +142,7 @@ export const COMMIT_BUFFS = {
     },
 } as const;
 
-// Wave Config
+/** @deprecated Import from '@cjr/engine/cjr' instead */
 export const WAVE_CONFIG = {
     INTERVAL: {
         1: 8000,
@@ -142,8 +164,8 @@ export const WAVE_CONFIG = {
     },
 } as const;
 
-// Boss Config
-export const BOSS_CONFIGS = {
+/** @deprecated Import from '@cjr/engine/cjr' instead */
+export const BOSS_CONFIG_LEGACY = {
     BOSS_1_TRIGGER: 'RING_2_ACTIVE',
     BOSS_2_TRIGGER: 'RING_3_ACTIVE',
 } as const;

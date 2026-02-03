@@ -56,6 +56,9 @@ export * from './config';
 // Factories Module
 export * from './factories';
 
+// Loader Module (Blueprint loading)
+export * from './loader';
+
 // Engine Class
 export { Engine } from './Engine';
 

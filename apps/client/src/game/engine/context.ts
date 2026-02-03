@@ -61,6 +61,11 @@ export class SpatialGrid implements ISpatialGrid {
     }
   }
 
+  // Direct access to underlying grid for zero-allocation queries
+  getRawGrid(): SpatialHashGrid {
+    return this.grid;
+  }
+
   // Legacy Adapter: Returns Objects (Slow)
   getNearby(entity: Entity, maxDistance: number = 200): Entity[] {
     const result = this.grid.queryRadius(entity.position, maxDistance);

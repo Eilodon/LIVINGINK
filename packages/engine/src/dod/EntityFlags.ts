@@ -1,10 +1,16 @@
 /**
- * @cjr/engine - EntityFlags
- * Pure const enum for entity type bitmasks
- * Zero dependencies - headless compatible
+ * @eidolon/engine - EntityFlags (Core)
+ *
+ * EIDOLON-V PLATFORMIZATION:
+ * Pure const enum for entity type bitmasks.
+ * Only generic engine flags - game-specific flags should be defined
+ * in game modules using bits 8+.
+ *
+ * Zero dependencies - headless compatible.
  */
 
 export enum EntityFlags {
+    // Core Entity States (bits 0-7 reserved for engine)
     NONE = 0,
     ACTIVE = 1 << 0,
     PLAYER = 1 << 1,
@@ -13,13 +19,20 @@ export enum EntityFlags {
     PROJECTILE = 1 << 4,
     DEAD = 1 << 5,
     OBSTACLE = 1 << 6,
+    BOSS = 1 << 7,
 
-    // Food Subtypes (High bits)
-    FOOD_PIGMENT = 1 << 7,
-    FOOD_CATALYST = 1 << 8,
-    FOOD_SHIELD = 1 << 9,
-    FOOD_SOLVENT = 1 << 10,
-    FOOD_NEUTRAL = 1 << 11,
+    // Bits 8-31 available for game modules
+    // Game modules should define their flags starting from 1 << 8
 }
 
+/**
+ * First available bit for game-specific flags.
+ * Modules should use: MY_FLAG = ENGINE_FLAG_OFFSET << 0, etc.
+ */
+export const ENGINE_FLAG_OFFSET = 8;
+
+/**
+ * Maximum entities in the DOD stores.
+ * Can be overridden by module configuration.
+ */
 export const MAX_ENTITIES = 4096;

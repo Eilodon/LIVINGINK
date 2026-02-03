@@ -4,8 +4,8 @@
 import { GameState, Player, Bot, Food, Entity } from '../../types';
 import { createInitialState } from './index';
 import { getCurrentSpatialGrid } from './context';
-import { FixedGameLoop } from './GameLoop'; // EIDOLON-V FIX: Import GameLoop
-import { optimizedEngine } from './OptimizedEngine';
+import { FixedGameLoop } from './GameLoop';
+import { cjrClientRunner } from './runner/CJRClientRunner';
 import { pooledEntityFactory } from '../pooling/ObjectPool';
 import { mathPerformanceMonitor } from '../math/FastMath';
 import { performanceMonitor } from '../core/performance/PerformanceMonitor';
@@ -111,7 +111,8 @@ export class GameStateManager {
 
     if (isMultiplayer) {
       // Multiplayer Logic
-      optimizedEngine.updateClientVisuals(state, dt);
+      cjrClientRunner.setGameState(state);
+      cjrClientRunner.updateVisualsOnly(dt);
 
       // EIDOLON-V: Use BufferedInput for both SP and MP (unified API)
       const events = this.bufferedInput.popEvents();
@@ -163,7 +164,8 @@ export class GameStateManager {
       // So we rely on Store.
 
       // Core physics/logic update
-      optimizedEngine.updateGameState(state, dt);
+      cjrClientRunner.setGameState(state);
+      cjrClientRunner.update(dt);
 
       // EIDOLON-V FIX: Sync player position from DOD Store back to object state after physics
       if (state.player.physicsIndex !== undefined) {
@@ -227,7 +229,8 @@ export class GameStateManager {
   public updateClientVisuals(dt: number): void {
     if (!this.currentState) return;
 
-    optimizedEngine.updateClientVisuals(this.currentState, dt);
+    cjrClientRunner.setGameState(this.currentState);
+    cjrClientRunner.updateVisualsOnly(dt);
   }
 
   // EIDOLON-V FIX: Centralized state access

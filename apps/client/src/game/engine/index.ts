@@ -22,7 +22,7 @@ import { getLevelConfig } from '../cjr/levels';
 import { tattooSynergyManager } from '../cjr/tattooSynergies';
 import { resetContributionLog } from '../cjr/contribution';
 
-import { optimizedEngine } from './OptimizedEngine';
+import { cjrClientRunner } from './runner/CJRClientRunner';
 import { gameStateManager } from './GameStateManager';
 import { createVFXEventPool } from './VFXRingBuffer';
 
@@ -30,12 +30,12 @@ import { createVFXEventPool } from './VFXRingBuffer';
 import { resetAllStores } from '@cjr/engine';
 import { entityManager } from './dod/EntityManager';
 
-// EIDOLON-V FIX: Export unified game state manager
-export { gameStateManager, optimizedEngine };
+// EIDOLON-V FIX: Export unified game state manager and new runner
+export { gameStateManager, cjrClientRunner };
 
-// EIDOLON-V: Legacy exports REMOVED - import directly from OptimizedEngine
-// Use: optimizedEngine.updateGameState(state, dt)
-// Use: optimizedEngine.updateClientVisuals(state, dt)
+// EIDOLON-V: Legacy exports REMOVED - use cjrClientRunner instead
+// Use: cjrClientRunner.setGameState(state); cjrClientRunner.update(dt)
+// Use: cjrClientRunner.setGameState(state); cjrClientRunner.updateVisualsOnly(dt)
 
 export const createInitialState = (level: number = 1): GameState => {
   // EIDOLON-V FIX: Reset DOD stores and entity manager FIRST

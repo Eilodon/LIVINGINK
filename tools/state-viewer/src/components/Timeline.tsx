@@ -8,7 +8,7 @@ interface TimelineProps {
   onPause: () => void;
   onResume: () => void;
   onStep: () => void;
-  onSeek: (frame: number) => void;
+  onSeek: (frame: number) => void
 }
 
 export function Timeline({ 
@@ -55,6 +55,7 @@ export function Timeline({
           value={currentFrame}
           onChange={(e) => onSeek(parseInt(e.target.value))}
           disabled={!isPaused}
+          aria-label="Timeline seek"
         />
         <span className="frame-info">
           Frame: {currentFrame} / {maxFrame}

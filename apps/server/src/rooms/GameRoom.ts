@@ -11,26 +11,14 @@ import {
   GameRoomState,
   PlayerState,
   BotState,
-  FoodState,
-  ProjectileState,
-  PigmentVec3,
-  VFXEventState,
 } from '../schema/GameState';
 import {
-  WORLD_WIDTH,
-  WORLD_HEIGHT,
   MAP_RADIUS,
-  GRID_CELL_SIZE,
-  FOOD_COUNT,
-  FOOD_RADIUS,
   PLAYER_START_RADIUS,
 } from '../constants';
 
 // Import shared game logic
 import { BinaryPacker } from '@cjr/engine/networking';
-import type { NetworkInput } from '@cjr/engine/networking';
-import { createPlayerData } from '@cjr/engine/factories';
-import { getLevelConfig } from '@cjr/engine/config';
 import {
   PhysicsSystem,
   MovementSystem,
@@ -41,13 +29,8 @@ import {
   InputStore,
   StatsStore,
   ConfigStore,
-  updateRingLogic,
   checkRingTransition,
   calcMatchPercentFast,
-  mixPigment,
-  type PigmentVec3 as EnginePigmentVec3,
-  // IMPERATOR Phase 2: Direct state mutation interface
-  type IEngineGameState,
 } from '@cjr/engine';
 import { EntityFlags, MAX_ENTITIES } from '@cjr/engine/dod/EntityFlags';
 
@@ -180,7 +163,7 @@ export class GameRoom extends Room<GameRoomState> {
     });
   }
 
-  onJoin(client: Client, options: { name?: string; shape?: string; pigment?: any }) {
+  onJoin(client: Client, options: { name?: string; shape?: string; pigment?: { r: number; g: number; b: number } }) {
     logger.info('Client joined', { sessionId: client.sessionId, options });
 
     // Validate player options
@@ -505,7 +488,11 @@ export class GameRoom extends Room<GameRoomState> {
   private allocateEntityIndex(): number {
     // Prefer recycled indices
     if (this.freeEntityIndices.length > 0) {
-      const idx = this.freeEntityIndices.pop()!;
+      const idx = this.freeEntityIndices.pop();
+      if (idx === undefined) {
+        // This should never happen due to length check, but satisfies type safety
+        return -1;
+      }
       this.entityGenerations[idx]++;  // Increment generation on reuse
       return idx;
     }

@@ -11,6 +11,15 @@ export { CJRModule, cjrModule, createCJRModule } from './CJRModule';
 // Types
 export * from './types';
 
+// CJR-specific Flags
+export * from './flags';
+
+// CJR State Interfaces (extends base engine interfaces)
+export * from './state';
+
+// CJR Constants
+export * from './constants';
+
 // Color Math
 export {
     getColorHint,

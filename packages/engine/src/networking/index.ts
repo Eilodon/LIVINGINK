@@ -7,3 +7,6 @@
 
 export * from './types';
 export * from './BinaryPacker';
+export * from './ProtocolSchema';
+export * from './DirtyTracker';
+export * from './SchemaBinaryPacker';
