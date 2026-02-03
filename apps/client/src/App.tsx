@@ -15,6 +15,9 @@ import { initLevelHotReload } from './dev/LevelHotReload';
 import { PacketInterceptor } from './dev/PacketInterceptor';
 import { networkClient } from './network/NetworkClient';
 
+// EIDOLON-V Phase 3: Initialize Core Registry for ComponentStores
+import { registerCoreComponents } from '@cjr/engine/core';
+
 const App: React.FC = () => {
   const session = useGameSession();
   const [bootError, setBootError] = useState<string | null>(null);
@@ -28,6 +31,12 @@ const App: React.FC = () => {
     const boot = async () => {
       try {
         clientLogger.info('🚀 SYSTEM BOOT INITIATED');
+
+        // EIDOLON-V Phase 3: CRITICAL - Register core components BEFORE any ComponentStore access
+        // This ensures memory convergence between ComponentRegistry and ComponentStores
+        registerCoreComponents();
+        clientLogger.info('✅ Core components registered');
+
         BufferedInput.init();
         mobileOptimizer.optimizeForMobile();
         // EIDOLON-V: Dev Tooling Init

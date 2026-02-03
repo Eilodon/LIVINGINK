@@ -7,3 +7,4 @@
 
 export * from './ComponentRegistry';
 export * from './BaseSimulation';
+export * from './CoreRegistry';

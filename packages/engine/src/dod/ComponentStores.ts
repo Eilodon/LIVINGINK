@@ -8,6 +8,11 @@
  */
 
 import { MAX_ENTITIES, EntityFlags } from './EntityFlags';
+import { getComponentRegistry } from '../core/ComponentRegistry';
+import type { IRegisteredStore } from '../core/ComponentRegistry';
+
+// EIDOLON-V Phase 3: ComponentStores now acts as a facade over ComponentRegistry
+// Lazy initialization ensures registry is populated before first access
 
 // Runtime validation for entity limits
 const MAX_TYPED_ARRAY_SIZE = 65536;
@@ -17,10 +22,36 @@ if (MAX_ENTITIES * 8 > MAX_TYPED_ARRAY_SIZE) {
     );
 }
 
+/**
+ * Helper to get cached store reference from ComponentRegistry.
+ * This ensures memory convergence - all data lives in one place.
+ */
+function getCachedStore(cache: { store: IRegisteredStore | null }, id: string): IRegisteredStore {
+    if (!cache.store) {
+        const registry = getComponentRegistry();
+        const store = registry.getStore(id);
+        if (!store) {
+            throw new Error(
+                `[ComponentStores] Store '${id}' not found in registry. ` +
+                `Did you forget to call registerCoreComponents() before accessing ComponentStores?`
+            );
+        }
+        cache.store = store;
+    }
+    return cache.store;
+}
+
 export class TransformStore {
-    // [x, y, rotation, scale, prevX, prevY, prevRotation, _pad]
     public static readonly STRIDE = 8;
-    public static readonly data = new Float32Array(MAX_ENTITIES * TransformStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Transform').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static set(id: number, x: number, y: number, rotation: number, scale: number = 1.0) {
         const idx = id * 8;
@@ -28,7 +59,6 @@ export class TransformStore {
         this.data[idx + 1] = y;
         this.data[idx + 2] = rotation;
         this.data[idx + 3] = scale;
-        // Initialize prev
         this.data[idx + 4] = x;
         this.data[idx + 5] = y;
         this.data[idx + 6] = rotation;
@@ -50,9 +80,16 @@ export class TransformStore {
 }
 
 export class PhysicsStore {
-    // [vx, vy, vRotation, mass, radius, restitution, friction, _pad]
     public static readonly STRIDE = 8;
-    public static readonly data = new Float32Array(MAX_ENTITIES * PhysicsStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Physics').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static set(
         id: number,
@@ -66,7 +103,7 @@ export class PhysicsStore {
         const idx = id * 8;
         this.data[idx] = vx;
         this.data[idx + 1] = vy;
-        this.data[idx + 2] = 0; // vRotation
+        this.data[idx + 2] = 0;
         this.data[idx + 3] = mass;
         this.data[idx + 4] = radius;
         this.data[idx + 5] = restitution;
@@ -93,7 +130,15 @@ export class PhysicsStore {
 }
 
 export class StateStore {
-    public static readonly flags = new Uint16Array(MAX_ENTITIES);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _flags: Uint16Array | null = null;
+
+    public static get flags(): Uint16Array {
+        if (!this._flags) {
+            this._flags = getCachedStore(this._cache, 'State').data as Uint16Array;
+        }
+        return this._flags;
+    }
 
     static setFlag(id: number, flag: EntityFlags) {
         this.flags[id] |= flag;
@@ -113,9 +158,16 @@ export class StateStore {
 }
 
 export class StatsStore {
-    // [currentHealth, maxHealth, score, matchPercent, defense, damageMultiplier, _pad, _pad]
     public static readonly STRIDE = 8;
-    public static readonly data = new Float32Array(MAX_ENTITIES * StatsStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Stats').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static set(
         id: number,
@@ -177,15 +229,22 @@ export class StatsStore {
 }
 
 export class SkillStore {
-    // [cooldown, maxCooldown, activeTimer, shapeId]
     public static readonly STRIDE = 4;
-    public static readonly data = new Float32Array(MAX_ENTITIES * SkillStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Skill').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static set(id: number, cooldown: number, maxCooldown: number, shapeId: number) {
         const idx = id * SkillStore.STRIDE;
         this.data[idx] = cooldown;
         this.data[idx + 1] = maxCooldown;
-        this.data[idx + 2] = 0; // activeTimer
+        this.data[idx + 2] = 0;
         this.data[idx + 3] = shapeId;
     }
 
@@ -204,22 +263,46 @@ export class SkillStore {
 
 export class TattooStore {
     public static readonly STRIDE = 4;
-    public static readonly data = new Float32Array(MAX_ENTITIES * TattooStore.STRIDE);
-    public static readonly flags = new Uint32Array(MAX_ENTITIES);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+    private static _flags: Uint32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Tattoo').data as Float32Array;
+        }
+        return this._data;
+    }
+
+    // Note: Tattoo flags stored separately (not in ComponentRegistry schema)
+    // Keeping legacy behavior for backward compatibility
+    public static get flags(): Uint32Array {
+        if (!this._flags) {
+            this._flags = new Uint32Array(MAX_ENTITIES);
+        }
+        return this._flags;
+    }
 
     static set(id: number, flags: number, procChance: number) {
         this.flags[id] = flags;
         const idx = id * TattooStore.STRIDE;
-        this.data[idx] = 0; // timer1
-        this.data[idx + 1] = 0; // timer2
+        this.data[idx] = 0;
+        this.data[idx + 1] = 0;
         this.data[idx + 2] = procChance;
     }
 }
 
 export class ProjectileStore {
-    // [ownerId (int), damage, duration, typeId]
     public static readonly STRIDE = 4;
-    public static readonly data = new Float32Array(MAX_ENTITIES * ProjectileStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Projectile').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static set(id: number, ownerId: number, damage: number, duration: number, typeId: number = 0) {
         const idx = id * ProjectileStore.STRIDE;
@@ -231,9 +314,16 @@ export class ProjectileStore {
 }
 
 export class ConfigStore {
-    // [maxSpeed, speedMultiplier, magnetRadius, _pad]
     public static readonly STRIDE = 4;
-    public static readonly data = new Float32Array(MAX_ENTITIES * ConfigStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Config').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static setMaxSpeed(id: number, value: number) {
         this.data[id * ConfigStore.STRIDE] = value;
@@ -261,9 +351,16 @@ export class ConfigStore {
 }
 
 export class InputStore {
-    // [targetX, targetY, isSkillActive, isEjectActive]
     public static readonly STRIDE = 4;
-    public static readonly data = new Float32Array(MAX_ENTITIES * InputStore.STRIDE);
+    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    private static _data: Float32Array | null = null;
+
+    public static get data(): Float32Array {
+        if (!this._data) {
+            this._data = getCachedStore(this._cache, 'Input').data as Float32Array;
+        }
+        return this._data;
+    }
 
     static setTarget(id: number, x: number, y: number) {
         const idx = id * InputStore.STRIDE;
