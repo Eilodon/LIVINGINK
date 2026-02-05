@@ -27,6 +27,7 @@ import { audioEngine } from '../../audio/AudioEngine';
 
 // EIDOLON-V PHASE 6: Pure DOD Logic for Consumption
 // Uses PigmentStore instead of EntityLookup - Zero Object Access!
+// NOTE: Internal function - exported for future collision system integration
 export const consumePickupDOD = (entityId: number, foodId: number, _state: GameState) => {
   // Safety checks
   const fFlags = StateStore.flags[foodId];

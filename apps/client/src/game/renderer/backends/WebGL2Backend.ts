@@ -220,35 +220,37 @@ export class WebGL2Backend implements IRenderBackend {
     }
 
     drawCircle(x: number, y: number, radius: number, color: number): void {
-        // Single circle - inefficient, use batch for production
-        // This is a fallback for testing
+        // NOT_IMPLEMENTED: Single circle fallback
+        // Use drawCircleBatch for production - this is intentionally a no-op
+        // to avoid performance issues with single-draw calls
         this.drawCallCount++;
         this.triangleCount += 2;
-        // TODO: Implement single-draw path
+        console.warn('[WebGL2Backend] drawCircle not implemented - use drawCircleBatch');
     }
 
     drawCircleBatch(batch: RenderBatch): void {
+        // NOT_IMPLEMENTED: Instanced batch rendering
+        // Game currently uses Canvas2D via GameCanvas.tsx
+        // This stub is ready for future WebGL2 migration
         if (!this.gl || !this.circleProgram || !batch.count) return;
 
-        // Use instanced rendering for batch
         this.drawCallCount++;
         this.triangleCount += batch.count * 2;
-
-        // TODO: Implement instanced batch rendering
     }
 
     drawRing(centerX: number, centerY: number, innerRadius: number, outerRadius: number, color: number): void {
+        // NOT_IMPLEMENTED: Ring shader
+        // Currently rendered via Canvas2D in RingRenderer.ts
         if (!this.gl) return;
 
         this.drawCallCount++;
-        this.triangleCount += 64; // Approximation for ring
-
-        // TODO: Implement ring shader
+        this.triangleCount += 64;
     }
 
     drawText(text: string, x: number, y: number, size: number, color: number): void {
-        // Text rendering via canvas overlay or SDF atlas
-        // TODO: Implement text rendering
+        // NOT_IMPLEMENTED: Text rendering via SDF atlas
+        // Currently handled by Canvas2D overlay
+        // Future: Use signed distance field font atlas
     }
 
     getDrawCallCount(): number {

@@ -104,27 +104,28 @@ export class WebGPUBackend implements IRenderBackend {
     }
 
     drawCircle(x: number, y: number, radius: number, color: number): void {
+        // NOT_IMPLEMENTED: WebGPU stub - game uses Canvas2D
         this.drawCallCount++;
         this.triangleCount += 2;
-        // TODO: Implement
     }
 
     drawCircleBatch(batch: RenderBatch): void {
+        // NOT_IMPLEMENTED: WebGPU instanced rendering with compute shader
+        // Future: Use compute shader for transform calculations
         if (!batch.count) return;
         this.drawCallCount++;
         this.triangleCount += batch.count * 2;
-        // TODO: Implement with compute shader for transforms
     }
 
     drawRing(centerX: number, centerY: number, innerRadius: number, outerRadius: number, color: number): void {
+        // NOT_IMPLEMENTED: WebGPU ring shader
         this.drawCallCount++;
         this.triangleCount += 64;
-        // TODO: Implement
     }
 
     drawText(text: string, x: number, y: number, size: number, color: number): void {
-        // Text via SDF atlas
-        // TODO: Implement
+        // NOT_IMPLEMENTED: SDF text atlas
+        // Future: Use signed distance field font rendering
     }
 
     getDrawCallCount(): number {
