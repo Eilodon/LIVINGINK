@@ -11,7 +11,7 @@ import {
 } from '../types/status';
 import { StatusFlag } from '../game/engine/statusFlags';
 // EIDOLON-V PHASE3: Import BinaryPacker from @cjr/engine
-import { BinaryPacker, SchemaBinaryUnpacker } from '@cjr/engine/networking';
+import { SchemaBinaryUnpacker } from '@cjr/engine/networking';
 import { MovementSystem } from '@cjr/engine/systems';
 import { PhysicsSystem } from '@cjr/engine/systems';
 import { TransformStore, PhysicsStore, defaultWorld } from '@cjr/engine';
@@ -461,6 +461,7 @@ export class NetworkClient {
         _replayTarget.y = targetY;
 
         MovementSystem.applyInputDOD(
+          defaultWorld,
           localPlayer.physicsIndex!,
           _replayTarget,
           {

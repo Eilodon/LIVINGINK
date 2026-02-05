@@ -4,7 +4,7 @@
  * Handles ring commit and elastic rejection mechanics
  */
 
-import { TransformStore, PhysicsStore } from '../../dod/ComponentStores';
+import { TransformStore, PhysicsStore } from '../../compat';
 import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants';
 import { fastMath } from '../../math/FastMath';
 import type { RingId } from './types';

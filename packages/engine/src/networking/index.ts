@@ -6,7 +6,7 @@
  */
 
 export * from './types';
-export * from './BinaryPacker';
+// export * from './BinaryPacker'; // DELETED
 export * from './ProtocolSchema';
 export * from './DirtyTracker';
 export * from './SchemaBinaryPacker';

@@ -5,7 +5,7 @@
 
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
 import { distanceSquared } from '../../math/FastMath';
-import { PhysicsStore } from '../../dod/ComponentStores';
+import { PhysicsStore } from '../../compat';
 
 /**
  * Minimal entity interfaces

@@ -5,7 +5,7 @@
  * Bridges high-level entity concepts to low-level DOD storage.
  */
 
-import { MAX_ENTITIES, EntityFlags } from '../dod/EntityFlags';
+import { MAX_ENTITIES, EntityFlags } from '../compat';
 import {
     TransformStore,
     PhysicsStore,
@@ -13,7 +13,7 @@ import {
     StateStore,
     SkillStore,
     InputStore,
-} from '../dod/ComponentStores';
+} from '../compat';
 import { PLAYER_START_RADIUS } from '../config/constants';
 import type { EntityTemplate } from './BlueprintLoader';
 

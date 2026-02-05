@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Client } from 'colyseus';
 import { GameRoom } from './GameRoom';
 import { GameRoomState } from '../schema/GameState';
-import { MAX_ENTITIES } from '@cjr/engine/dod/EntityFlags';
+import { MAX_ENTITIES } from '@cjr/engine';
 import { StatsStore } from '@cjr/engine';
 
 vi.mock('../logging/Logger', () => ({

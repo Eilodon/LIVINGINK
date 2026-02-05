@@ -1,53 +1,39 @@
 /**
  * @eidolon/engine - SchemaBinaryPacker
- *
- * Schema-based binary packet encoding with dirty tracking.
- * Smart Lane implementation - only sends changed data.
+ * 
+ * EIDOLON-V: Smart Lane packet encoding.
+ * Uses generated NetworkSerializer for zero-overhead packing.
  */
 
-import { ProtocolSchema, SchemaPacketType } from './ProtocolSchema';
-import { DirtyTracker, DirtyMask } from './DirtyTracker';
 import {
-    TransformStore,
-    PhysicsStore,
-} from '../dod/ComponentStores';
+    COMPONENT_IDS,
+    NetworkSerializer,
+    WorldState,
+    defaultWorld,
+} from '../generated';
 
-/**
- * Packet buffer pool entry
- */
-interface BufferPoolEntry {
+import { DirtyTracker } from './DirtyTracker';
+import { SchemaPacketType } from './ProtocolSchema';
+
+// Pool for reuse
+interface IPacketBuffer {
     buffer: ArrayBuffer;
     view: DataView;
-    u8: Uint8Array;
-    inUse: boolean;
+    offset: number;
 }
 
-/**
- * SchemaBinaryPacker - Smart Lane packet encoding
- *
- * Encodes only dirty components for efficient network sync.
- * Uses ProtocolSchema for flexible component serialization.
- */
 export class SchemaBinaryPacker {
-    private static readonly POOL_SIZE = 4;
-    private static readonly BUFFER_SIZE = 4096 * 32; // 128KB
-
-    private static _pool: BufferPoolEntry[] = [];
+    // Shared buffer pool
+    private static POOL_SIZE = 10;
+    private static BUFFER_SIZE = 64 * 1024; // Increased to 64KB for snapshots
+    private static _pool: IPacketBuffer[] = [];
     private static _poolInitialized = false;
 
-    private schema: ProtocolSchema;
-    private dirtyTracker: DirtyTracker;
-
-    constructor(schema: ProtocolSchema, dirtyTracker: DirtyTracker) {
-        this.schema = schema;
-        this.dirtyTracker = dirtyTracker;
-        this.initPool();
+    constructor() {
+        SchemaBinaryPacker.initPool();
     }
 
-    /**
-     * Initialize buffer pool
-     */
-    private initPool(): void {
+    static initPool() {
         if (SchemaBinaryPacker._poolInitialized) return;
 
         for (let i = 0; i < SchemaBinaryPacker.POOL_SIZE; i++) {
@@ -55,300 +41,156 @@ export class SchemaBinaryPacker {
             SchemaBinaryPacker._pool.push({
                 buffer,
                 view: new DataView(buffer),
-                u8: new Uint8Array(buffer),
-                inUse: false,
+                offset: 0
             });
         }
         SchemaBinaryPacker._poolInitialized = true;
     }
 
     /**
-     * Checkout buffer from pool
+     * Acquire a buffer from the pool (reset offset)
      */
-    private checkoutBuffer(): BufferPoolEntry {
-        for (const entry of SchemaBinaryPacker._pool) {
-            if (!entry.inUse) {
-                entry.inUse = true;
-                return entry;
-            }
+    private static acquire(): IPacketBuffer {
+        this.initPool();
+        if (this._pool.length > 0) {
+            const entry = this._pool.pop()!;
+            entry.offset = 0;
+            return entry;
         }
-
-        // Pool exhausted - create temporary buffer
-        const buffer = new ArrayBuffer(SchemaBinaryPacker.BUFFER_SIZE);
-        return {
-            buffer,
-            view: new DataView(buffer),
-            u8: new Uint8Array(buffer),
-            inUse: true,
-        };
+        // Fallback if empty
+        const buffer = new ArrayBuffer(this.BUFFER_SIZE);
+        return { buffer, view: new DataView(buffer), offset: 0 };
     }
 
-    /**
-     * Return buffer to pool
-     */
-    private returnBuffer(entry: BufferPoolEntry): void {
-        if (SchemaBinaryPacker._pool.includes(entry)) {
-            entry.inUse = false;
+    private static release(entry: IPacketBuffer) {
+        if (this._pool.length < this.POOL_SIZE) {
+            this._pool.push(entry);
         }
     }
 
     /**
-     * Pack transform updates for dirty entities (Fast Lane)
+     * Pack optimized Transform Snapshot (Fast Lane)
+     * Replaces BinaryPacker.packTransforms/Indexed
+     * 
+     * Uses explicit X/Y packing for maximum density (8 bytes/entity + overhead)
+     * instead of full NetworkSerializer (32 bytes/entity).
      */
-    packTransformUpdates(timestamp: number): ArrayBuffer | null {
-        const dirtyEntities = this.dirtyTracker.getDirtyEntities(DirtyMask.TRANSFORM);
-
-        if (dirtyEntities.length === 0) {
-            return null;
-        }
-
-        const poolEntry = this.checkoutBuffer();
-        const { buffer, view, u8 } = poolEntry;
-
-        try {
-            let offset = 0;
-
-            // Header: Type (1) + Timestamp (4) + Count (2)
-            u8[offset++] = SchemaPacketType.TRANSFORM_UPDATE;
-            view.setFloat32(offset, timestamp, true);
-            offset += 4;
-            view.setUint16(offset, dirtyEntities.length, true);
-            offset += 2;
-
-            // Entity data: ID (2) + X (4) + Y (4)
-            for (const entityId of dirtyEntities) {
-                view.setUint16(offset, entityId, true);
-                offset += 2;
-                view.setFloat32(offset, TransformStore.getX(entityId), true);
-                offset += 4;
-                view.setFloat32(offset, TransformStore.getY(entityId), true);
-                offset += 4;
-            }
-
-            return buffer.slice(0, offset);
-        } finally {
-            this.returnBuffer(poolEntry);
-        }
-    }
-
-    /**
-     * Pack physics updates for dirty entities (Fast Lane)
-     */
-    packPhysicsUpdates(timestamp: number): ArrayBuffer | null {
-        const dirtyEntities = this.dirtyTracker.getDirtyEntities(DirtyMask.PHYSICS);
-
-        if (dirtyEntities.length === 0) {
-            return null;
-        }
-
-        const poolEntry = this.checkoutBuffer();
-        const { buffer, view, u8 } = poolEntry;
-
-        try {
-            let offset = 0;
-
-            // Header
-            u8[offset++] = SchemaPacketType.PHYSICS_UPDATE;
-            view.setFloat32(offset, timestamp, true);
-            offset += 4;
-            view.setUint16(offset, dirtyEntities.length, true);
-            offset += 2;
-
-            // Entity data: ID (2) + VX (4) + VY (4) + Radius (4)
-            for (const entityId of dirtyEntities) {
-                view.setUint16(offset, entityId, true);
-                offset += 2;
-                view.setFloat32(offset, PhysicsStore.getVelocityX(entityId), true);
-                offset += 4;
-                view.setFloat32(offset, PhysicsStore.getVelocityY(entityId), true);
-                offset += 4;
-                view.setFloat32(offset, PhysicsStore.getRadius(entityId), true);
-                offset += 4;
-            }
-
-            return buffer.slice(0, offset);
-        } finally {
-            this.returnBuffer(poolEntry);
-        }
-    }
-
-    /**
-     * Pack component delta updates (Smart Lane)
-     * Encodes only changed fields for arbitrary components
-     */
-    packComponentDelta(
-        componentId: string,
+    static packTransformSnapshot(
+        world: WorldState,
         timestamp: number
+    ): ArrayBuffer {
+        const entry = this.acquire();
+        const { view } = entry;
+        let { offset } = entry;
+
+        // Header: Type(1) + Timestamp(4) + Count(2)
+        view.setUint8(offset, SchemaPacketType.TRANSFORM_UPDATE); offset += 1;
+        view.setFloat32(offset, timestamp, true); offset += 4;
+
+        const countOffset = offset;
+        view.setUint16(offset, 0, true); offset += 2; // Placeholder for count
+
+        let count = 0;
+        const maxEnt = world.maxEntities;
+        const tView = world.transformView; // DataView access
+
+        // Loop all active entities
+        for (let id = 0; id < maxEnt; id++) {
+            if (!world.isValidEntityId(id)) continue;
+
+            // Write ID (2)
+            view.setUint16(offset, id, true); offset += 2;
+
+            // Manual optimization: Only pack X/Y (Fast Lane)
+            // Stride is 32 bytes (8 floats). 
+            // X is float 0 (bytes 0-3), Y is float 1 (bytes 4-7)
+            const ptr = id * 32;
+            const x = tView.getFloat32(ptr + 0, true);
+            const y = tView.getFloat32(ptr + 4, true);
+
+            view.setFloat32(offset, x, true); offset += 4;
+            view.setFloat32(offset, y, true); offset += 4;
+
+            count++;
+        }
+
+        view.setUint16(countOffset, count, true);
+
+        // Copy to result buffer
+        const result = entry.buffer.slice(0, offset);
+        this.release(entry);
+        return result;
+    }
+
+    /**
+     * Pack Component Deltas (Smart Lane) using Generated Serializer
+     */
+    static packComponentDeltas(
+        world: WorldState,
+        timestamp: number,
+        dirtyTracker: DirtyTracker // Used to identify WHO is dirty
     ): ArrayBuffer | null {
-        const schema = this.schema.getSchema(componentId);
-        if (!schema) {
-            return null;
-        }
+        // For simplicity in this refactor, we iterate component types and dirty masks
+        // This assumes DirtyTracker aligns with component IDs.
 
-        // Map component to dirty mask
-        const dirtyMask = this.componentIdToMask(componentId);
-        const dirtyEntities = this.dirtyTracker.getDirtyEntities(dirtyMask);
+        const entry = this.acquire();
+        const { view } = entry;
+        let { offset } = entry;
 
-        if (dirtyEntities.length === 0) {
-            return null;
-        }
+        // Header
+        view.setUint8(offset, SchemaPacketType.COMPONENT_DELTA); offset += 1;
+        view.setFloat32(offset, timestamp, true); offset += 4;
 
-        const poolEntry = this.checkoutBuffer();
-        const { buffer, view, u8 } = poolEntry;
+        let hasData = false;
 
-        try {
-            let offset = 0;
+        // List of components (excluding Transform/Physics which are Fast Lane)
+        const components = [
+            'STATS', 'SKILL', 'PIGMENT', 'TATTOO', 'CONFIG', 'INPUT'
+        ];
 
-            // Header
-            u8[offset++] = SchemaPacketType.COMPONENT_DELTA;
-            view.setFloat32(offset, timestamp, true);
-            offset += 4;
+        // Inverse map for ID string
+        const compIds = COMPONENT_IDS as any;
 
-            // Component ID length and string
-            const idBytes = new TextEncoder().encode(schema.id);
-            u8[offset++] = idBytes.length;
-            u8.set(idBytes, offset);
-            offset += idBytes.length;
+        for (const compName of components) {
+            const compId = compIds[compName] as number;
+            if (!compId) continue;
 
-            // Entity count
-            view.setUint16(offset, dirtyEntities.length, true);
-            offset += 2;
+            // Check dirty entities for this component
+            const dirtyEntities = dirtyTracker.getDirtyEntities(1 << (compId - 1));
+            if (dirtyEntities.length === 0) continue;
 
-            // Entity data based on schema
+            hasData = true;
+
+            // Component Section: [IDLen][IDStr][Count][ (ID + Data)... ]
+            const idStr = compName; // Send UPPERCASE ID (e.g. STATS) or adjust as needed
+            const idBytes = new TextEncoder().encode(idStr);
+            view.setUint8(offset, idBytes.length); offset += 1;
+            new Uint8Array(entry.buffer).set(idBytes, offset); offset += idBytes.length;
+
+            const countOffset = offset;
+            view.setUint16(offset, 0, true); offset += 2;
+            let count = 0;
+
             for (const entityId of dirtyEntities) {
-                view.setUint16(offset, entityId, true);
-                offset += 2;
+                if (!world.isValidEntityId(entityId)) continue;
 
-                // Encode each field according to schema
-                for (const field of schema.fields) {
-                    offset = this.encodeField(
-                        view,
-                        offset,
-                        entityId,
-                        field.type,
-                        field.offset
-                    );
-                }
+                view.setUint16(offset, entityId, true); offset += 2;
+
+                // USE GENERATED SERIALIZER
+                offset = NetworkSerializer.packEntityComponent(world, entityId, compId, view, offset);
+                count++;
             }
 
-            return buffer.slice(0, offset);
-        } finally {
-            this.returnBuffer(poolEntry);
+            view.setUint16(countOffset, count, true);
         }
-    }
 
-    /**
-     * Pack entity spawn event
-     */
-    packEntitySpawn(entityId: number, templateId: string): ArrayBuffer {
-        const poolEntry = this.checkoutBuffer();
-        const { buffer, view, u8 } = poolEntry;
-
-        try {
-            let offset = 0;
-
-            u8[offset++] = SchemaPacketType.ENTITY_SPAWN;
-            view.setUint16(offset, entityId, true);
-            offset += 2;
-
-            const idBytes = new TextEncoder().encode(templateId);
-            u8[offset++] = idBytes.length;
-            u8.set(idBytes, offset);
-            offset += idBytes.length;
-
-            return buffer.slice(0, offset);
-        } finally {
-            this.returnBuffer(poolEntry);
+        if (!hasData) {
+            this.release(entry);
+            return null;
         }
-    }
 
-    /**
-     * Pack entity destroy event
-     */
-    packEntityDestroy(entityId: number): ArrayBuffer {
-        const poolEntry = this.checkoutBuffer();
-        const { buffer, view, u8 } = poolEntry;
-
-        try {
-            let offset = 0;
-
-            u8[offset++] = SchemaPacketType.ENTITY_DESTROY;
-            view.setUint16(offset, entityId, true);
-            offset += 2;
-
-            return buffer.slice(0, offset);
-        } finally {
-            this.returnBuffer(poolEntry);
-        }
-    }
-
-    /**
-     * Clear dirty flags after successful send
-     */
-    clearSentDeltas(componentMask: number = 0): void {
-        const dirtyEntities = this.dirtyTracker.getDirtyEntities(componentMask);
-
-        for (const entityId of dirtyEntities) {
-            // Clear the mask bits we're sending
-            if (componentMask === 0) {
-                this.dirtyTracker.clearDirty(entityId);
-            } else {
-                // Clear specific component bits
-                for (let bit = 1; bit <= DirtyMask.CUSTOM; bit <<= 1) {
-                    if (componentMask & bit) {
-                        this.dirtyTracker.clearComponentDirty(entityId, bit);
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Map component ID to dirty mask
-     */
-    private componentIdToMask(componentId: string): number {
-        switch (componentId) {
-            case 'Transform':
-                return DirtyMask.TRANSFORM;
-            case 'Physics':
-                return DirtyMask.PHYSICS;
-            case 'Stats':
-                return DirtyMask.STATS;
-            case 'State':
-                return DirtyMask.STATE;
-            case 'Skills':
-                return DirtyMask.SKILLS;
-            default:
-                return DirtyMask.CUSTOM;
-        }
-    }
-
-    /**
-     * Encode a single field value
-     */
-    private encodeField(
-        view: DataView,
-        offset: number,
-        entityId: number,
-        type: string,
-        fieldOffset: number
-    ): number {
-        // Calculate array index from entityId and fieldOffset
-        const stride = 8; // Default stride
-        const idx = entityId * stride + fieldOffset / 4;
-
-        switch (type) {
-            case 'f32':
-                view.setFloat32(offset, TransformStore.data[idx] || 0, true);
-                return offset + 4;
-            case 'u16':
-                view.setUint16(offset, Math.floor(TransformStore.data[idx] || 0), true);
-                return offset + 2;
-            case 'u32':
-                view.setUint32(offset, Math.floor(TransformStore.data[idx] || 0), true);
-                return offset + 4;
-            default:
-                return offset;
-        }
+        const result = entry.buffer.slice(0, offset);
+        this.release(entry);
+        return result;
     }
 }

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GameRoom } from '../rooms/GameRoom';
-import { MAX_ENTITIES } from '@cjr/engine/dod/EntityFlags';
+import { MAX_ENTITIES } from '@cjr/engine';
 
 describe('Entity Handle Validation', () => {
   let room: GameRoom;

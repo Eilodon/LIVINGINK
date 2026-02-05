@@ -21,7 +21,7 @@ import { getCurrentSpatialGrid } from '../context';
 
 // Input & Network Wiring
 import { BufferedInput } from '../../input/BufferedInput';
-import { TransformStore, InputStore, PhysicsStore, PhysicsSystem, MovementSystem } from '@cjr/engine';
+import { TransformStore, InputStore, PhysicsStore, PhysicsSystem, MovementSystem, defaultWorld } from '@cjr/engine';
 
 /**
  * CJR Client Simulation Configuration
@@ -194,10 +194,10 @@ export class CJRClientRunner extends ClientRunner {
 
     // EIDOLON-V FIX: Core physics pipeline
     // 1. MovementSystem: Convert input targets to velocities
-    MovementSystem.updateAll(dt);
+    MovementSystem.updateAll(defaultWorld, dt);
 
     // 2. PhysicsSystem: Integrate velocity to position + map boundary clamping
-    PhysicsSystem.update(dt);
+    PhysicsSystem.update(defaultWorld, dt);
 
     // Future: Ring logic, emotions, tattoo synergies
   }

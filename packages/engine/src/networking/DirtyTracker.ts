@@ -5,7 +5,7 @@
  * Part of Smart Lane networking - only send what changed.
  */
 
-import { MAX_ENTITIES } from '../dod/EntityFlags';
+import { MAX_ENTITIES } from '../compat';
 
 /**
  * Dirty bit masks for component categories

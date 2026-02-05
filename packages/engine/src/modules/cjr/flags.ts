@@ -5,7 +5,7 @@
  * Uses bits 8+ as reserved by the engine for game modules.
  */
 
-import { ENGINE_FLAG_OFFSET } from '../../dod/EntityFlags';
+import { ENGINE_FLAG_OFFSET } from '../../compat';
 
 /**
  * CJR Food Subtype Flags

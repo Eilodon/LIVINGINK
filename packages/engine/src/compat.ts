@@ -1,8 +1,10 @@
 /**
- * @cjr/engine - DOD Module Index
+ * @cjr/engine - Compatibility Layer
  * 
- * EIDOLON-V: Compatibility Layer for Legacy ComponentStores.
+ * EIDOLON-V: Keeps the lights on for legacy code while we migrate to WorldState.
  * Proxies legacy static access (TransformStore.data, etc.) to generated WorldState.
+ * 
+ * @deprecated Migrate to usage of 'generated/WorldState' and 'generated/ComponentAccessors'
  */
 
 import {
@@ -11,7 +13,7 @@ import {
     STRIDES,
     MAX_ENTITIES,
     type IWorldConfig
-} from '../generated/WorldState';
+} from './generated/WorldState';
 
 import {
     EntityFlags as GeneratedEntityFlags,
@@ -25,7 +27,7 @@ import {
     StateAccess,
     PigmentAccess,
     TattooAccess,
-} from '../generated/ComponentAccessors';
+} from './generated/ComponentAccessors';
 
 // Re-export generated types
 export {
@@ -40,7 +42,26 @@ export {
     NetworkSerializer,
     COMPONENT_IDS,
     COMPONENT_STRIDES
-} from '../generated/NetworkPacker';
+} from './generated/NetworkPacker';
+
+// Re-export EntityFlags
+export { GeneratedEntityFlags as EntityFlags };
+
+// Reserved flags offset for engine use (bits 0-7 used by engine, 8+ available for modules)
+export const ENGINE_FLAG_OFFSET = 8;
+
+// Re-export CJR Flags for compatibility
+export * from './modules/cjr/flags';
+
+// =============================================================================
+// LEGACY ENTITY LOOKUP
+// =============================================================================
+/**
+ * Global entity lookup array for legacy client code.
+ * @deprecated Use IEntityLookup interface and dependency injection where possible.
+ */
+export const EntityLookup: any[] = new Array(MAX_ENTITIES).fill(null);
+
 
 // =============================================================================
 // COMPATIBILITY STORES
@@ -63,8 +84,7 @@ export class TransformStore {
     }
 
     static set(id: number, x: number, y: number, rotation: number, scale: number = 1): void {
-        // Old set took 4-5 args. New set takes 9. We'll map what we have.
-        // Initialize prev values to current values
+        // Init prev values to current values
         TransformAccess.set(defaultWorld, id, x, y, rotation, scale, x, y, rotation);
     }
 
@@ -156,10 +176,6 @@ export class StatsStore {
 }
 
 export class StateStore {
-    // State is strictly Uint8Array, not Float32Array. 
-    // Old StateStore might have exposed 'flags' as Uint8Array? 
-    // Checking memory-convergence.test.ts: StateStore.flags[0]
-
     static get flags(): Uint8Array {
         return defaultWorld.stateFlags;
     }
@@ -203,84 +219,41 @@ export class InputStore {
     }
 
     static setAction(id: number, bit: number, active: boolean): void {
-        // Implementation might depend on old storage bitmask logic
-        // Current generated Input has 'actions' field (float)
-        // Bit ops on float are tricky, usually cast to int
-        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT + 8, true); // actions is at offset 8
+        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
         if (active) actions |= (1 << bit);
         else actions &= ~(1 << bit);
-        defaultWorld.inputView.setUint32(id * STRIDES.INPUT + 8, actions, true);
+        defaultWorld.inputView.setUint32(id * STRIDES.INPUT * 4 + 8, actions, true);
     }
 
     static isActionActive(id: number, bit: number): boolean {
-        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT + 8, true);
+        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
         return (actions & (1 << bit)) !== 0;
-    }
-
-    static consumeAction(id: number, bit: number): boolean {
-        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT + 8, true);
-        if ((actions & (1 << bit)) !== 0) {
-            actions &= ~(1 << bit);
-            defaultWorld.inputView.setUint32(id * STRIDES.INPUT + 8, actions, true);
-            return true;
-        }
-        return false;
     }
 }
 
 export class ConfigStore {
     static readonly STRIDE = STRIDES.CONFIG;
+    static get data(): Float32Array { return defaultWorld.config; }
 
-    static get data(): Float32Array {
-        return defaultWorld.config;
-    }
+    static setMaxSpeed(id: number, speed: number) { /* unused in generated? */ }
+    static setSpeedMultiplier(id: number, value: number) { ConfigAccess.setSpeedMult(defaultWorld, id, value); }
+    static setMagnetRadius(id: number, value: number) { ConfigAccess.setMagneticRadius(defaultWorld, id, value); }
 
-    static getMaxSpeed(id: number): number {
-        // ConfigAccess doesn't seem to have maxSpeed? Checking schema...
-        // Schema had: magneticRadius, damageMult, speedMult, pickupRange, visionRange
-        // Maybe old code used maxSpeed?
-        // Let's assume defaults or map to speedMult * BASE
-        return 0; // Fallback
-    }
-
-    static getSpeedMultiplier(id: number): number {
-        return ConfigAccess.getSpeedMult(defaultWorld, id);
-    }
-
-    static setSpeedMultiplier(id: number, value: number): void {
-        ConfigAccess.setSpeedMult(defaultWorld, id, value);
-    }
-
-    static getMagnetRadius(id: number): number {
-        return ConfigAccess.getMagneticRadius(defaultWorld, id);
-    }
-
-    static setMagnetRadius(id: number, value: number): void {
-        ConfigAccess.setMagneticRadius(defaultWorld, id, value);
+    static set(id: number, maxSpeed: number, speedMult: number, magnetRadius: number) {
+        // Reuse magnet radius as maxSpeed if needed, or update schema
+        ConfigAccess.setSpeedMult(defaultWorld, id, speedMult);
+        ConfigAccess.setMagneticRadius(defaultWorld, id, magnetRadius);
     }
 }
 
 export class SkillStore {
     static readonly STRIDE = STRIDES.SKILL;
+    static get data(): Float32Array { return defaultWorld.skill; }
 
-    static get data(): Float32Array {
-        return defaultWorld.skill;
-    }
+    static update(dt: number) { /* Global update logic moved to System? This store just proxies data */ }
 
-    static getCooldown(id: number): number {
-        return SkillAccess.getCooldown(defaultWorld, id);
-    }
-
-    static getMaxCooldown(id: number): number {
-        return SkillAccess.getMaxCooldown(defaultWorld, id);
-    }
-
-    static getActiveTimer(id: number): number {
-        return SkillAccess.getActiveTimer(defaultWorld, id);
-    }
-
+    // Required by legacy usage
     static set(id: number, cooldown: number, maxCooldown: number, activeTimer: number): void {
-        // SkillAccess.set takes additional shapeId arg
         SkillAccess.set(defaultWorld, id, cooldown, maxCooldown, activeTimer, 0);
     }
 
@@ -291,11 +264,7 @@ export class SkillStore {
 
 export class ProjectileStore {
     static readonly STRIDE = STRIDES.PROJECTILE;
-
-    static get data(): Float32Array {
-        return defaultWorld.projectile;
-    }
-
+    static get data(): Float32Array { return defaultWorld.projectile; }
     static set(id: number, ownerId: number, damage: number, duration: number, typeId: number): void {
         ProjectileAccess.set(defaultWorld, id, ownerId, damage, duration, typeId);
     }
@@ -303,16 +272,54 @@ export class ProjectileStore {
 
 export class PigmentStore {
     static readonly STRIDE = STRIDES.PIGMENT;
+    // Helper constants for array access (Legacy code uses [idx + R], etc.)
+    static readonly R = 0;
+    static readonly G = 1;
+    static readonly B = 2;
+    static readonly MATCH = 3;
+
     static get data(): Float32Array { return defaultWorld.pigment; }
+
+    static getColorInt(id: number): number {
+        const r = Math.floor(PigmentAccess.getR(defaultWorld, id) * 255);
+        const g = Math.floor(PigmentAccess.getG(defaultWorld, id) * 255);
+        const b = Math.floor(PigmentAccess.getB(defaultWorld, id) * 255);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    static getMatch(id: number): number {
+        return PigmentAccess.getMatchPercent(defaultWorld, id);
+    }
+
+    static set(id: number, r: number, g: number, b: number): void {
+        PigmentAccess.setR(defaultWorld, id, r);
+        PigmentAccess.setG(defaultWorld, id, g);
+        PigmentAccess.setB(defaultWorld, id, b);
+    }
+
+    static mix(id: number, r: number, g: number, b: number, ratio: number): void {
+        const currentR = PigmentAccess.getR(defaultWorld, id);
+        const currentG = PigmentAccess.getG(defaultWorld, id);
+        const currentB = PigmentAccess.getB(defaultWorld, id);
+
+        PigmentAccess.setR(defaultWorld, id, currentR + (r - currentR) * ratio);
+        PigmentAccess.setG(defaultWorld, id, currentG + (g - currentG) * ratio);
+        PigmentAccess.setB(defaultWorld, id, currentB + (b - currentB) * ratio);
+    }
 }
 
 export class TattooStore {
-    // Schema doesn't seem to have Tattoo? 
-    // Wait, generated types might have missed it or it wasn't in schema.config.js
-    // I recall TattooAccess in exports.
-    // If it exists in ComponentAccessors, I can map it.
-    // Checking exports list includes TattooAccess.
-    static get data(): Float32Array { return (defaultWorld as any).tattoo || new Float32Array(0); }
+    // Legacy flags support
+    private static _flags = new Uint8Array(MAX_ENTITIES);
+
+    static get flags(): Uint8Array {
+        return this._flags;
+    }
+
+    // New Float32 data from WorldState
+    static get data(): Float32Array {
+        return defaultWorld.tattoo;
+    }
 }
 
 /**

@@ -1,6 +1,6 @@
 
 import { NetworkClient } from '../network/NetworkClient';
-import { BinaryPacker } from '@cjr/engine/networking';
+// import { BinaryPacker } from '@cjr/engine/networking';
 
 // Internal type for captured packets
 export interface CapturedPacket {

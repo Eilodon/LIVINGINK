@@ -27,6 +27,7 @@ import {
     TransformStore,
     PhysicsStore,
     StatsStore,
+    defaultWorld,
 } from '@cjr/engine';
 import { logger } from '../logging/Logger';
 
@@ -155,12 +156,13 @@ export class ServerEngineBridge {
         // 2. Movement (DOD)
         for (const player of players) {
             if (player.physicsIndex !== undefined) {
-                MovementSystem.update(player.physicsIndex, dt);
+                // EIDOLON-V: Pass defaultWorld and dt
+                MovementSystem.update(defaultWorld, player.physicsIndex, dt);
             }
         }
         for (const bot of bots) {
             if (bot.physicsIndex !== undefined) {
-                MovementSystem.update(bot.physicsIndex, dt);
+                MovementSystem.update(defaultWorld, bot.physicsIndex, dt);
             }
         }
 

@@ -3,28 +3,21 @@
  * Pure physics integration - no VFX dependencies
  * 
  * EIDOLON-V REFACTOR: Now uses generated WorldState from schema.
- * Uses Float32Array for fast direct access.
+ * Uses Generated Accessors for Type Safety.
  */
 
-import { WorldState, defaultWorld, STRIDES } from '../generated/WorldState';
-import { EntityFlags } from '../generated/ComponentAccessors';
+import { WorldState, defaultWorld } from '../generated/WorldState';
+import { EntityFlags, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
 
 // EIDOLON-V P2 FIX: Document the intentional difference between physics and visual boundaries
-// PHY_MAP_RADIUS = 2500: Physics hard boundary - entities cannot move beyond this
-// MAP_RADIUS = 1600 (in constants.ts): Visual game boundary / spawn zone
-// The physics boundary is larger to allow visual effects and smooth clamping at edges
-// This is NOT a bug - it's intentional margin for better gameplay feel
 export const PHY_MAP_RADIUS = 2500;
 export const FRICTION_BASE = 0.92;
 
 export class PhysicsSystem {
     /**
      * Update physics for all active entities
-     * @param worldOrDt - WorldState instance OR dt for backward compatibility
-     * @param dt - Delta time (only used when worldOrDt is WorldState)
      */
     static update(worldOrDt: WorldState | number, dt?: number): void {
-        // Backward compatibility: if first arg is number, use defaultWorld
         let world: WorldState;
         let deltaTime: number;
 
@@ -37,33 +30,28 @@ export class PhysicsSystem {
         }
 
         const count = world.maxEntities;
-        const flags = world.stateFlags;
-        const pData = world.physics;
 
-        // Time scaling for variable framerate
+        // Time scaling
         const timeScale = deltaTime * 60;
-
-        // Fast path check for stable 60fps
         const useFastFriction = Math.abs(timeScale - 1.0) < 0.01;
-
-        // Pre-calculate power for standard friction (lag spike protection)
         const defaultFrictionUnstable = Math.pow(FRICTION_BASE, timeScale);
 
+        // Iterate entities
+        // Optimization: In a real ECS query, we'd have a list of active entities.
+        // Here we scan. Accessors are inlineable.
         for (let id = 0; id < count; id++) {
-            // Bitmask check: only process active entities
-            if ((flags[id] & EntityFlags.ACTIVE) === 0) continue;
+            // Check ACTIVE flag directly via Accessor
+            // Note: StateAccess.isActive is slightly slower than direct array access but safer.
+            // For tight loop, we can access stateFlags directly if we really want, but let's stick to Accessors first.
+            // Actually, StateAccess uses world.stateFlags directly.
+            if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
 
-            const pIdx = id * STRIDES.PHYSICS;
-
-            // Get base friction from store (index 6)
-            const frictionBase = pData[pIdx + 6];
+            const frictionBase = PhysicsAccess.getFriction(world, id);
 
             let effectiveFriction: number;
-
             if (useFastFriction) {
                 effectiveFriction = frictionBase;
             } else {
-                // Optimization: most entities use FRICTION_BASE
                 if (Math.abs(frictionBase - FRICTION_BASE) < 0.0001) {
                     effectiveFriction = defaultFrictionUnstable;
                 } else {
@@ -75,20 +63,12 @@ export class PhysicsSystem {
         }
     }
 
-    /**
-     * Integrate single entity's physics
-     * @param worldOrId - WorldState instance OR entity ID for backward compatibility
-     * @param idOrDt - Entity ID (when world is passed) OR dt (backward compat)
-     * @param dtOrFriction - dt (when world is passed) OR friction (backward compat)
-     * @param friction - friction (only when world is passed)
-     */
     static integrateEntity(
         worldOrId: WorldState | number,
         idOrDt: number,
         dtOrFriction: number,
         friction?: number
     ): void {
-        // Backward compatibility
         let world: WorldState;
         let id: number;
         let dt: number;
@@ -106,60 +86,57 @@ export class PhysicsSystem {
             fric = friction!;
         }
 
-        const tData = world.transform;
-        const pData = world.physics;
-        const tIdx = id * STRIDES.TRANSFORM;
-        const pIdx = id * STRIDES.PHYSICS;
+        // 1. Get Velocity
+        let vx = PhysicsAccess.getVx(world, id);
+        let vy = PhysicsAccess.getVy(world, id);
 
-        // 1. Unpack velocity
-        let vx = pData[pIdx];
-        let vy = pData[pIdx + 1];
-
-        // 2. Apply friction
+        // 2. Apply Friction
         vx *= fric;
         vy *= fric;
 
-        // 3. Snapshot for interpolation
-        tData[tIdx + 4] = tData[tIdx]; // prevX
-        tData[tIdx + 5] = tData[tIdx + 1]; // prevY
+        // 3. Snapshot for interpolation (Prev = Current)
+        const currX = TransformAccess.getX(world, id);
+        const currY = TransformAccess.getY(world, id);
+        TransformAccess.setPrevX(world, id, currX);
+        TransformAccess.setPrevY(world, id, currY);
 
-        // 4. Integrate position (Euler)
-        // PHYSICS_TIME_SCALE = 10: Converts velocity from "units per 100ms" to "units per frame"
+        // 4. Integrate Position
         const PHYSICS_TIME_SCALE = 10;
         const delta = dt * PHYSICS_TIME_SCALE;
-        tData[tIdx] += vx * delta;
-        tData[tIdx + 1] += vy * delta;
 
-        // 5. Write back velocity
-        pData[pIdx] = vx;
-        pData[pIdx + 1] = vy;
+        let newX = currX + vx * delta;
+        let newY = currY + vy * delta;
 
-        // 6. Map constraints (circular arena)
-        const r = pData[pIdx + 4]; // radius
-        const limit = PHY_MAP_RADIUS - r;
+        // 5. Map Constraints
+        const radius = PhysicsAccess.getRadius(world, id);
+        const limit = PHY_MAP_RADIUS - radius;
         const limitSq = limit * limit;
-
-        const x = tData[tIdx];
-        const y = tData[tIdx + 1];
-        const distSq = x * x + y * y;
+        const distSq = newX * newX + newY * newY;
 
         if (distSq > limitSq) {
             const dist = Math.sqrt(distSq);
             const invDist = 1.0 / dist;
-            const nx = x * invDist;
-            const ny = y * invDist;
+            const nx = newX * invDist;
+            const ny = newY * invDist;
 
-            // Clamp position
-            tData[tIdx] = nx * limit;
-            tData[tIdx + 1] = ny * limit;
+            // Clamp
+            newX = nx * limit;
+            newY = ny * limit;
 
-            // Bounce (reflect velocity)
+            // Bounce
             const dot = vx * nx + vy * ny;
             if (dot > 0) {
                 const bounceFactor = 1.5;
-                pData[pIdx] -= bounceFactor * dot * nx;
-                pData[pIdx + 1] -= bounceFactor * dot * ny;
+                vx -= bounceFactor * dot * nx;
+                vy -= bounceFactor * dot * ny;
             }
         }
+
+        // 6. Write Back
+        TransformAccess.setX(world, id, newX);
+        TransformAccess.setY(world, id, newY);
+        PhysicsAccess.setVx(world, id, vx);
+        PhysicsAccess.setVy(world, id, vy);
     }
 }
+

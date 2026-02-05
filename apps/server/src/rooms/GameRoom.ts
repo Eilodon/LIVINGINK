@@ -19,7 +19,7 @@ import {
 } from '../constants';
 
 // Import shared game logic
-import { BinaryPacker } from '@cjr/engine/networking';
+import { SchemaBinaryPacker } from '@cjr/engine/networking';
 import {
   PhysicsSystem,
   MovementSystem,
@@ -35,8 +35,11 @@ import {
   updateWaveSpawner,
   WAVE_CONFIG,
   type IFood,
+  defaultWorld,
 } from '@cjr/engine';
-import { EntityFlags, MAX_ENTITIES } from '@cjr/engine/dod/EntityFlags';
+// Import EntityFlags from engine root (exported via compat/generated)
+import { EntityFlags } from '@cjr/engine';
+import { MAX_ENTITIES } from '@cjr/engine';
 
 // Import security validation
 import { serverValidator } from '../security/ServerValidator';
@@ -308,7 +311,7 @@ export class GameRoom extends Room<GameRoomState> {
     // EIDOLON-V FIX: Correct order - Movement THEN Physics
     // MovementSystem converts input targets to velocities
     // PhysicsSystem integrates velocity to position + applies friction
-    MovementSystem.updateAll(dtSec);
+    MovementSystem.updateAll(defaultWorld, dtSec);
     PhysicsSystem.update(dtSec);
     SkillSystem.update(dtSec);
 
@@ -464,42 +467,18 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   private broadcastBinaryTransforms() {
-    // EIDOLON-V BOT DOD: Unified indexed transforms for ALL entities (players + bots)
-    const indexedUpdates: { index: number; x: number; y: number; vx: number; vy: number }[] = [];
+    // EIDOLON-V: Unified Snapshot using SchemaBinaryPacker (SSOT from WorldState)
+    // Replaces manual loop over players/bots with zero-overhead iteration
+    const buffer = SchemaBinaryPacker.packTransformSnapshot(defaultWorld, this.state.gameTime);
 
-    // Gather player transforms from DOD stores (authoritative)
-    this.state.players.forEach((player, sessionId) => {
-      const entityIndex = this.entityIndices.get(sessionId);
-      if (entityIndex === undefined) return;
-      if (!StateStore.isActive(entityIndex)) return;
-
-      indexedUpdates.push({
-        index: entityIndex,
-        x: TransformStore.getX(entityIndex),
-        y: TransformStore.getY(entityIndex),
-        vx: PhysicsStore.getVelocityX(entityIndex),
-        vy: PhysicsStore.getVelocityY(entityIndex),
-      });
-    });
-
-    // EIDOLON-V BOT DOD: Bots now use indexed format (unified with players)
-    this.state.bots.forEach((bot, botId) => {
-      const entityIndex = this.botEntityIndices.get(botId);
-      if (entityIndex === undefined) return;
-      if (!StateStore.isActive(entityIndex)) return;
-
-      indexedUpdates.push({
-        index: entityIndex,
-        x: TransformStore.getX(entityIndex),
-        y: TransformStore.getY(entityIndex),
-        vx: PhysicsStore.getVelocityX(entityIndex),
-        vy: PhysicsStore.getVelocityY(entityIndex),
-      });
-    });
-
-    // Single unified broadcast (players + bots together)
-    if (indexedUpdates.length > 0) {
-      const buffer = BinaryPacker.packTransformsIndexed(indexedUpdates, this.state.gameTime);
+    if (buffer.byteLength > 0) {
+      // Use 'binary' channel if client supports it, or 'binIdx' as legacy?
+      // Client NetworkClient.ts: handleBinaryIndexedUpdate uses SchemaBinaryUnpacker now.
+      // We can use 'binIdx' to keep routing same.
+      // But wait: 'binary' message type might be handled differently?
+      // Client: this.room.onMessage('binIdx', ...) => handleBinaryIndexedUpdate
+      // handleBinaryIndexedUpdate => calls handleBinaryUpdate => unpacks Schema.
+      // So 'binIdx' is fine.
       this.broadcast('binIdx', new Uint8Array(buffer));
     }
   }
