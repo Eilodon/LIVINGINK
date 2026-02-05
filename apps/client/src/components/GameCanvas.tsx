@@ -376,82 +376,91 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // 5. Draw Entities (Zero-GC Iteration + Manual Transform)
-      // EIDOLON-V: DrawStrategies now include reverse translate - no save/restore needed
+      // 5. Draw Entities
+      // EIDOLON-V FIX #4: Option to use direct DOD rendering (eliminates fragmented state)
+      const useDODRendering = false; // Toggle to true to enable direct DOD rendering
 
-      // Food (Draw FIRST so it is BELOW players)
-      // EIDOLON-V FIX: Use index-based API for zero Map lookup
-      for (let i = 0; i < state.food.length; i++) {
-        const f = state.food[i];
-        if (f.isDead) continue;
-        const interpAlpha = alphaRef.current;
-        const pos = f.physicsIndex !== undefined
-          ? getInterpolatedPositionByIndex(f.physicsIndex, interpAlpha, _renderPoint)
-          : { x: f.position.x, y: f.position.y };
-        DrawStrategies.Food(ctx, f, pos.x, pos.y);
-      }
+      if (useDODRendering) {
+        // Direct DOD rendering - reads directly from DOD stores, no JS object intermediaries
+        renderEntitiesFromDOD(ctx, alphaRef.current, state.camera.x, state.camera.y, width, height);
+      } else {
+        // Legacy rendering path - uses JS entity objects with index-based position lookup
+        // EIDOLON-V: DrawStrategies now include reverse translate - no save/restore needed
 
-      // Player
-      // EIDOLON-V FIX: Use index-based API for zero Map lookup
-      if (!state.player.isDead) {
-        const interpAlpha = alphaRef.current;
-        const pos = state.player.physicsIndex !== undefined
-          ? getInterpolatedPositionByIndex(state.player.physicsIndex, interpAlpha, _renderPoint)
-          : { x: state.player.position.x, y: state.player.position.y };
-        const baseX = pos.x;
-        const baseY = pos.y;
-        const intensity = state.player.aberrationIntensity || 0;
-        // EIDOLON-V: Disable shake for users with reduced motion preference
-        const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
-        DrawStrategies.Player(ctx, state.player, baseX + shake, baseY + shake);
-      }
+        // Food (Draw FIRST so it is BELOW players)
+        // EIDOLON-V FIX: Use index-based API for zero Map lookup
+        for (let i = 0; i < state.food.length; i++) {
+          const f = state.food[i];
+          if (f.isDead) continue;
+          const interpAlpha = alphaRef.current;
+          const pos = f.physicsIndex !== undefined
+            ? getInterpolatedPositionByIndex(f.physicsIndex, interpAlpha, _renderPoint)
+            : { x: f.position.x, y: f.position.y };
+          DrawStrategies.Food(ctx, f, pos.x, pos.y);
+        }
 
-      // Bots
-      // EIDOLON-V FIX: Use index-based API for zero Map lookup
-      for (let i = 0; i < state.bots.length; i++) {
-        const b = state.bots[i];
-        if (b.isDead) continue;
-        const interpAlpha = alphaRef.current;
-        const pos = b.physicsIndex !== undefined
-          ? getInterpolatedPositionByIndex(b.physicsIndex, interpAlpha, _renderPoint)
-          : { x: b.position.x, y: b.position.y };
-        const baseX = pos.x;
-        const baseY = pos.y;
-        const intensity = b.aberrationIntensity || 0;
-        // EIDOLON-V: Disable shake for users with reduced motion preference
-        const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
-        DrawStrategies.Player(ctx, b, baseX + shake, baseY + shake);
-      }
+        // Player
+        // EIDOLON-V FIX: Use index-based API for zero Map lookup
+        if (!state.player.isDead) {
+          const interpAlpha = alphaRef.current;
+          const pos = state.player.physicsIndex !== undefined
+            ? getInterpolatedPositionByIndex(state.player.physicsIndex, interpAlpha, _renderPoint)
+            : { x: state.player.position.x, y: state.player.position.y };
+          const baseX = pos.x;
+          const baseY = pos.y;
+          const intensity = state.player.aberrationIntensity || 0;
+          // EIDOLON-V: Disable shake for users with reduced motion preference
+          const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
+          DrawStrategies.Player(ctx, state.player, baseX + shake, baseY + shake);
+        }
 
-      // Projectiles (EIDOLON ARCHITECT: Manual transforms - no save/restore)
-      // EIDOLON-V FIX: Use index-based API for zero Map lookup
-      for (let i = 0; i < state.projectiles.length; i++) {
-        const p = state.projectiles[i];
-        if (p.isDead) continue;
+        // Bots
+        // EIDOLON-V FIX: Use index-based API for zero Map lookup
+        for (let i = 0; i < state.bots.length; i++) {
+          const b = state.bots[i];
+          if (b.isDead) continue;
+          const interpAlpha = alphaRef.current;
+          const pos = b.physicsIndex !== undefined
+            ? getInterpolatedPositionByIndex(b.physicsIndex, interpAlpha, _renderPoint)
+            : { x: b.position.x, y: b.position.y };
+          const baseX = pos.x;
+          const baseY = pos.y;
+          const intensity = b.aberrationIntensity || 0;
+          // EIDOLON-V: Disable shake for users with reduced motion preference
+          const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
+          DrawStrategies.Player(ctx, b, baseX + shake, baseY + shake);
+        }
 
-        const alpha = alphaRef.current;
-        const pos = p.physicsIndex !== undefined
-          ? getInterpolatedPositionByIndex(p.physicsIndex, alpha, _renderPoint)
-          : { x: p.position.x, y: p.position.y };
-        const px = pos.x;
-        const py = pos.y;
+        // Projectiles (EIDOLON ARCHITECT: Manual transforms - no save/restore)
+        // EIDOLON-V FIX: Use index-based API for zero Map lookup
+        for (let i = 0; i < state.projectiles.length; i++) {
+          const p = state.projectiles[i];
+          if (p.isDead) continue;
 
-        const intensity = (p as any).aberrationIntensity || 0;
-        // EIDOLON-V: Disable shake for users with reduced motion preference
-        const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
-        const drawX = px + shake;
-        const drawY = py + shake;
+          const alpha = alphaRef.current;
+          const pos = p.physicsIndex !== undefined
+            ? getInterpolatedPositionByIndex(p.physicsIndex, alpha, _renderPoint)
+            : { x: p.position.x, y: p.position.y };
+          const px = pos.x;
+          const py = pos.y;
 
-        // CRITICAL: Manual transform + reset (eliminates canvas stack overhead)
-        ctx.translate(drawX, drawY);
+          const intensity = (p as any).aberrationIntensity || 0;
+          // EIDOLON-V: Disable shake for users with reduced motion preference
+          const shake = reducedMotion ? 0 : intensity > 0 ? (Math.random() - 0.5) * 4 : 0;
+          const drawX = px + shake;
+          const drawY = py + shake;
 
-        ctx.fillStyle = getColor(p.color, '#ff0000');
-        ctx.beginPath();
-        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-        ctx.fill();
+          // CRITICAL: Manual transform + reset (eliminates canvas stack overhead)
+          ctx.translate(drawX, drawY);
 
-        // CRITICAL: Manual reset instead of restore()
-        ctx.translate(-drawX, -drawY);
+          ctx.fillStyle = getColor(p.color, '#ff0000');
+          ctx.beginPath();
+          ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // CRITICAL: Manual reset instead of restore()
+          ctx.translate(-drawX, -drawY);
+        }
       }
 
       // IMPERATOR Phase 4: Particles (Decoupled from React State)
