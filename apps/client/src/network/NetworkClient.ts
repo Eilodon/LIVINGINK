@@ -390,12 +390,14 @@ export class NetworkClient {
         this.localState!.players.push(localPlayer);
 
         // EIDOLON-V FIX: Sync to PhysicsWorld
+        // Mass = PI * radius^2 (proportional to area)
+        const mass = Math.PI * localPlayer.radius * localPlayer.radius;
         localPlayer.physicsIndex = this.localState!.engine.physicsWorld.addBody(
           sessionId,
           localPlayer.position.x,
           localPlayer.position.y,
           localPlayer.radius,
-          1, // Mass (calculated later or defaulting) - TODO: Calculate mass properly
+          mass,
           true
         );
       }
