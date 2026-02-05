@@ -140,8 +140,12 @@ async function main() {
     const redisHealth = await cache.healthCheck().catch(() => ({ connected: false }));
     const rateLimitStats = rateLimiter.getStats();
 
-    res.json({
-      status: 'healthy',
+    // EIDOLON-V FIX: Cascade failure if critical infrastructure is down
+    const isHealthy = redisHealth.connected;
+    const status = isHealthy ? 200 : 503;
+
+    res.status(status).json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
       timestamp: Date.now(),
       uptime: process.uptime(),
       security: {
@@ -152,7 +156,7 @@ async function main() {
       },
       infrastructure: {
         redis: redisHealth.connected ? 'connected' : 'disconnected',
-        redisLatency: 'latency' in redisHealth ? redisHealth.latency : null,
+        redisLatency: 'latency' in redisHealth ? (redisHealth as any).latency : null,
       },
       version: '1.0.0-beta.1',
     });

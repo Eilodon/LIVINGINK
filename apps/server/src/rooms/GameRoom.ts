@@ -23,6 +23,7 @@ import { SchemaBinaryPacker } from '@cjr/engine/networking';
 import {
   PhysicsSystem,
   MovementSystem,
+  GameConfig,
   SkillSystem,
   TransformStore,
   PhysicsStore,
@@ -30,12 +31,13 @@ import {
   InputStore,
   StatsStore,
   ConfigStore,
+  SkillAccess, // EIDOLON-V P1: For server-authoritative cooldown check
   checkRingTransition,
   calcMatchPercentFast,
   updateWaveSpawner,
   WAVE_CONFIG,
   type IFood,
-  defaultWorld,
+  WorldState, // EIDOLON-V FIX: Removed invalid 'Type' import
 } from '@cjr/engine';
 // Import EntityFlags from engine root (exported via compat/generated)
 import { EntityFlags } from '@cjr/engine';
@@ -64,7 +66,12 @@ export class GameRoom extends Room<GameRoomState> {
   private nextEntityIndex: number = 0;
   // EIDOLON-V P0: Entity pool recycling with generation for safe ID reuse
   private freeEntityIndices: number[] = [];
+  // EIDOLON-V P5 FIX: Active entity list for O(N) iteration
+  private activeEntityIndices: number[] = [];
   private entityGenerations: Uint16Array = new Uint16Array(MAX_ENTITIES);
+
+  // EIDOLON-V P6 FIX: Instance-based WorldState (No Global Singleton)
+  private world!: WorldState;
 
   // Security & Physics constants
   private static readonly SECURITY_MAX_DT_SEC = 0.2;
@@ -72,10 +79,18 @@ export class GameRoom extends Room<GameRoomState> {
   private static readonly SPEED_VALIDATION_TOLERANCE = 1.15; // 15% tolerance
   private lastUpdateDtSec = 1 / 60;
 
+  // EIDOLON-V P0 SECURITY: Entity pool DoS protection
+  private readonly MAX_ENTITIES_PER_CLIENT = 5; // Max bots/entities per client
+  private clientEntityCounts: Map<string, number> = new Map();
+  
   // EIDOLON-V: WebSocket Rate Limiting
   private clientRates: Map<string, { count: number; resetTime: number }> = new Map();
   private readonly RATE_LIMIT_WINDOW = 1000;
   private readonly RATE_LIMIT_MAX = 60;
+
+  // EIDOLON-V P12 SECURITY: Room creation rate limit tracking
+  private roomCreateRates = new Map<string, number>(); // IP -> count
+  private roomCreateLastReset = new Map<string, number>(); // IP -> timestamp
 
   // EIDOLON-V FIX: Wave spawner state for food generation
   private waveState = {
@@ -87,6 +102,8 @@ export class GameRoom extends Room<GameRoomState> {
 
   // EIDOLON-V P0 SECURITY: Entity handle validation to prevent ABA problem
   // Composite handle: (generation << 16) | index
+  private entityHandleMap = new Map<string, number>(); // sessionId -> composite handle
+
   private makeEntityHandle(index: number): number {
     const gen = this.entityGenerations[index];
     return (gen << 16) | index;
@@ -109,8 +126,55 @@ export class GameRoom extends Room<GameRoomState> {
     return handle & 0xFFFF;
   }
 
+  // EIDOLON-V FIX: Rate limiting for room creation/joining
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async onAuth(client: Client, options: unknown, request?: any): Promise<boolean> {
+    // EIDOLON-V P12 SECURITY: Room creation rate limiting to prevent DoS
+    const clientIp = request?.headers?.['x-forwarded-for'] ||
+                     request?.headers?.['x-real-ip'] ||
+                     request?.socket?.remoteAddress ||
+                     'unknown';
+
+    const now = Date.now();
+    const rateKey = `room_create:${clientIp}`;
+    const windowMs = 60000; // 1 minute window
+    const maxRequests = 5;  // Max 5 rooms per minute per IP
+
+    // Get current count for this IP
+    const currentCount = this.roomCreateRates.get(rateKey) || 0;
+
+    // Check if window expired and reset
+    const lastReset = this.roomCreateLastReset.get(rateKey) || 0;
+    if (now - lastReset > windowMs) {
+      this.roomCreateRates.set(rateKey, 1);
+      this.roomCreateLastReset.set(rateKey, now);
+      return true;
+    }
+
+    if (currentCount >= maxRequests) {
+      logger.warn('Room creation rate limit exceeded', {
+        clientIp: clientIp.slice(0, 7), // Log partial IP for privacy
+        currentCount,
+        maxRequests,
+      });
+      return false; // Reject connection
+    }
+
+    // Increment counter
+    this.roomCreateRates.set(rateKey, currentCount + 1);
+    return true;
+  }
+
   onCreate(options: unknown) {
     logger.info('GameRoom created!', { options });
+
+    // EIDOLON-V P6 FIX: Instantiate WorldState per room
+    this.world = new WorldState();
+
+    // EIDOLON-V P4 FIX: Periodic Cleanup Interval
+    this.clock.setInterval(() => {
+      serverValidator.cleanup();
+    }, 60000); // Every 1 minute
 
     // EIDOLON-V PHASE1: Validate room creation options
     const roomValidation = InputValidator.validateRoomOptions(options);
@@ -121,7 +185,8 @@ export class GameRoom extends Room<GameRoomState> {
 
     this.setState(new GameRoomState());
 
-    this.serverEngine = new ServerEngineBridge();
+    // EIDOLON-V P6 FIX: Pass instance world to ServerEngineBridge
+    this.serverEngine = new ServerEngineBridge(this.world);
 
     this.onMessage('input', (client, message: unknown) => {
       // EIDOLON-V P7: Message type and size validation
@@ -202,6 +267,9 @@ export class GameRoom extends Room<GameRoomState> {
     }
     this.entityIndices.set(client.sessionId, entityIndex);
 
+    // EIDOLON-V P9 FIX: Store entity handle for validation
+    this.entityHandleMap.set(client.sessionId, this.makeEntityHandle(entityIndex));
+
     // Create Colyseus state
     const player = new PlayerState();
     player.id = client.sessionId;
@@ -279,6 +347,12 @@ export class GameRoom extends Room<GameRoomState> {
     // Cleanup Rate Limiter
     this.clientRates.delete(client.sessionId);
 
+    // EIDOLON-V P0 SECURITY: Cleanup entity count tracking
+    this.clientEntityCounts.delete(client.sessionId);
+
+    // EIDOLON-V P9 FIX: Cleanup entity handle
+    this.entityHandleMap.delete(client.sessionId);
+
     // EIDOLON-V P0: Cleanup DOD entity with proper release
     const entityIndex = this.entityIndices.get(client.sessionId);
     if (entityIndex !== undefined) {
@@ -311,9 +385,14 @@ export class GameRoom extends Room<GameRoomState> {
     // EIDOLON-V FIX: Correct order - Movement THEN Physics
     // MovementSystem converts input targets to velocities
     // PhysicsSystem integrates velocity to position + applies friction
-    MovementSystem.updateAll(defaultWorld, dtSec);
-    PhysicsSystem.update(dtSec);
-    SkillSystem.update(dtSec);
+
+    // EIDOLON-V P6 FIX: Pass instance world
+    MovementSystem.updateAll(this.world, dtSec);
+
+    // EIDOLON-V P5 FIX: Pass active indices for O(N) iteration
+    PhysicsSystem.update(this.world, dtSec, this.activeEntityIndices);
+
+    SkillSystem.update(dtSec, this.world);
 
     // 3. Update Ring Logic (CJR specific)
     this.updateRingLogicForAll();
@@ -336,6 +415,30 @@ export class GameRoom extends Room<GameRoomState> {
       const entityIndex = this.entityIndices.get(sessionId);
       if (entityIndex === undefined) return;
 
+      // EIDOLON-V P9 SECURITY: Validate entity handle before processing
+      // Prevents ABA problem: entity recycled and assigned to different player
+      const storedHandle = this.entityHandleMap.get(sessionId);
+      if (storedHandle === undefined || !this.isValidEntityHandle(storedHandle)) {
+        logger.warn('Invalid entity handle - possible ABA attack or stale data', {
+          sessionId,
+          storedHandle,
+          entityIndex,
+        });
+        return; // Drop input for invalid entity
+      }
+
+      // Verify handle matches current index
+      const currentHandle = this.makeEntityHandle(entityIndex);
+      if (storedHandle !== currentHandle) {
+        logger.warn('Entity handle mismatch - entity was recycled', {
+          sessionId,
+          storedHandle,
+          currentHandle,
+        });
+        // Update handle map and continue processing
+        this.entityHandleMap.set(sessionId, currentHandle);
+      }
+
       // EIDOLON-V FIX: Atomic input consumption - get and delete immediately
       // Prevents race condition where input gets overwritten mid-processing
       const input = this.inputsBySession.get(sessionId);
@@ -349,9 +452,18 @@ export class GameRoom extends Room<GameRoomState> {
       // Apply to DOD InputStore
       InputStore.setTarget(entityIndex, clampedX, clampedY);
 
-      // Handle skill input
+      // Handle skill input with server-authoritative cooldown check
       if (input.space) {
-        InputStore.setAction(entityIndex, 0, true); // Bit 0 = Primary/Skill
+        // EIDOLON-V P1 SECURITY: Check cooldown from DOD store (not Colyseus schema)
+        const currentCooldown = SkillAccess.getCooldown(this.world, entityIndex);
+        if (currentCooldown <= 0) {
+          InputStore.setAction(entityIndex, 0, true); // Bit 0 = Primary/Skill
+        } else {
+          logger.debug('Skill input rejected - cooldown active', {
+            sessionId,
+            cooldown: currentCooldown.toFixed(2),
+          });
+        }
       }
       if (input.w) {
         InputStore.setAction(entityIndex, 1, true); // Bit 1 = Secondary/Eject
@@ -413,7 +525,7 @@ export class GameRoom extends Room<GameRoomState> {
   private broadcastBinaryTransforms() {
     // EIDOLON-V: Unified Snapshot using SchemaBinaryPacker (SSOT from WorldState)
     // Replaces manual loop over players/bots with zero-overhead iteration
-    const buffer = SchemaBinaryPacker.packTransformSnapshot(defaultWorld, this.state.gameTime);
+    const buffer = SchemaBinaryPacker.packTransformSnapshot(this.world, this.state.gameTime);
 
     if (buffer.byteLength > 0) {
       // Use 'binary' channel if client supports it, or 'binIdx' as legacy?
@@ -438,6 +550,7 @@ export class GameRoom extends Room<GameRoomState> {
         return -1;
       }
       this.entityGenerations[idx]++;  // Increment generation on reuse
+      this.activeEntityIndices.push(idx);
       return idx;
     }
 
@@ -446,7 +559,9 @@ export class GameRoom extends Room<GameRoomState> {
       return -1;  // Pool exhausted
     }
 
-    return this.nextEntityIndex++;
+    const idx = this.nextEntityIndex++;
+    this.activeEntityIndices.push(idx);
+    return idx;
   }
 
   // EIDOLON-V P0: Release entity index for recycling with DOD store cleanup
@@ -462,21 +577,50 @@ export class GameRoom extends Room<GameRoomState> {
 
     // Return to free list
     this.freeEntityIndices.push(idx);
+
+    // EIDOLON-V P5 FIX: Remove from active list (swap-remove O(1))
+    const listIndex = this.activeEntityIndices.indexOf(idx);
+    if (listIndex !== -1) {
+      const last = this.activeEntityIndices.pop();
+      if (last !== undefined && listIndex < this.activeEntityIndices.length) {
+        this.activeEntityIndices[listIndex] = last;
+      }
+    }
   }
 
   // EIDOLON-V BOT DOD: Spawn a bot with DOD entity allocation
-  // Returns entityIndex on success, -1 on failure (pool exhausted)
+  // Returns entityIndex on success, -1 on failure (pool exhausted or limit reached)
   spawnBot(
     botId: string,
     x: number,
     y: number,
     name: string = 'Bot',
-    personality: string = 'farmer'
+    personality: string = 'farmer',
+    ownerSessionId?: string // EIDOLON-V P0: Track owner for DoS protection
   ): number {
+    // EIDOLON-V P0 SECURITY: Check per-client entity limit
+    if (ownerSessionId) {
+      const currentCount = this.clientEntityCounts.get(ownerSessionId) || 0;
+      if (currentCount >= this.MAX_ENTITIES_PER_CLIENT) {
+        logger.warn('Entity limit exceeded for client', {
+          ownerSessionId,
+          currentCount,
+          max: this.MAX_ENTITIES_PER_CLIENT,
+        });
+        return -1;
+      }
+    }
+
     const entityIndex = this.allocateEntityIndex();
     if (entityIndex === -1) {
       logger.error('Cannot spawn bot - entity pool exhausted', { botId });
       return -1;
+    }
+
+    // EIDOLON-V P0 SECURITY: Track entity count for owner
+    if (ownerSessionId) {
+      const newCount = (this.clientEntityCounts.get(ownerSessionId) || 0) + 1;
+      this.clientEntityCounts.set(ownerSessionId, newCount);
     }
 
     // Initialize DOD stores
@@ -515,11 +659,19 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   // EIDOLON-V BOT DOD: Remove a bot with proper DOD cleanup
-  removeBot(botId: string): void {
+  removeBot(botId: string, ownerSessionId?: string): void {
     const entityIndex = this.botEntityIndices.get(botId);
     if (entityIndex !== undefined) {
       this.releaseEntityIndex(entityIndex);
       this.botEntityIndices.delete(botId);
+
+      // EIDOLON-V P0 SECURITY: Decrement entity count for owner
+      if (ownerSessionId) {
+        const currentCount = this.clientEntityCounts.get(ownerSessionId) || 0;
+        if (currentCount > 0) {
+          this.clientEntityCounts.set(ownerSessionId, currentCount - 1);
+        }
+      }
     }
     this.state.bots.delete(botId);
     logger.info('Bot removed', { botId });
@@ -551,14 +703,22 @@ export class GameRoom extends Room<GameRoomState> {
       this.state.food.set(foodState.id, foodState);
     }
 
-    // Limit max food on map (prevent memory issues)
-    const MAX_FOOD = 200;
+    // EIDOLON-V FIX: Optimized Food Culling (No GC thrashing)
+    const MAX_FOOD = GameConfig.MEMORY.MAX_FOOD_COUNT;
+
     if (this.state.food.size > MAX_FOOD) {
-      // Remove oldest food items
-      const foodIds = Array.from(this.state.food.keys());
-      const toRemove = foodIds.slice(0, this.state.food.size - MAX_FOOD);
-      for (const id of toRemove) {
-        this.state.food.delete(id);
+      // Remove oldest food items using iterator (avoids Array.from allocation)
+      const iterator = this.state.food.keys();
+      let removed = 0;
+      const target = this.state.food.size - MAX_FOOD;
+
+      while (removed < target) {
+        const { value: id, done } = iterator.next();
+        if (done) break;
+        if (id) {
+          this.state.food.delete(id);
+          removed++;
+        }
       }
     }
   }

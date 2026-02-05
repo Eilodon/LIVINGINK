@@ -14,7 +14,7 @@ import { StatusFlag } from '../game/engine/statusFlags';
 import { SchemaBinaryUnpacker } from '@cjr/engine/networking';
 import { MovementSystem } from '@cjr/engine/systems';
 import { PhysicsSystem } from '@cjr/engine/systems';
-import { TransformAccess, PhysicsAccess, defaultWorld } from '@cjr/engine';
+import { TransformAccess, PhysicsAccess, defaultWorld, GameConfig } from '@cjr/engine';
 import { InputRingBuffer } from './InputRingBuffer';
 import { clientLogger } from '../game/logging/ClientLogger';
 // EIDOLON-V: Dev tooling
@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: NetworkConfig = {
   reconnectAttempts: 5,
 };
 
-export type NetworkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting' | 'error';
+export type NetworkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting' | 'error' | 'offline_mode';
 
 // EIDOLON-V P1-3: Connection state machine for security
 export enum ConnectionState {
@@ -78,11 +78,14 @@ export class NetworkClient {
   private pendingInputs = new InputRingBuffer(256);
   private inputSeq: number = 0;
 
-  private reconcileThreshold = 20; // 20px allowance
+  private reconcileThreshold = GameConfig.NETWORK.RECONCILE_THRESHOLD;
   private statusListener?: (status: NetworkStatus) => void;
   private lastCredentials?: { name: string; shape: ShapeId };
   private isConnecting = false;
   private autoReconnect = true;
+  // EIDOLON-V P10: Offline mode fallback for graceful degradation
+  private offlineMode = false;
+  private offlineModeListener?: (enabled: boolean) => void;
   // EIDOLON-V P1-3: Connection security state
   private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
   private reconnectAttemptCount = 0;
@@ -95,7 +98,7 @@ export class NetworkClient {
   private snapshotBuffer: NetworkSnapshot[];
   private snapshotHead = 0; // Circular write index
   private snapshotCount = 0; // Number of valid snapshots (0 to SNAPSHOT_BUFFER_SIZE)
-  private interpolationDelayMs = 100;
+  private interpolationDelayMs = GameConfig.NETWORK.INTERPOLATION_DELAY_MS;
 
   constructor(config: Partial<NetworkConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -120,6 +123,22 @@ export class NetworkClient {
 
   enableAutoReconnect(enabled: boolean) {
     this.autoReconnect = enabled;
+  }
+
+  // EIDOLON-V P10: Enable offline mode for graceful degradation
+  enableOfflineMode(enabled: boolean) {
+    this.offlineMode = enabled;
+    if (this.offlineModeListener) {
+      this.offlineModeListener(enabled);
+    }
+  }
+
+  isOfflineMode(): boolean {
+    return this.offlineMode;
+  }
+
+  setOfflineModeListener(listener?: (enabled: boolean) => void) {
+    this.offlineModeListener = listener;
   }
 
   private emitStatus(status: NetworkStatus) {
@@ -169,6 +188,13 @@ export class NetworkClient {
     this.connectionState = ConnectionState.ERROR;
     this.emitStatus('error');
     this.isConnecting = false;
+
+    // EIDOLON-V FIX: Allow UI to detect permanent failure
+    // EIDOLON-V P10: Offer offline mode as graceful degradation
+    if (this.offlineMode) {
+      this.emitStatus('offline_mode');
+      clientLogger.info('Network failed - switching to offline mode');
+    }
     return false;
   }
 
@@ -251,10 +277,21 @@ export class NetworkClient {
       }
     });
 
-    this.room.onError(() => {
+    this.room.onError((err) => {
+      clientLogger.error('Room error', undefined, err instanceof Error ? err : new Error(String(err)));
       if (this.autoReconnect && this.lastCredentials) {
         this.emitStatus('reconnecting');
-        this.connectWithRetry(this.lastCredentials.name, this.lastCredentials.shape);
+        this.connectWithRetry(this.lastCredentials.name, this.lastCredentials.shape).then(success => {
+          // EIDOLON-V P10: If reconnection fails and offline mode enabled, switch to offline
+          if (!success && this.offlineMode) {
+            this.emitStatus('offline_mode');
+            clientLogger.info('Reconnection failed - switched to offline mode');
+          }
+        });
+      } else if (this.offlineMode) {
+        // EIDOLON-V P10: Graceful degradation - offer offline mode
+        this.emitStatus('offline_mode');
+        clientLogger.info('Connection error - switched to offline mode');
       } else {
         this.emitStatus('error');
       }

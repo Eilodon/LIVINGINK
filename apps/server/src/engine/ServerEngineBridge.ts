@@ -15,6 +15,7 @@ import {
     updateWinConditionLogic,
     checkRingTransition,
     triggerTattooOnUpdate,
+    WorldState, // EIDOLON-V P6 FIX: Import WorldState type
     type IWinEntity,
     type IWinState,
     type IBossEntity,
@@ -24,11 +25,8 @@ import {
     type IRingEntity,
     type ITattooEntity,
     type IEngineGameState,
-    TransformStore,
-    PhysicsStore,
-    StatsStore,
-    defaultWorld,
 } from '@cjr/engine';
+import { TransformAccess, PhysicsAccess, StatsAccess } from '@cjr/engine'; // EIDOLON-V P6 FIX: Use generated accessors
 import { logger } from '../logging/Logger';
 
 /**
@@ -70,8 +68,10 @@ export class ServerEngineBridge {
     private tickRate: number;
     private dt: number;
     private entities: Map<string, number> = new Map(); // sessionId -> dodIndex
+    private world: WorldState; // EIDOLON-V P6 FIX: Instance-based world
 
-    constructor(tickRate: number = 20) {
+    constructor(world: WorldState, tickRate: number = 20) {
+        this.world = world;
         this.tickRate = tickRate;
         this.dt = 1 / tickRate;
     }
@@ -111,13 +111,13 @@ export class ServerEngineBridge {
             const player = state.players.get(sessionId);
             if (!player) continue;
 
-            // Read from DOD stores
-            const x = TransformStore.getX(entityIndex);
-            const y = TransformStore.getY(entityIndex);
-            const vx = PhysicsStore.getVelocityX(entityIndex);
-            const vy = PhysicsStore.getVelocityY(entityIndex);
-            const radius = PhysicsStore.getRadius(entityIndex);
-            const health = StatsStore.getCurrentHealth(entityIndex);
+            // Read from DOD stores using instance world
+            const x = TransformAccess.getX(this.world, entityIndex);
+            const y = TransformAccess.getY(this.world, entityIndex);
+            const vx = PhysicsAccess.getVx(this.world, entityIndex);
+            const vy = PhysicsAccess.getVy(this.world, entityIndex);
+            const radius = PhysicsAccess.getRadius(this.world, entityIndex);
+            const health = StatsAccess.getHp(this.world, entityIndex);
 
             // Direct write to state (bypassing manual sync)
             player.setPosition(x, y);
@@ -151,23 +151,24 @@ export class ServerEngineBridge {
         const dt = this.dt;
 
         // 1. Physics (DOD)
-        PhysicsSystem.update(dt);
+        PhysicsSystem.update(this.world, dt);
 
         // 2. Movement (DOD)
         for (const player of players) {
             if (player.physicsIndex !== undefined) {
-                // EIDOLON-V: Pass defaultWorld and dt
-                MovementSystem.update(defaultWorld, player.physicsIndex, dt);
+                // EIDOLON-V P6 FIX: Pass instance world
+                MovementSystem.update(this.world, player.physicsIndex, dt);
             }
         }
         for (const bot of bots) {
             if (bot.physicsIndex !== undefined) {
-                MovementSystem.update(defaultWorld, bot.physicsIndex, dt);
+                // EIDOLON-V P6 FIX: Pass instance world
+                MovementSystem.update(this.world, bot.physicsIndex, dt);
             }
         }
 
         // 3. Skills (DOD)
-        SkillSystem.update(dt);
+        SkillSystem.update(dt, this.world);
 
         // 4. Ring Logic
         const allEntities = [...players, ...bots];
@@ -255,4 +256,5 @@ export class ServerEngineBridge {
 }
 
 // Export singleton for simple usage
-export const serverEngineBridge = new ServerEngineBridge();
+// EIDOLON-V P6 FIX: Deprecated - use constructor with WorldState instance
+export const serverEngineBridge = new ServerEngineBridge(new WorldState());

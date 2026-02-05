@@ -12,7 +12,7 @@ import { performanceMonitor } from '../../core/performance/PerformanceMonitor';
 
 // EIDOLON-V FIX: Dependency Injection
 import { BufferedInput } from '../input/BufferedInput';
-import { InputStore, TransformStore, PhysicsStore, resetAllStores } from '@cjr/engine';
+import { InputStore, TransformStore, PhysicsStore, resetAllStores, GameConfig } from '@cjr/engine';
 import {
   NetworkClient,
   networkClient as defaultNetworkClient,
@@ -103,127 +103,135 @@ export class GameStateManager {
 
   // EIDOLON-V FIX: The core game loop logic (The Heart Transplant)
   private gameLoopLogic(dt: number): void {
-    if (!this.currentState) return; // Should not happen if loop is running
-    if (this.currentState.isPaused) return;
+    try {
+      if (!this.currentState) return; // Should not happen if loop is running
+      if (this.currentState.isPaused) return;
 
-    const state = this.currentState;
-    const isMultiplayer = this.currentConfig?.useMultiplayer && this.networkClient.getRoomId();
+      const state = this.currentState;
+      const isMultiplayer = this.currentConfig?.useMultiplayer && this.networkClient.getRoomId();
 
-    if (isMultiplayer) {
-      // Multiplayer Logic
-      cjrClientRunner.setGameState(state);
-      cjrClientRunner.updateVisualsOnly(dt);
+      if (isMultiplayer) {
+        // Multiplayer Logic
+        cjrClientRunner.setGameState(state);
+        cjrClientRunner.updateVisualsOnly(dt);
 
-      // EIDOLON-V: Use BufferedInput for both SP and MP (unified API)
-      const events = this.bufferedInput.popEvents();
-      this.bufferedInput.updateTargetPosition(state.player.position, this.tempMoveTarget);
+        // EIDOLON-V: Use BufferedInput for both SP and MP (unified API)
+        const events = this.bufferedInput.popEvents();
+        this.bufferedInput.updateTargetPosition(state.player.position, this.tempMoveTarget);
 
-      const actions = this.bufferedInput.state.actions;
-      const networkInputs = {
-        space: actions.space,
-        w: actions.w,
-      };
+        const actions = this.bufferedInput.state.actions;
+        const networkInputs = {
+          space: actions.space,
+          w: actions.w,
+        };
 
-      this.networkClient.sendInput(this.tempMoveTarget, networkInputs, dt, events);
-    } else {
-      // Singleplayer Logic
-      // EIDOLON-V: Pull from InputManager and sync to DOD InputStore
-      // BƯỚC 1.3: KÍCH HOẠT "BUFFERED INPUT"
-      // Thay vì inputManager.updateTargetPosition(...), gọi bufferedInput.syncToStore(localPlayerIndex)
+        this.networkClient.sendInput(this.tempMoveTarget, networkInputs, dt, events);
+      } else {
+        // Singleplayer Logic
+        // EIDOLON-V: Pull from InputManager and sync to DOD InputStore
+        // BƯỚC 1.3: KÍCH HOẠT "BUFFERED INPUT"
+        // Thay vì inputManager.updateTargetPosition(...), gọi bufferedInput.syncToStore(localPlayerIndex)
 
-      // Get player position from DOD Store for input conversion
-      const pIdx = state.player.physicsIndex ?? 0;
-      const tIdx = pIdx * 8;
-      const playerWorldX = TransformStore.data[tIdx];
-      const playerWorldY = TransformStore.data[tIdx + 1];
+        // Get player position from DOD Store for input conversion
+        const pIdx = state.player.physicsIndex ?? 0;
+        const tIdx = pIdx * 8;
+        const playerWorldX = TransformStore.data[tIdx];
+        const playerWorldY = TransformStore.data[tIdx + 1];
 
-      // Sync Input directly to DOD Store (Player Index = 0) with world coordinate conversion
-      this.bufferedInput.syncToStore(
-        0,
-        { x: playerWorldX, y: playerWorldY },
-        { x: state.camera.x, y: state.camera.y }
-      );
+        // Sync Input directly to DOD Store (Player Index = 0) with world coordinate conversion
+        this.bufferedInput.syncToStore(
+          0,
+          { x: playerWorldX, y: playerWorldY },
+          { x: state.camera.x, y: state.camera.y }
+        );
 
-      // Update logic target position from Store for compatibility
-      // Using helper:
-      const inputTarget = { x: 0, y: 0 };
-      InputStore.getTarget(0, inputTarget);
+        // Update logic target position from Store for compatibility
+        // Using helper:
+        const inputTarget = { x: 0, y: 0 };
+        InputStore.getTarget(0, inputTarget);
 
-      // Apply to State for legacy compatibility (if needed)
-      // OptimizedEngine uses store directly, but state.targetPosition might be used by UI?
-      state.player.targetPosition.x = inputTarget.x;
-      state.player.targetPosition.y = inputTarget.y;
+        // Apply to State for legacy compatibility (if needed)
+        // OptimizedEngine uses store directly, but state.targetPosition might be used by UI?
+        state.player.targetPosition.x = inputTarget.x;
+        state.player.targetPosition.y = inputTarget.y;
 
-      // Note: Skill input is already in Store via syncToStore
-      // We don't need to manually check inputManager.state.actions.space anymore for engine logic
-      // But clearing it? InputStore.consumeSkillInput(0) will be called by Systems.
+        // Note: Skill input is already in Store via syncToStore
+        // We don't need to manually check inputManager.state.actions.space anymore for engine logic
+        // But clearing it? InputStore.consumeSkillInput(0) will be called by Systems.
 
-      // Legacy support: if something else checks inputManager, we might leave it or remove it.
-      // Instruction says: "Kết quả: Input đi thẳng từ Bàn phím/Chuột -> Ring Buffer -> InputStore (DOD). Không qua Object trung gian."
+        // Legacy support: if something else checks inputManager, we might leave it or remove it.
+        // Instruction says: "Kết quả: Input đi thẳng từ Bàn phím/Chuột -> Ring Buffer -> InputStore (DOD). Không qua Object trung gian."
 
-      // So we rely on Store.
+        // So we rely on Store.
 
-      // Core physics/logic update
-      cjrClientRunner.setGameState(state);
-      cjrClientRunner.update(dt);
+        // Core physics/logic update
+        cjrClientRunner.setGameState(state);
+        cjrClientRunner.update(dt);
 
-      // EIDOLON-V FIX: Sync player position from DOD Store back to object state after physics
+        // EIDOLON-V FIX: Sync player position from DOD Store back to object state after physics
+        if (state.player.physicsIndex !== undefined) {
+          const playerTIdx = state.player.physicsIndex * 8;
+          state.player.position.x = TransformStore.data[playerTIdx];
+          state.player.position.y = TransformStore.data[playerTIdx + 1];
+          state.player.velocity.x = PhysicsStore.data[playerTIdx];
+          state.player.velocity.y = PhysicsStore.data[playerTIdx + 1];
+        }
+
+        // EIDOLON-V FIX: Camera follows player with smooth interpolation
+        const CAMERA_LERP = GameConfig.CAMERA.LERP_FACTOR; // Smoothing factor (0 = no movement, 1 = instant snap)
+        const targetCamX = state.player.position.x;
+        const targetCamY = state.player.position.y;
+        state.camera.x += (targetCamX - state.camera.x) * CAMERA_LERP;
+        state.camera.y += (targetCamY - state.camera.y) * CAMERA_LERP;
+      }
+
+      // Audio Sync - EIDOLON-V: Read from DOD first
+      let listenerX = state.player.position.x;
+      let listenerY = state.player.position.y;
       if (state.player.physicsIndex !== undefined) {
-        const playerTIdx = state.player.physicsIndex * 8;
-        state.player.position.x = TransformStore.data[playerTIdx];
-        state.player.position.y = TransformStore.data[playerTIdx + 1];
-        state.player.velocity.x = PhysicsStore.data[playerTIdx];
-        state.player.velocity.y = PhysicsStore.data[playerTIdx + 1];
+        const tIdx = state.player.physicsIndex * 8;
+        listenerX = TransformStore.data[tIdx];
+        listenerY = TransformStore.data[tIdx + 1];
+      }
+      this.audioEngine.setListenerPosition(listenerX, listenerY);
+      this.audioEngine.setBGMIntensity(Math.floor(state.player.matchPercent * 4));
+
+      // EIDOLON-V FIX: Update VFX System (Particles, Shake, etc)
+      vfxIntegrationManager.update(state, dt);
+
+      // Check Win/Loss
+      if (state.result) {
+        if (state.result === 'win') {
+          // EIDOLON-V FIX: Specialized event for progression
+          this.emitEvent({ type: 'LEVEL_UNLOCKED', level: state.level + 1 });
+        }
+        this.stopGameLoop();
+        this.emitEvent({ type: 'GAME_OVER', result: state.result });
       }
 
-      // EIDOLON-V FIX: Camera follows player with smooth interpolation
-      const CAMERA_LERP = 0.1; // Smoothing factor (0 = no movement, 1 = instant snap)
-      const targetCamX = state.player.position.x;
-      const targetCamY = state.player.position.y;
-      state.camera.x += (targetCamX - state.camera.x) * CAMERA_LERP;
-      state.camera.y += (targetCamY - state.camera.y) * CAMERA_LERP;
-    }
-
-    // Audio Sync - EIDOLON-V: Read from DOD first
-    let listenerX = state.player.position.x;
-    let listenerY = state.player.position.y;
-    if (state.player.physicsIndex !== undefined) {
-      const tIdx = state.player.physicsIndex * 8;
-      listenerX = TransformStore.data[tIdx];
-      listenerY = TransformStore.data[tIdx + 1];
-    }
-    this.audioEngine.setListenerPosition(listenerX, listenerY);
-    this.audioEngine.setBGMIntensity(Math.floor(state.player.matchPercent * 4));
-
-    // EIDOLON-V FIX: Update VFX System (Particles, Shake, etc)
-    vfxIntegrationManager.update(state, dt);
-
-    // Check Win/Loss
-    if (state.result) {
-      if (state.result === 'win') {
-        // EIDOLON-V FIX: Specialized event for progression
-        this.emitEvent({ type: 'LEVEL_UNLOCKED', level: state.level + 1 });
+      // Check Tattoos
+      // Note: We need to know if UI is already showing tattoo pick.
+      // The Manager shouldn't know UI state.
+      // However, the event is 'TATTOO_REQUEST'. UI can decide to ignore if already showing.
+      if (state.tattooChoices) {
+        // Simple debounce/check could be done here if we tracked last event time,
+        // but for now just emit and let UI handle idempotency or we clear it in state?
+        // optimizedEngine typically clears tattooChoices after selection?
+        // Actually, tattooChoices persists until picked.
+        // We should emit only if we haven't recently? or just emit.
+        // The UI checks: !ui.overlays.some(o => o.type === 'tattooPick')
+        this.emitEvent({ type: 'TATTOO_REQUEST' });
       }
+
+      // Notify state subscribers (e.g. for debug UI or minimally reactive UI)
+      this.notifySubscribers();
+
+    } catch (error) {
+      clientLogger.error('CRITICAL: Game Loop Crash', undefined, error instanceof Error ? error : undefined);
+      // Attempt recovery? For now, just stop to prevent log spam
       this.stopGameLoop();
-      this.emitEvent({ type: 'GAME_OVER', result: state.result });
+      this.emitEvent({ type: 'GAME_OVER', result: 'lose' }); // Fail safe to UI
     }
-
-    // Check Tattoos
-    // Note: We need to know if UI is already showing tattoo pick.
-    // The Manager shouldn't know UI state.
-    // However, the event is 'TATTOO_REQUEST'. UI can decide to ignore if already showing.
-    if (state.tattooChoices) {
-      // Simple debounce/check could be done here if we tracked last event time,
-      // but for now just emit and let UI handle idempotency or we clear it in state?
-      // optimizedEngine typically clears tattooChoices after selection?
-      // Actually, tattooChoices persists until picked.
-      // We should emit only if we haven't recently? or just emit.
-      // The UI checks: !ui.overlays.some(o => o.type === 'tattooPick')
-      this.emitEvent({ type: 'TATTOO_REQUEST' });
-    }
-
-    // Notify state subscribers (e.g. for debug UI or minimally reactive UI)
-    this.notifySubscribers();
   }
 
   // EIDOLON-V FIX: Public update method that users might call manually (debugging) or legacy
@@ -334,6 +342,12 @@ export class GameStateManager {
   // EIDOLON-V FIX: Centralized cleanup
   public dispose(): void {
     this.stopGameLoop(); // EIDOLON-V FIX: Stop loop before cleanup
+
+    // EIDOLON-V FIX: Audio Cleanup
+    this.audioEngine.stopBGM();
+    // We don't fully dispose AudioEngine here as it's a singleton (might be reused),
+    // but we MUST stop current sounds.
+    // If we wanted full teardown: this.audioEngine.dispose();
 
     // EIDOLON-V: Clear spatial grid to prevent memory leak
     try {

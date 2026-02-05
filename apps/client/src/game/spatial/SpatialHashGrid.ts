@@ -7,9 +7,17 @@ import { TransformStore, PhysicsStore, EntityLookup } from '@cjr/engine';
 
 // EIDOLON-V P0 FIX: __DEV__ guard for hot path warnings
 declare const __DEV__: boolean;
+// EIDOLON-V FIX: Proper warn-once implementation
+const warnedMessages = new Set<string>();
 const warnOnce = (msg: string, data?: unknown) => {
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    warnOnce(msg, data);
+    if (warnedMessages.has(msg)) return;
+    warnedMessages.add(msg);
+    if (data) {
+      console.warn(msg, data);
+    } else {
+      console.warn(msg);
+    }
   }
 };
 

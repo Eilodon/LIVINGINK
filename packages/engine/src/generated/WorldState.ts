@@ -124,3 +124,9 @@ export const STRIDES = {
  * @deprecated Prefer injecting WorldState instances for new code.
  */
 export const defaultWorld = new WorldState();
+
+// EIDOLON-V P6: Runtime deprecation warning
+declare const __DEV__: boolean | undefined;
+if (typeof console !== 'undefined' && typeof __DEV__ !== 'undefined' && __DEV__) {
+  console.warn('[EIDOLON-V] defaultWorld singleton is deprecated. Use new WorldState() for instance-based architecture.');
+}

@@ -13,6 +13,8 @@ import { EntityFlags, TransformAccess, PhysicsAccess } from '../generated/Compon
 export const PHY_MAP_RADIUS = 2500;
 export const FRICTION_BASE = 0.92;
 
+import { GameConfig } from '../config/GameConfig';
+
 // EIDOLON-V Phase 3: Anti-cheat speed limits
 const MAX_SPEED_BASE = 150;
 const SPEED_VALIDATION_TOLERANCE = 1.15;
@@ -21,7 +23,11 @@ export class PhysicsSystem {
     /**
      * Update physics for all active entities
      */
-    static update(worldOrDt: WorldState | number, dt?: number): void {
+    /**
+     * Update physics for all active entities
+     * Uses active list for zero-overhead skipping of empty slots
+     */
+    static update(worldOrDt: WorldState | number, dt?: number, activeIndices?: number[]): void {
         let world: WorldState;
         let deltaTime: number;
 
@@ -33,38 +39,57 @@ export class PhysicsSystem {
             deltaTime = dt!;
         }
 
-        const count = world.maxEntities;
-
         // Time scaling
         const timeScale = deltaTime * 60;
         const useFastFriction = Math.abs(timeScale - 1.0) < 0.01;
         const defaultFrictionUnstable = Math.pow(FRICTION_BASE, timeScale);
 
-        // Iterate entities
-        // Optimization: In a real ECS query, we'd have a list of active entities.
-        // Here we scan. Accessors are inlineable.
-        for (let id = 0; id < count; id++) {
-            // Check ACTIVE flag directly via Accessor
-            // Note: StateAccess.isActive is slightly slower than direct array access but safer.
-            // For tight loop, we can access stateFlags directly if we really want, but let's stick to Accessors first.
-            // Actually, StateAccess uses world.stateFlags directly.
-            if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
+        // ITERATION STRATEGY:
+        // 1. If activeIndices provided: Iterate ONLY active entities (O(Active)) - FASTEST
+        // 2. Fallback: Iterate 0..maxEntities (O(Max))
 
-            const frictionBase = PhysicsAccess.getFriction(world, id);
+        if (activeIndices) {
+            const count = activeIndices.length;
+            for (let i = 0; i < count; i++) {
+                const id = activeIndices[i];
+                // Double check active flag just in case (fast bitwise)
+                // if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
 
-            let effectiveFriction: number;
-            if (useFastFriction) {
-                effectiveFriction = frictionBase;
-            } else {
-                if (Math.abs(frictionBase - FRICTION_BASE) < 0.0001) {
-                    effectiveFriction = defaultFrictionUnstable;
-                } else {
-                    effectiveFriction = Math.pow(frictionBase, timeScale);
-                }
+                PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
             }
+        } else {
+            const count = world.maxEntities;
+            for (let id = 0; id < count; id++) {
+                if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
 
-            this.integrateEntity(world, id, deltaTime, effectiveFriction);
+                PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
+            }
         }
+    }
+
+    // Extracted for JIT inlining
+    private static processEntity(
+        world: WorldState,
+        id: number,
+        deltaTime: number,
+        useFastFriction: boolean,
+        defaultFrictionUnstable: number,
+        timeScale: number
+    ) {
+        const frictionBase = PhysicsAccess.getFriction(world, id);
+
+        let effectiveFriction: number;
+        if (useFastFriction) {
+            effectiveFriction = frictionBase;
+        } else {
+            if (Math.abs(frictionBase - FRICTION_BASE) < 0.0001) {
+                effectiveFriction = defaultFrictionUnstable;
+            } else {
+                effectiveFriction = Math.pow(frictionBase, timeScale);
+            }
+        }
+
+        this.integrateEntity(world, id, deltaTime, effectiveFriction);
     }
 
     static integrateEntity(
@@ -105,8 +130,7 @@ export class PhysicsSystem {
         TransformAccess.setPrevY(world, id, currY);
 
         // 4. Integrate Position
-        const PHYSICS_TIME_SCALE = 10;
-        const delta = dt * PHYSICS_TIME_SCALE;
+        const delta = dt * GameConfig.PHYSICS.TIME_SCALE;
 
         let newX = currX + vx * delta;
         let newY = currY + vy * delta;
@@ -141,7 +165,7 @@ export class PhysicsSystem {
         const speedSq = vx * vx + vy * vy;
         const maxSpeed = MAX_SPEED_BASE * SPEED_VALIDATION_TOLERANCE;
         const maxSpeedSq = maxSpeed * maxSpeed;
-        
+
         if (speedSq > maxSpeedSq) {
             const speed = Math.sqrt(speedSq);
             const scale = maxSpeed / speed;

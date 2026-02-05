@@ -5,3 +5,4 @@
 
 export * from './constants';
 export { LEVELS, getLevelConfig, updateLevelConfig, type LevelConfig } from './levels';
+export * from './GameConfig';

@@ -5,6 +5,7 @@
 
 import { PlayerState, BotState, FoodState, ProjectileState } from '../schema/GameState';
 import { WORLD_WIDTH, WORLD_HEIGHT, MAP_RADIUS } from '../constants';
+import { GameConfig } from '@cjr/engine';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -32,8 +33,8 @@ export class ServerValidator {
   private static readonly TELEPORT_THRESHOLD = 200; // max distance per update
   private static readonly POSITION_HISTORY_SIZE = 10;
 
-  private positionHistory: Map<string, { x: number; y: number; timestamp: number }[]> = new Map();
-  private lastUpdateTime: Map<string, number> = new Map();
+  private static positionHistory: Map<string, { x: number; y: number; timestamp: number }[]> = new Map();
+  private static lastUpdateTime: Map<string, number> = new Map();
 
   // IMPERATOR Phase 1: O(1) rate limiting with counter window
   // EIDOLON-V OPTIMIZATION: Nested Map eliminates string concatenation garbage
@@ -117,11 +118,22 @@ export class ServerValidator {
     playerState: PlayerState
   ): ValidationResult {
     // Validate sequence number to prevent replay attacks
-    if (lastInput && input.seq <= lastInput.seq) {
-      return {
-        isValid: false,
-        reason: 'Invalid sequence number - possible replay attack',
-      };
+    if (lastInput) {
+      if (input.seq <= lastInput.seq) {
+        return {
+          isValid: false,
+          reason: 'Invalid sequence number - possible replay attack',
+        };
+      }
+
+      // EIDOLON-V FIX: Anti-Speedhack / Lag Switch Check from GameConfig
+      const jump = input.seq - lastInput.seq;
+      if (jump > GameConfig.NETWORK.MAX_SEQUENCE_JUMP) {
+        return {
+          isValid: false,
+          reason: `Sequence jump too large (${jump}) - possible speedhack`,
+        };
+      }
     }
 
     // Validate target position
@@ -297,7 +309,7 @@ export class ServerValidator {
     maxActionsPerSecond: number = 10
   ): ValidationResult {
     const now = Date.now();
-    
+
     // O(1): Get or create action map for this session (no string concat!)
     let actionMap = this.rateTrackers.get(sessionId);
     if (!actionMap) {
@@ -306,7 +318,7 @@ export class ServerValidator {
     }
 
     let tracker = actionMap.get(actionType);
-    
+
     // O(1): Reset counter if window expired
     if (!tracker || now > tracker.resetAt) {
       tracker = { count: 0, resetAt: now + 1000 };
@@ -374,6 +386,16 @@ export class ServerValidator {
       // Remove empty session maps to prevent memory leak
       if (actionMap.size === 0) {
         this.rateTrackers.delete(sessionId);
+      }
+    }
+
+    // EIDOLON-V FIX: Also clean position history
+    for (const [sessionId, history] of this.positionHistory) {
+      // If history is old (user likely left), remove it
+      const lastUpdate = this.lastUpdateTime.get(sessionId);
+      if (!lastUpdate || lastUpdate < oneMinuteAgo) {
+        this.positionHistory.delete(sessionId);
+        this.lastUpdateTime.delete(sessionId);
       }
     }
   }

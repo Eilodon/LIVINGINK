@@ -24,6 +24,10 @@ export class Engine {
     private static readonly FIXED_DT = 1 / 60;  // 60 Hz physics
     private static readonly MAX_ACCUMULATOR = 0.25;  // Spiral of death prevention
 
+    private accumulator: number = 0;
+    private time: number = 0;
+    private _interpolationAlpha: number = 0;
+
     private tickRate: number;
     constructor(config: IEngineConfig = { tickRate: 60 }) {
         this.tickRate = config.tickRate;
