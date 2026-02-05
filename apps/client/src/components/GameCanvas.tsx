@@ -1,14 +1,13 @@
 import React, { useRef, useEffect } from 'react';
-import { GameState, Entity, Player } from '../types';
-import { MAP_RADIUS, CENTER_RADIUS, WORLD_WIDTH, WORLD_HEIGHT } from '../constants';
-import { COLOR_PALETTE_HEX as COLOR_PALETTE, RING_RADII } from '../constants';
-import type { PigmentVec3 } from '../game/cjr/cjrTypes';
+import { GameState } from '../types';
+import { MAP_RADIUS, WORLD_WIDTH, WORLD_HEIGHT } from '../constants';
+import { COLOR_PALETTE_HEX as COLOR_PALETTE } from '../constants';
 import { intToHex } from '../game/cjr/colorMath'; // EIDOLON-V: Import color helper
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 import { Canvas2DRingRenderer } from '../game/renderer/RingRenderer';
 // EIDOLON-V FIX: Use index-based API (faster, no Map lookup)
-import { getInterpolatedPositionByIndex, type RenderPoint } from '../game/engine/RenderBridge';
+import { getInterpolatedPositionByIndex } from '../game/engine/RenderBridge';
 // EIDOLON-V FIX #4: Direct DOD rendering without JS object intermediaries
 import { renderEntitiesFromDOD, cullEntities } from '../game/engine/DODEntityRenderer';
 // IMPERATOR Phase 4: Standalone ParticleSystem (decoupled from React state)

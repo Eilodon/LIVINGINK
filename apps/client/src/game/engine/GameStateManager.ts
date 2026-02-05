@@ -1,11 +1,10 @@
 // EIDOLON-V FIX: Unified Game State Manager
 // Refactored: Split GOD Object into dedicated systems (Input, Audio, Session)
 
-import { GameState, Player, Bot, Food, Entity } from '../../types';
+import { GameState, Player, Bot, Food } from '../../types';
 import { createInitialState } from './index';
 import { FixedGameLoop } from './GameLoop';
 import { cjrClientRunner } from './runner/CJRClientRunner';
-import { pooledEntityFactory } from '../pooling/ObjectPool';
 import { mathPerformanceMonitor } from '../math/FastMath';
 import { performanceMonitor } from '../../core/performance/PerformanceMonitor';
 
@@ -25,8 +24,8 @@ import { clientLogger } from '../../core/logging/ClientLogger';
 import { inputSystem, InputSystem } from './systems/InputSystem';
 import { AudioSyncSystem } from './systems/AudioSyncSystem';
 import { SessionManager } from './systems/SessionManager';
-import { PhysicsCoordinator, physicsCoordinator } from './systems/PhysicsCoordinator';
-import { NetworkSync, networkSync } from './systems/NetworkSync';
+import { physicsCoordinator } from './systems/PhysicsCoordinator';
+import { networkSync } from './systems/NetworkSync';
 
 export type GameEvent =
   | { type: 'GAME_OVER'; result: 'win' | 'lose' }
