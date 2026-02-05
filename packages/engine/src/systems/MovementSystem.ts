@@ -5,8 +5,8 @@
 
 import { PhysicsStore, TransformStore, InputStore, ConfigStore, StateStore } from '../dod/ComponentStores';
 import { MAX_ENTITIES, EntityFlags } from '../dod/EntityFlags';
-
-export const MAX_SPEED_BASE = 150;
+// EIDOLON-V FIX: Import from unified config SSOT
+import { MAX_SPEED_BASE } from '../config/constants';
 
 export class MovementSystem {
     // EIDOLON-V DEBUG: Frame counter (REMOVE AFTER DEBUG)

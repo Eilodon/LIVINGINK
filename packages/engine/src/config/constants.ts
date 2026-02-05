@@ -27,7 +27,9 @@ export const FOOD_RADIUS = 7;
 export const TURN_SPEED_BASE = 0.25;
 export const ACCELERATION_BASE = 1.0;
 export const FRICTION_BASE = 0.93;
-export const MAX_SPEED_BASE = 2.3;
+// EIDOLON-V FIX: Unified MAX_SPEED_BASE = 150 (was 2.3 legacy)
+// This matches MovementSystem and GameRoom server validation
+export const MAX_SPEED_BASE = 150;
 
 export const PHYSICS = {
     // Integration

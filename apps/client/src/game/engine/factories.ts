@@ -6,9 +6,10 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   ACCELERATION_BASE,
-  MAX_SPEED_BASE,
   FRICTION_BASE,
 } from '../../constants';
+// EIDOLON-V FIX: Import MAX_SPEED_BASE from engine SSOT
+import { MAX_SPEED_BASE } from '@cjr/engine';
 import { Entity, Food, Particle, Player, Bot, Projectile, SizeTier, Vector2 } from '../../types';
 import { getCurrentEngine } from './context';
 import { randomRange, randomPos, randomPosInCenter, randomPosInRing } from '../math/FastMath';

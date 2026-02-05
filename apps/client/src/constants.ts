@@ -22,7 +22,9 @@ export const GROWTH_DECAY_END = 155;
 export const TURN_SPEED_BASE = 0.25;
 export const ACCELERATION_BASE = 1.0;
 export const FRICTION_BASE = 0.93;
-export const MAX_SPEED_BASE = 2.3; // EIDOLON-V FIX: Reduced to 1/3 as requested
+// EIDOLON-V FIX: Unified with @cjr/engine SSOT (was 2.3 legacy)
+// Use @cjr/engine's MAX_SPEED_BASE instead of this local copy
+export const MAX_SPEED_BASE = 150;
 
 export const FOOD_COUNT = 260;
 export const BOT_COUNT = 28;

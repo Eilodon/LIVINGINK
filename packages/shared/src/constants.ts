@@ -28,10 +28,10 @@ export const TURN_SPEED_BASE = 0.25;
 export const ACCELERATION_BASE = 1.0;
 export const FRICTION_BASE = 0.93;
 
-// EIDOLON-V MONOREPO FIX: Merged from server/src/constants.ts (newer edit)
-// Server uses 6.8, client used 2.3 (reduced to 1/3)
-// Keeping server value for authoritative gameplay
-export const MAX_SPEED_BASE = 6.8;
+// EIDOLON-V FIX: Unified MAX_SPEED_BASE = 150
+// This matches @cjr/engine MovementSystem and GameRoom server validation
+// Previous values (6.8, 2.3) were legacy visual scaling values
+export const MAX_SPEED_BASE = 150;
 
 export const FOOD_COUNT = 260;
 export const BOT_COUNT = 28;
