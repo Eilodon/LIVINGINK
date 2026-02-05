@@ -202,6 +202,9 @@ export const createPlayer = (
   // Register in Global Lookup
   EntityLookup[entId] = player;
 
+  // EIDOLON-V FIX: Zero-Copy Live View (SSOT)
+  bindToLiveView(player, entId);
+
   return player;
 };
 
@@ -342,6 +345,9 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
   bot.statusTimers.invulnerable = 3;
   EntityLookup[entId] = bot;
 
+  // EIDOLON-V FIX: Zero-Copy Live View (SSOT)
+  bindToLiveView(bot, entId);
+
   return bot;
 };
 
@@ -460,6 +466,9 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food | nu
 
   EntityLookup[entId] = food;
 
+  // EIDOLON-V FIX: Zero-Copy Live View (SSOT)
+  bindToLiveView(food, entId);
+
   return food;
 };
 
@@ -545,5 +554,38 @@ export const createProjectile = (
 
   ProjectileStore.set(entId, oIdx, damage, duration, 0);
 
+  // EIDOLON-V FIX: Zero-Copy Live View (SSOT)
+  bindToLiveView(projectile, entId);
+
   return projectile;
+};
+
+// EIDOLON-V FIX: Zero-Copy Helper
+// Binds object properties directly to DOD Stores via Getters/Setters
+const bindToLiveView = (entity: any, entId: number) => {
+  const pBase = entId * TransformStore.STRIDE;
+  const vBase = entId * PhysicsStore.STRIDE;
+
+  Object.defineProperties(entity, {
+    position: {
+      get: () => ({
+        get x() { return TransformStore.data[pBase]; },
+        get y() { return TransformStore.data[pBase + 1]; },
+        set x(v) { TransformStore.data[pBase] = v; },
+        set y(v) { TransformStore.data[pBase + 1] = v; }
+      }),
+      configurable: true,
+      enumerable: true
+    },
+    velocity: {
+      get: () => ({
+        get x() { return PhysicsStore.data[vBase]; },
+        get y() { return PhysicsStore.data[vBase + 1]; },
+        set x(v) { PhysicsStore.data[vBase] = v; },
+        set y(v) { PhysicsStore.data[vBase + 1] = v; }
+      }),
+      configurable: true,
+      enumerable: true
+    }
+  });
 };

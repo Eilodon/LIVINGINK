@@ -111,12 +111,8 @@ export class RateLimiter {
         { identifier },
         error as Error
       );
-      // Fail open - allow request if Redis fails (graceful degradation)
-      return {
-        allowed: true,
-        remaining: this.config.maxRequests,
-        resetTime: now + this.config.windowMs,
-      };
+      // EIDOLON-V FIX: Fail Safe - Fallback to in-memory limiting instead of fail-open
+      return this.checkLimitMemory(identifier);
     }
   }
 

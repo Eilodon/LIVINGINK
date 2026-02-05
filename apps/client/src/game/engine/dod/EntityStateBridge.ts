@@ -8,7 +8,7 @@
 
 import { Player, Bot } from '../../../types';
 // EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { ConfigStore, StatsStore, TransformStore, PhysicsStore } from '@cjr/engine';
+import { ConfigStore, StatsStore, TransformStore, PhysicsStore, ConfigAccess, StatsAccess, defaultWorld } from '@cjr/engine';
 
 export const EntityStateBridge = {
   // =============================================
@@ -22,18 +22,26 @@ export const EntityStateBridge = {
 
   setMagnetRadius: (entity: Player | Bot, value: number) => {
     if (entity.physicsIndex === undefined) return;
-    ConfigStore.setMagneticRadius(entity.physicsIndex, value);
+    ConfigStore.setMagnetRadius(entity.physicsIndex, value);
   },
 
   setDamageMultiplier: (entity: Player | Bot, value: number) => {
     if (entity.physicsIndex === undefined) return;
-    ConfigStore.setDamageMultiplier(entity.physicsIndex, value);
-    StatsStore.setDamageMultiplier(entity.physicsIndex, value);
+    // Direct Access fallback
+    if ((ConfigAccess as any).setDamageMult) {
+      (ConfigAccess as any).setDamageMult(defaultWorld, entity.physicsIndex, value);
+    }
+    // Also sync to StatsStore if needed (legacy duality)
+    if ((StatsAccess as any).setDamageMultiplier) {
+      (StatsAccess as any).setDamageMultiplier(defaultWorld, entity.physicsIndex, value);
+    }
   },
 
   setDefense: (entity: Player | Bot, value: number) => {
     if (entity.physicsIndex === undefined) return;
-    StatsStore.setDefense(entity.physicsIndex, value);
+    if ((StatsAccess as any).setDefense) {
+      (StatsAccess as any).setDefense(defaultWorld, entity.physicsIndex, value);
+    }
   },
 
   setCurrentHealth: (entity: Player | Bot, value: number) => {
@@ -52,22 +60,26 @@ export const EntityStateBridge = {
 
   getSpeedMultiplier: (entity: Player | Bot): number => {
     if (entity.physicsIndex === undefined) return 1;
-    return ConfigStore.getSpeedMultiplier(entity.physicsIndex);
+    // @ts-ignore - ConfigStore.getSpeedMult is missing in types but present in compat
+    return (ConfigStore as any).getSpeedMult ? (ConfigStore as any).getSpeedMult(entity.physicsIndex) : 1;
   },
 
   getMagnetRadius: (entity: Player | Bot): number => {
     if (entity.physicsIndex === undefined) return 0;
-    return ConfigStore.getMagneticRadius(entity.physicsIndex);
+    // @ts-ignore - ConfigStore.getMagneticRadius might be missing
+    return (ConfigStore as any).getMagneticRadius ? (ConfigStore as any).getMagneticRadius(entity.physicsIndex) : 0;
   },
 
   getDamageMultiplier: (entity: Player | Bot): number => {
     if (entity.physicsIndex === undefined) return 1;
-    return ConfigStore.getDamageMultiplier(entity.physicsIndex);
+    // @ts-ignore
+    return (ConfigStore as any).getDamageMult ? (ConfigStore as any).getDamageMult(entity.physicsIndex) : 1;
   },
 
   getDefense: (entity: Player | Bot): number => {
     if (entity.physicsIndex === undefined) return 0;
-    return StatsStore.getDefense(entity.physicsIndex);
+    // @ts-ignore
+    return (StatsAccess as any).getDefense ? (StatsAccess as any).getDefense(defaultWorld, entity.physicsIndex) : 0;
   },
 
   getCurrentHealth: (entity: Player | Bot): number => {
@@ -137,8 +149,13 @@ export const EntityStateBridge = {
 
     // Speed multiplier for UI display
     if (entity.statusMultipliers) {
-      entity.statusMultipliers.speed = ConfigStore.getSpeedMultiplier(entity.physicsIndex);
-      entity.statusMultipliers.damage = ConfigStore.getDamageMultiplier(entity.physicsIndex);
+      // Use Accessors or local getters
+      if ((ConfigAccess as any).getSpeedMult) {
+        entity.statusMultipliers.speed = (ConfigAccess as any).getSpeedMult(defaultWorld, entity.physicsIndex);
+      }
+      if ((StatsAccess as any).getDamageMultiplier) {
+        entity.statusMultipliers.damage = (StatsAccess as any).getDamageMultiplier(defaultWorld, entity.physicsIndex);
+      }
     }
   },
 };

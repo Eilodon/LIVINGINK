@@ -119,7 +119,21 @@ export class ServerValidator {
   ): ValidationResult {
     // Validate sequence number to prevent replay attacks
     if (lastInput) {
-      if (input.seq <= lastInput.seq) {
+      const MAX_SEQ = 65535; // Assuming Uint16 wrapping
+      const diff = input.seq - lastInput.seq;
+      // Handle wrap-around: e.g. 0 - 65535 = -65535 -> become positive equivalent
+      // Or simply: check if it's a "forward" move in the ring buffer
+
+      // EIDOLON-V FIX: Robust wrap-around handling
+      // If diff is negative but large (e.g. < -60000), it's likely a wrap-around (valid)
+      // If diff is small negative, it's a replay/out-of-order (invalid)
+
+      let adjustedJump = diff;
+      if (diff < -MAX_SEQ / 2) {
+        adjustedJump = diff + (MAX_SEQ + 1);
+      }
+
+      if (adjustedJump <= 0) {
         return {
           isValid: false,
           reason: 'Invalid sequence number - possible replay attack',
@@ -127,11 +141,10 @@ export class ServerValidator {
       }
 
       // EIDOLON-V FIX: Anti-Speedhack / Lag Switch Check from GameConfig
-      const jump = input.seq - lastInput.seq;
-      if (jump > GameConfig.NETWORK.MAX_SEQUENCE_JUMP) {
+      if (adjustedJump > GameConfig.NETWORK.MAX_SEQUENCE_JUMP) {
         return {
           isValid: false,
-          reason: `Sequence jump too large (${jump}) - possible speedhack`,
+          reason: `Sequence jump too large (${adjustedJump}) - possible speedhack`,
         };
       }
     }

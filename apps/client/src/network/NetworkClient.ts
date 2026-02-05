@@ -277,8 +277,9 @@ export class NetworkClient {
       }
     });
 
-    this.room.onError((err) => {
-      clientLogger.error('Room error', undefined, err instanceof Error ? err : new Error(String(err)));
+    this.room.onError((err: any) => {
+      const errorObj = err instanceof Error ? err : new Error(String(err));
+      clientLogger.error('Room error', undefined, errorObj);
       if (this.autoReconnect && this.lastCredentials) {
         this.emitStatus('reconnecting');
         this.connectWithRetry(this.lastCredentials.name, this.lastCredentials.shape).then(success => {

@@ -82,7 +82,7 @@ export class GameRoom extends Room<GameRoomState> {
   // EIDOLON-V P0 SECURITY: Entity pool DoS protection
   private readonly MAX_ENTITIES_PER_CLIENT = 5; // Max bots/entities per client
   private clientEntityCounts: Map<string, number> = new Map();
-  
+
   // EIDOLON-V: WebSocket Rate Limiting
   private clientRates: Map<string, { count: number; resetTime: number }> = new Map();
   private readonly RATE_LIMIT_WINDOW = 1000;
@@ -130,10 +130,19 @@ export class GameRoom extends Room<GameRoomState> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async onAuth(client: Client, options: unknown, request?: any): Promise<boolean> {
     // EIDOLON-V P12 SECURITY: Room creation rate limiting to prevent DoS
-    const clientIp = request?.headers?.['x-forwarded-for'] ||
-                     request?.headers?.['x-real-ip'] ||
-                     request?.socket?.remoteAddress ||
-                     'unknown';
+    // EIDOLON-V FIX: IP Spoofing protection - Prefer remoteAddress unless TRUST_PROXY is set
+    let clientIp = 'unknown';
+
+    if (process.env.TRUST_PROXY === 'true') {
+      // Trust headers only if explicitly configured
+      clientIp = (request?.headers?.['x-forwarded-for'] as string) ||
+        (request?.headers?.['x-real-ip'] as string) ||
+        request?.socket?.remoteAddress ||
+        'unknown';
+    } else {
+      // Direct connection (no proxy trusted)
+      clientIp = request?.socket?.remoteAddress || 'unknown';
+    }
 
     const now = Date.now();
     const rateKey = `room_create:${clientIp}`;
@@ -437,6 +446,7 @@ export class GameRoom extends Room<GameRoomState> {
         });
         // Update handle map and continue processing
         this.entityHandleMap.set(sessionId, currentHandle);
+        return; // EIDOLON-V FIX: Stop processing input for mismatched entity!
       }
 
       // EIDOLON-V FIX: Atomic input consumption - get and delete immediately
@@ -444,6 +454,10 @@ export class GameRoom extends Room<GameRoomState> {
       const input = this.inputsBySession.get(sessionId);
       if (!input) return;
       this.inputsBySession.delete(sessionId); // Consume immediately
+
+      // EIDOLON-V FIX: Sequence number overflow protection
+      // Normalize seq to prevent overflow after ~100 hours of continuous play
+      const normalizedSeq = input.seq % 0x7FFFFFFF;
 
       // Validate and clamp target position (anti-cheat)
       const clampedX = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, input.targetX));
@@ -469,8 +483,8 @@ export class GameRoom extends Room<GameRoomState> {
         InputStore.setAction(entityIndex, 1, true); // Bit 1 = Secondary/Eject
       }
 
-      // Mark input as processed
-      player.lastProcessedInput = input.seq;
+      // Mark input as processed using normalized sequence
+      player.lastProcessedInput = normalizedSeq;
     });
   }
 
