@@ -1,0 +1,31 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/server/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "npm run prod",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production",
+        "PORT": "2567",
+        "CORS_ORIGIN": "https://your-vercel-app.vercel.app",
+        "POSTGRES_HOST": "${{Postgres.PGHOST}}",
+        "POSTGRES_PORT": "${{Postgres.PGPORT}}",
+        "POSTGRES_DB": "${{Postgres.PGDATABASE}}",
+        "POSTGRES_USER": "${{Postgres.PGUSER}}",
+        "POSTGRES_PASSWORD": "${{Postgres.PGPASSWORD}}",
+        "REDIS_HOST": "${{Redis.REDISHOST}}",
+        "REDIS_PORT": "${{Redis.REDISPORT}}",
+        "REDIS_PASSWORD": "${{Redis.REDISPASSWORD}}"
+      }
+    }
+  }
+}

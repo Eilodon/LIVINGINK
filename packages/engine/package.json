@@ -12,6 +12,7 @@
         "./config": "./src/config/index.ts",
         "./math": "./src/math/index.ts",
         "./core": "./src/core/index.ts",
+        "./client": "./src/client/index.ts",
         "./interfaces": "./src/interfaces/index.ts",
         "./modules": "./src/modules/index.ts",
         "./modules/cjr": "./src/modules/cjr/index.ts",

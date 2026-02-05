@@ -1,7 +1,7 @@
 import { Bot, Player, GameState, Food, Entity } from '../../types';
 import { RING_RADII } from '../../constants';
 import { getCurrentSpatialGrid } from '../engine/context';
-import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore } from '@cjr/engine';
 
 /**
  * BOT PERSONALITIES - PR15

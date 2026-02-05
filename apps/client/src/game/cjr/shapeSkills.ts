@@ -1,7 +1,7 @@
 import { Player, Bot, GameState, Vector2, Entity } from '../../types';
 import { ShapeId, TattooId } from './cjrTypes';
 import { StatusFlag } from '../engine/statusFlags';
-import { TransformStore, PhysicsStore, StatsStore } from '../engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore, StatsStore } from '@cjr/engine';
 import { EntityStateBridge } from '../engine/dod/EntityStateBridge';
 import { vfxSystem } from '../vfx/vfxSystem';
 

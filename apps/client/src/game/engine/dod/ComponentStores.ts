@@ -8,16 +8,6 @@ if (MAX_ENTITIES * 8 > MAX_TYPED_ARRAY_SIZE) {
   );
 }
 
-// EIDOLON-V P0-2 FIX: Runtime bounds validation helper
-// Throws error immediately if id is out of bounds - fail fast principle
-function validateEntityId(id: number, caller: string): void {
-  if (__DEV__ && (id < 0 || id >= MAX_ENTITIES)) {
-    throw new RangeError(
-      `[DOD] ${caller}: Entity ID ${id} out of bounds [0, ${MAX_ENTITIES})`
-    );
-  }
-}
-
 // EIDOLON-V P0-2: Production-safe bounds check (returns false instead of throwing)
 function isValidEntityId(id: number): boolean {
   return id >= 0 && id < MAX_ENTITIES;
@@ -285,7 +275,7 @@ export * from './ConfigStore';
 import { ConfigStore } from './ConfigStore';
 
 export class InputStore {
-  // [targetX, targetY, isSkillActive, isEjectActive]
+  // [targetX, targetY, actions (bitmask), _pad]
   // Stride = 4
   public static readonly STRIDE = 4;
   public static readonly data = new Float32Array(MAX_ENTITIES * InputStore.STRIDE);
@@ -304,45 +294,49 @@ export class InputStore {
     out.y = this.data[idx + 1];
   }
 
-  static setSkillActive(id: number, active: boolean) {
+  /**
+   * Generic action setter - use this instead of deprecated specific setters
+   * @param id - entity id
+   * @param bit - action bit index (0-31)
+   * @param active - true to set, false to clear
+   */
+  static setAction(id: number, bit: number, active: boolean): void {
     if (!isValidEntityId(id)) return;
+    if (bit < 0 || bit > 31) return;
     const idx = id * InputStore.STRIDE;
-    this.data[idx + 2] = active ? 1 : 0;
+    const currentActions = this.data[idx + 2];
+    const bitMask = 1 << bit;
+    this.data[idx + 2] = active ? (currentActions | bitMask) : (currentActions & ~bitMask);
   }
 
-  static getSkillActive(id: number): boolean {
+  /**
+   * Generic action getter
+   * @param id - entity id
+   * @param bit - action bit index (0-31)
+   * @returns true if action bit is set
+   */
+  static getAction(id: number, bit: number): boolean {
     if (!isValidEntityId(id)) return false;
+    if (bit < 0 || bit > 31) return false;
     const idx = id * InputStore.STRIDE;
-    return this.data[idx + 2] === 1;
+    const actions = this.data[idx + 2];
+    return ((actions >> bit) & 1) === 1;
   }
 
-  static consumeSkillInput(id: number): boolean {
+  /**
+   * Consume an action (read and clear)
+   * @param id - entity id
+   * @param bit - action bit index
+   * @returns true if action was consumed
+   */
+  static consumeAction(id: number, bit: number): boolean {
     if (!isValidEntityId(id)) return false;
+    if (bit < 0 || bit > 31) return false;
     const idx = id * InputStore.STRIDE;
-    if (this.data[idx + 2] === 1) {
-      this.data[idx + 2] = 0;
-      return true;
-    }
-    return false;
-  }
-
-  static setEjectActive(id: number, active: boolean) {
-    if (!isValidEntityId(id)) return;
-    const idx = id * InputStore.STRIDE;
-    this.data[idx + 3] = active ? 1 : 0;
-  }
-
-  static getEjectActive(id: number): boolean {
-    if (!isValidEntityId(id)) return false;
-    const idx = id * InputStore.STRIDE;
-    return this.data[idx + 3] === 1;
-  }
-
-  static consumeEjectInput(id: number): boolean {
-    if (!isValidEntityId(id)) return false;
-    const idx = id * InputStore.STRIDE;
-    if (this.data[idx + 3] === 1) {
-      this.data[idx + 3] = 0;
+    const currentActions = this.data[idx + 2];
+    const bitMask = 1 << bit;
+    if ((currentActions & bitMask) !== 0) {
+      this.data[idx + 2] = currentActions & ~bitMask;
       return true;
     }
     return false;

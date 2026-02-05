@@ -104,7 +104,11 @@ export abstract class BaseSimulation {
      * @param dt Delta time from external clock
      */
     update(dt: number): void {
-        if (!this.running) return;
+        // EIDOLON-V DEBUG: Verify update is called (REMOVE AFTER DEBUG)
+        if (!this.running) {
+            console.log('[DEBUG] BaseSimulation.update: SKIPPED - running=false');
+            return;
+        }
 
         // Clamp dt for safety
         dt = Math.max(0.001, Math.min(dt, 0.1));

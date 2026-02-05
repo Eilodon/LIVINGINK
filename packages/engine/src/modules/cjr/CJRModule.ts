@@ -92,12 +92,11 @@ const CJR_COMPONENT_SCHEMAS: IComponentSchema[] = [
         id: 'Skill',
         displayName: 'Skill',
         description: 'Generic skill cooldown and state',
-        stride: 16, // 4 floats × 4 bytes
+        stride: 12, // 3 floats × 4 bytes
         fields: [
             { name: 'cooldown', type: 'f32', offset: 0 },
             { name: 'maxCooldown', type: 'f32', offset: 4 },
             { name: 'activeTimer', type: 'f32', offset: 8 },
-            { name: 'shapeId', type: 'f32', offset: 12 }, // Kept for backward compat or CJR specific
         ],
         tags: ['cjr', 'skills'],
     },

@@ -8,7 +8,7 @@
  * All transforms flow: Network -> Buffer -> Engine Tick -> DOD Stores
  */
 
-import { TransformStore, PhysicsStore } from '../game/engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore } from '@cjr/engine';
 
 interface PendingTransform {
   x: number;

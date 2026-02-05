@@ -10,8 +10,7 @@
  * - Graceful shutdown
  */
 
-import colyseus from 'colyseus';
-const { Server } = colyseus;
+import { Server } from 'colyseus';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import express, { Request } from 'express';
 import cors from 'cors';
@@ -65,13 +64,11 @@ async function main() {
   });
 
   // EIDOLON-V OPEN BETA: Initialize Redis for distributed rate limiting and sessions
-  let redisConnected = false;
   try {
     await cache.connect();
     await rateLimiter.init(cache);
     await authRateLimiter.init(cache);
     await AuthService.initSessionStore(cache);
-    redisConnected = true;
     logger.info('✅ Redis connected - using distributed rate limiting and sessions');
   } catch (error) {
     logger.warn(

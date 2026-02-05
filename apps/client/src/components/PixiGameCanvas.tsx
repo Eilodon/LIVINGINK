@@ -11,9 +11,9 @@ import {
 } from 'pixi.js';
 import { GameState } from '../types';
 import { JELLY_VERTEX, JELLY_FRAGMENT, JellyShaderResources } from '../game/cjr/shaders';
-import { MAP_RADIUS, COLOR_PALETTE_HEX } from '../constants';
+import { MAP_RADIUS, COLOR_PALETTE_HEX, RING_RADII } from '../constants';
 import { getPhysicsWorld } from '../game/engine/context';
-import { TransformStore, PhysicsStore } from '../game/engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore } from '@cjr/engine';
 
 const STRIDE = TransformStore.STRIDE;
 const X_OFFSET = 0;
@@ -180,39 +180,38 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
         return g;
       });
 
+      // EIDOLON-V FIX: Use Graphics-based rendering for units (shader matrices broken in Pixi 8)
       unitPoolRef.current = new FixedRenderPool(UNIT_POOL_SIZE, () => {
-        // Quad Geometry for Shader
-        const geometry = new Geometry({
-          attributes: {
-            position: [-1, -1, 1, -1, 1, 1, -1, 1],
-            uv: [0, 0, 1, 0, 1, 1, 0, 1],
-          },
-          indexBuffer: [0, 1, 2, 0, 2, 3],
-        });
+        const g = new Graphics();
+        // Draw base jelly circle - will be redrawn each frame with correct size/color
+        g.circle(0, 0, 1);
+        g.fill(0xffffff);
+        unitLayer.addChild(g);
+        return g;
+      }) as any; // Cast to match the ref type since we changed from Mesh to Graphics
 
-        // Clone shader for individual uniforms
-        const s = new Shader({
-          glProgram,
-          resources: {
-            uniforms: { ...shaderRef.current!.resources.uniforms },
-          },
-        });
-
-        const m = new Mesh({ geometry, shader: s, texture: Texture.WHITE });
-
-        // CRITICAL: Pre-initialize uJellyColor as Float32Array ONCE at creation
-        // This eliminates runtime allocation in render loop
-        const resources = m.shader?.resources as JellyShaderResources | undefined;
-        if (resources?.uniforms?.uniforms) {
-          resources.uniforms.uniforms.uJellyColor.value = new Float32Array([0, 0, 0]);
-        }
-
-        unitLayer.addChild(m);
-        return m;
-      });
-
-      // 4. Draw Static Elements (Map Border)
+      // 4. Draw Static Elements (Map Border + Ring Zones)
       const border = new Graphics();
+
+      // EIDOLON-V: Draw Ring Zones (R1 outer to R3 inner)
+      // Ring 1 (Outer Safe Zone) - Gray
+      border.arc(0, 0, RING_RADII.R1, 0, Math.PI * 2);
+      border.stroke({ width: 3, color: 0x475569, alpha: 0.6 });
+
+      // Ring 2 (Mid Zone) - Blue
+      border.arc(0, 0, RING_RADII.R2, 0, Math.PI * 2);
+      border.stroke({ width: 4, color: 0x3b82f6, alpha: 0.7 });
+
+      // Ring 3 (Danger Zone) - Red
+      border.arc(0, 0, RING_RADII.R3, 0, Math.PI * 2);
+      border.stroke({ width: 5, color: 0xef4444, alpha: 0.8 });
+
+      // Center Zone
+      border.arc(0, 0, RING_RADII.CENTER, 0, Math.PI * 2);
+      border.fill({ color: 0xfbbf24, alpha: 0.15 });
+      border.stroke({ width: 2, color: 0xfbbf24, alpha: 0.6 });
+
+      // Outer Map Border
       border.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);
       border.stroke({ width: 20, color: 0x444444, alpha: 0.5 });
       world.addChild(border);
@@ -298,10 +297,20 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
 
         // E. Render Units (Player + Bots)
         const units = [state.player, ...state.bots];
+        // EIDOLON-V DEBUG: Log unit rendering info (REMOVE AFTER DEBUG)
+        if (state.gameTime < 1) {
+          console.log('[DEBUG] Rendering units:', {
+            playerExists: !!state.player,
+            playerDead: state.player?.isDead,
+            playerPos: state.player?.position,
+            playerPhysicsIdx: state.player?.physicsIndex,
+            botsCount: state.bots?.length,
+            botsDeadCount: state.bots?.filter(b => b.isDead).length,
+          });
+        }
         for (const u of units) {
           if (!u || u.isDead) continue;
 
-          const mesh = unitPoolRef.current!.get();
           const idx = u.physicsIndex ?? idToIndex.get(u.id);
           let ux = u.position.x;
           let uy = u.position.y;
@@ -316,23 +325,36 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
             uy = prevY + (currY - prevY) * interpAlpha;
             ur = pData[base + RADIUS_OFFSET];
           }
-          mesh.position.set(ux, uy);
-          mesh.scale.set(ur, ur);
 
-          // Update Shader Uniforms - Direct mutation, ZERO allocation
-          const uData = (mesh.shader as any).resources?.uniforms?.uniforms;
-          if (uData) {
-            // Color extraction via bitwise - no allocation
-            const c = u.color as number;
-            // Direct mutation of pre-allocated Float32Array
-            uData.uJellyColor[0] = ((c >> 16) & 255) / 255;
-            uData.uJellyColor[1] = ((c >> 8) & 255) / 255;
-            uData.uJellyColor[2] = (c & 255) / 255;
+          // EIDOLON-V FIX: Use Graphics API to draw jelly (shader matrices fixed later)
+          const gfx = unitPoolRef.current!.get() as unknown as Graphics;
+          gfx.position.set(ux, uy);
+          gfx.clear();
 
-            // Juice parameters
-            uData.uTime = state.gameTime;
-            uData.uAberration = u.aberrationIntensity || 0;
-            uData.uEnergy = u.currentHealth / u.maxHealth;
+          // Extract color from integer
+          const color = u.color as number;
+
+          // Draw jelly body with gradient effect
+          const energy = u.currentHealth / u.maxHealth;
+
+          // Outer glow
+          gfx.circle(0, 0, ur * 1.1);
+          gfx.fill({ color, alpha: 0.3 });
+
+          // Main body
+          gfx.circle(0, 0, ur);
+          gfx.fill({ color, alpha: 0.9 });
+
+          // Inner core (brighter)
+          const coreRadius = ur * 0.4 * energy;
+          if (coreRadius > 2) {
+            gfx.circle(0, 0, coreRadius);
+            gfx.fill({ color: 0xffffff, alpha: 0.4 });
+          }
+
+          // EIDOLON-V DEBUG (REMOVE AFTER DEBUG)
+          if (state.gameTime < 1 && u === state.player) {
+            console.log('[DEBUG] Player render (Graphics):', { ux, uy, ur, color: color.toString(16) });
           }
         }
 

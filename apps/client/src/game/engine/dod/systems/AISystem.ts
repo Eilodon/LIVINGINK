@@ -22,8 +22,8 @@ import {
   StateStore,
   EntityLookup,
   InputStore,
-} from '../ComponentStores';
-import { EntityFlags } from '../EntityFlags';
+  EntityFlags,
+} from '@cjr/engine';
 import { SkillSystem } from './SkillSystem';
 import { updateBotPersonality } from '../../../cjr/botPersonalities';
 import type { SpatialGrid } from '../../context';

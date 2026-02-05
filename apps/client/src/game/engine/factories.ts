@@ -31,8 +31,8 @@ import {
   TattooStore,
   EntityLookup,
   ProjectileStore,
-} from './dod/ComponentStores';
-import { EntityFlags } from './dod/EntityFlags';
+  EntityFlags,
+} from '@cjr/engine';
 
 // Helper: Random Pigment
 export const randomPigment = (): PigmentVec3 => ({
@@ -41,8 +41,7 @@ export const randomPigment = (): PigmentVec3 => ({
   b: Math.random(),
 });
 
-import { ConfigStore } from './dod/ConfigStore';
-import { InputStore } from './dod/ComponentStores';
+import { ConfigStore, InputStore } from '@cjr/engine';
 import { pigmentToInt, intToHex, hexToInt } from '../cjr/colorMath'; // EIDOLON-V: Import color helper
 
 export const createPlayer = (

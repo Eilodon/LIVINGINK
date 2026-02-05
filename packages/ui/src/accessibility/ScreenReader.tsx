@@ -10,13 +10,24 @@ export const ScreenReader: React.FC<ScreenReaderProps> = ({
   priority = 'polite',
 }) => {
   // EIDOLON-V: Explicit aria-live values for accessibility compliance
-  const ariaLive = priority === 'assertive' ? 'assertive' : 'polite';
+  if (priority === 'assertive') {
+    return (
+      <span
+        className="sr-only"
+        role="status"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
+        {text}
+      </span>
+    );
+  }
 
   return (
     <span
       className="sr-only"
       role="status"
-      aria-live={ariaLive}
+      aria-live="polite"
       aria-atomic="true"
     >
       {text}

@@ -1,5 +1,4 @@
-import { SkillStore, TransformStore, PhysicsStore, StateStore } from '../ComponentStores';
-import { MAX_ENTITIES, EntityFlags } from '../EntityFlags';
+import { SkillStore, TransformStore, PhysicsStore, StateStore, MAX_ENTITIES, EntityFlags } from '@cjr/engine';
 import { vfxBuffer, VFX_TYPES } from '../../VFXRingBuffer'; // Import trực tiếp Buffer
 
 // EIDOLON-V: CONST ENUM để Inline số nguyên (Tối ưu biên dịch)

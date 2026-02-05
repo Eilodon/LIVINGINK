@@ -14,7 +14,7 @@ import { SpatialHashGrid, SpatialQueryResult } from '../spatial/SpatialHashGrid'
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
-import { EntityLookup, TransformStore } from './dod/ComponentStores';
+import { EntityLookup, TransformStore } from '@cjr/engine';
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine

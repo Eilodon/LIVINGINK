@@ -1,6 +1,5 @@
 import { entityManager } from './dod/EntityManager';
-import { TransformStore, PhysicsStore, StateStore } from './dod/ComponentStores';
-import { EntityFlags } from './dod/EntityFlags';
+import { TransformStore, PhysicsStore, StateStore, EntityFlags } from '@cjr/engine';
 import { networkTransformBuffer } from '../../network/NetworkTransformBuffer';
 
 export class PhysicsWorld {

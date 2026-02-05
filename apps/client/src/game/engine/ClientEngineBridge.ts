@@ -12,7 +12,7 @@ import {
     type IEngineEvent
 } from '@cjr/engine';
 import { vfxBuffer, VFX_TYPES, packHex } from './VFXRingBuffer';
-import { EntityLookup } from './dod/ComponentStores';
+import { EntityLookup } from '@cjr/engine';
 import type { RingId } from '../cjr/cjrTypes';
 
 // Text lookup table for floating text events

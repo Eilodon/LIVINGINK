@@ -16,7 +16,7 @@
 // ============================================
 
 // EIDOLON-V FIX: Import TransformStore for Spatial Audio
-import { TransformStore } from '../engine/dod/ComponentStores';
+import { TransformStore } from '@cjr/engine';
 
 export interface AudioConfig {
   masterVolume: number;

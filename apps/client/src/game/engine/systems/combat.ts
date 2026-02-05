@@ -21,8 +21,8 @@ import {
   TattooStore,
   EntityLookup,
   PigmentStore,
-} from '../dod/ComponentStores';
-import { EntityFlags } from '../dod/EntityFlags';
+  EntityFlags,
+} from '@cjr/engine';
 import { audioEngine } from '../../audio/AudioEngine';
 
 // EIDOLON-V PHASE 6: Pure DOD Logic for Consumption

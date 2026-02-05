@@ -1,4 +1,4 @@
-import { InputStore } from '../engine/dod/ComponentStores';
+import { InputStore } from '@cjr/engine';
 
 // EIDOLON-V FIX: Input types and interfaces
 export type InputEventType =

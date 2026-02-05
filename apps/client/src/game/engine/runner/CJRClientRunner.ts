@@ -21,7 +21,7 @@ import { getCurrentSpatialGrid } from '../context';
 
 // Input & Network Wiring
 import { BufferedInput } from '../../input/BufferedInput';
-import { TransformStore, InputStore, PhysicsStore } from '@cjr/engine';
+import { TransformStore, InputStore, PhysicsStore, PhysicsSystem, MovementSystem } from '@cjr/engine';
 
 /**
  * CJR Client Simulation Configuration
@@ -192,6 +192,13 @@ export class CJRClientRunner extends ClientRunner {
       this.aiSystem.update(this.gameState, dt);
     }
 
+    // EIDOLON-V FIX: Core physics pipeline
+    // 1. MovementSystem: Convert input targets to velocities
+    MovementSystem.updateAll(dt);
+
+    // 2. PhysicsSystem: Integrate velocity to position + map boundary clamping
+    PhysicsSystem.update(dt);
+
     // Future: Ring logic, emotions, tattoo synergies
   }
 
@@ -211,7 +218,13 @@ export class CJRClientRunner extends ClientRunner {
   /**
    * Main update method - uses BaseSimulation
    */
+  private static updateDebugCount = 0;
   update(dt: number): void {
+    // EIDOLON-V DEBUG: Trace update execution (REMOVE AFTER DEBUG)
+    if (CJRClientRunner.updateDebugCount++ < 5) {
+      console.log(`[DEBUG] CJRClientRunner.update: gameState=${!!this.gameState}, running=${this.isRunning()}, dt=${dt.toFixed(4)}`);
+    }
+
     if (!this.gameState) return;
 
     try {

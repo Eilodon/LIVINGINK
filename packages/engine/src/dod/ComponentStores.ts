@@ -2,109 +2,77 @@
  * @cjr/engine - ComponentStores
  * Data-Oriented Design stores using TypedArrays
  * Zero dependencies - headless compatible
- * 
- * NOTE: EntityLookup is NOT included - it's client-only.
- * Use setEntityResolver() to inject a resolver function.
+ *
+ * EIDOLON-V UNIFICATION: Replaced ComponentRegistry pattern with STATIC TypedArrays.
+ * This is the SINGLE SOURCE OF TRUTH for all DOD stores.
  */
 
 import { MAX_ENTITIES, EntityFlags } from './EntityFlags';
-import { getComponentRegistry } from '../core/ComponentRegistry';
-import type { IRegisteredStore } from '../core/ComponentRegistry';
-
-// EIDOLON-V Phase 3: ComponentStores now acts as a facade over ComponentRegistry
-// Lazy initialization ensures registry is populated before first access
 
 // Runtime validation for entity limits
-const MAX_TYPED_ARRAY_SIZE = 65536;
+const MAX_TYPED_ARRAY_SIZE = 65536; // Safe limit for Float32Array
 if (MAX_ENTITIES * 8 > MAX_TYPED_ARRAY_SIZE) {
     throw new Error(
         `Entity configuration exceeds TypedArray limits: ${MAX_ENTITIES} entities × 8 stride = ${MAX_ENTITIES * 8} > ${MAX_TYPED_ARRAY_SIZE}`
     );
 }
 
-/**
- * Helper to get cached store reference from ComponentRegistry.
- * This ensures memory convergence - all data lives in one place.
- */
-function getCachedStore(cache: { store: IRegisteredStore | null }, id: string): IRegisteredStore {
-    if (!cache.store) {
-        const registry = getComponentRegistry();
-        const store = registry.getStore(id);
-        if (!store) {
-            throw new Error(
-                `[ComponentStores] Store '${id}' not found in registry. ` +
-                `Did you forget to call registerCoreComponents() before accessing ComponentStores?`
-            );
-        }
-        cache.store = store;
-    }
-    return cache.store;
+// Production-safe bounds check (returns false instead of throwing)
+function isValidEntityId(id: number): boolean {
+    return id >= 0 && id < MAX_ENTITIES;
 }
 
-/**
- * Reset all store caches. Call this when ComponentRegistry is reset.
- * This ensures ComponentStores fetches fresh stores from the new registry.
- */
-export function resetStoreCaches(): void {
-    TransformStore.resetCache();
-    PhysicsStore.resetCache();
-    StatsStore.resetCache();
-    StateStore.resetCache();
-    SkillStore.resetCache();
-    ProjectileStore.resetCache();
-    ConfigStore.resetCache();
-    InputStore.resetCache();
-}
+// =============================================================================
+// TRANSFORM STORE
+// =============================================================================
 
 export class TransformStore {
+    // [x, y, rotation, scale, prevX, prevY, prevRotation, _pad]
     public static readonly STRIDE = 8;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Transform').data as Float32Array;
-    }
+    public static readonly data = new Float32Array(MAX_ENTITIES * TransformStore.STRIDE);
 
     static set(id: number, x: number, y: number, rotation: number, scale: number = 1.0) {
+        if (!isValidEntityId(id)) {
+            console.error(`[DOD] TransformStore.set: Invalid entity ID ${id}`);
+            return;
+        }
         const idx = id * 8;
         this.data[idx] = x;
         this.data[idx + 1] = y;
         this.data[idx + 2] = rotation;
         this.data[idx + 3] = scale;
+        // Initialize prev
         this.data[idx + 4] = x;
         this.data[idx + 5] = y;
         this.data[idx + 6] = rotation;
     }
 
-    static getX(id: number): number {
-        return this.data[id * 8];
-    }
-
-    static getY(id: number): number {
-        return this.data[id * 8 + 1];
-    }
-
-    static setPosition(id: number, x: number, y: number) {
+    static setPosition(id: number, x: number, y: number): void {
+        if (!isValidEntityId(id)) return;
         const idx = id * 8;
         this.data[idx] = x;
         this.data[idx + 1] = y;
     }
+
+    static getX(id: number): number {
+        if (!isValidEntityId(id)) return 0;
+        return this.data[id * 8];
+    }
+
+    static getY(id: number): number {
+        if (!isValidEntityId(id)) return 0;
+        return this.data[id * 8 + 1];
+    }
 }
 
+// =============================================================================
+// PHYSICS STORE
+// =============================================================================
+
 export class PhysicsStore {
+    // [vx, vy, vRotation, mass, radius, restitution, friction, _pad]
     public static readonly STRIDE = 8;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Physics').data as Float32Array;
-    }
+    public static readonly data = new Float32Array(MAX_ENTITIES * PhysicsStore.STRIDE);
 
     static set(
         id: number,
@@ -115,74 +83,80 @@ export class PhysicsStore {
         restitution: number = 0.5,
         friction: number = 0.9
     ) {
+        if (!isValidEntityId(id)) {
+            console.error(`[DOD] PhysicsStore.set: Invalid entity ID ${id}`);
+            return;
+        }
         const idx = id * 8;
         this.data[idx] = vx;
         this.data[idx + 1] = vy;
-        this.data[idx + 2] = 0;
+        this.data[idx + 2] = 0; // vRotation
         this.data[idx + 3] = mass;
         this.data[idx + 4] = radius;
         this.data[idx + 5] = restitution;
         this.data[idx + 6] = friction;
     }
 
-    static getVelocityX(id: number): number {
-        return this.data[id * 8];
-    }
-
-    static getVelocityY(id: number): number {
-        return this.data[id * 8 + 1];
-    }
-
-    static setVelocity(id: number, vx: number, vy: number) {
+    static setVelocity(id: number, vx: number, vy: number): void {
+        if (!isValidEntityId(id)) return;
         const idx = id * 8;
         this.data[idx] = vx;
         this.data[idx + 1] = vy;
     }
 
+    static getVelocityX(id: number): number {
+        if (!isValidEntityId(id)) return 0;
+        return this.data[id * 8];
+    }
+
+    static getVelocityY(id: number): number {
+        if (!isValidEntityId(id)) return 0;
+        return this.data[id * 8 + 1];
+    }
+
     static getRadius(id: number): number {
+        if (!isValidEntityId(id)) return 0;
         return this.data[id * 8 + 4];
     }
 }
 
+// =============================================================================
+// STATE STORE
+// =============================================================================
+
 export class StateStore {
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    public static get flags(): Uint16Array {
-        return getCachedStore(this._cache, 'State').data as Uint16Array;
-    }
+    // Flags for type and status
+    public static readonly flags = new Uint16Array(MAX_ENTITIES);
 
     static setFlag(id: number, flag: EntityFlags) {
+        if (!isValidEntityId(id)) return;
         this.flags[id] |= flag;
     }
 
     static clearFlag(id: number, flag: EntityFlags) {
+        if (!isValidEntityId(id)) return;
         this.flags[id] &= ~flag;
     }
 
     static hasFlag(id: number, flag: EntityFlags): boolean {
+        if (!isValidEntityId(id)) return false;
         return (this.flags[id] & flag) === flag;
     }
 
     static isActive(id: number): boolean {
+        if (!isValidEntityId(id)) return false;
         return (this.flags[id] & EntityFlags.ACTIVE) !== 0;
     }
 }
 
+// =============================================================================
+// STATS STORE
+// =============================================================================
+
 export class StatsStore {
+    // [currentHealth, maxHealth, score, matchPercent, defense, damageMultiplier, _pad, _pad]
     public static readonly STRIDE = 8;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Stats').data as Float32Array;
-    }
+    public static readonly data = new Float32Array(MAX_ENTITIES * StatsStore.STRIDE);
 
     static set(
         id: number,
@@ -203,63 +177,71 @@ export class StatsStore {
     }
 
     static setDefense(id: number, value: number) {
+        if (!isValidEntityId(id)) return;
         this.data[id * StatsStore.STRIDE + 4] = value;
     }
 
     static setDamageMultiplier(id: number, value: number) {
+        if (!isValidEntityId(id)) return;
         this.data[id * StatsStore.STRIDE + 5] = value;
     }
 
     static setCurrentHealth(id: number, value: number) {
+        if (!isValidEntityId(id)) return;
         this.data[id * StatsStore.STRIDE] = value;
     }
 
     static setMaxHealth(id: number, value: number) {
+        if (!isValidEntityId(id)) return;
         this.data[id * StatsStore.STRIDE + 1] = value;
     }
 
     static getCurrentHealth(id: number): number {
+        if (!isValidEntityId(id)) return 0;
         return this.data[id * StatsStore.STRIDE];
     }
 
     static getMaxHealth(id: number): number {
+        if (!isValidEntityId(id)) return 0;
         return this.data[id * StatsStore.STRIDE + 1];
     }
 
     static getScore(id: number): number {
+        if (!isValidEntityId(id)) return 0;
         return this.data[id * StatsStore.STRIDE + 2];
     }
 
     static getMatchPercent(id: number): number {
+        if (!isValidEntityId(id)) return 0;
         return this.data[id * StatsStore.STRIDE + 3];
     }
 
     static getDefense(id: number): number {
+        if (!isValidEntityId(id)) return 1;
         return this.data[id * StatsStore.STRIDE + 4];
     }
 
     static getDamageMultiplier(id: number): number {
+        if (!isValidEntityId(id)) return 1;
         return this.data[id * StatsStore.STRIDE + 5];
     }
 }
 
+// =============================================================================
+// SKILL STORE
+// =============================================================================
+
 export class SkillStore {
+    // [cooldown, maxCooldown, activeTimer, shapeId]
     public static readonly STRIDE = 4;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Skill').data as Float32Array;
-    }
+    public static readonly data = new Float32Array(MAX_ENTITIES * SkillStore.STRIDE);
 
     static set(id: number, cooldown: number, maxCooldown: number, shapeId: number) {
+        if (!isValidEntityId(id)) return;
         const idx = id * SkillStore.STRIDE;
         this.data[idx] = cooldown;
         this.data[idx + 1] = maxCooldown;
-        this.data[idx + 2] = 0;
+        this.data[idx + 2] = 0; // activeTimer
         this.data[idx + 3] = shapeId;
     }
 
@@ -271,24 +253,53 @@ export class SkillStore {
         this.data[id * SkillStore.STRIDE] = value;
     }
 
-    static getShapeId(id: number): number {
-        return this.data[id * SkillStore.STRIDE + 3];
+    static getMaxCooldown(id: number): number {
+        return this.data[id * SkillStore.STRIDE + 1];
+    }
+
+    static setMaxCooldown(id: number, value: number) {
+        this.data[id * SkillStore.STRIDE + 1] = value;
+    }
+
+    static getActiveTimer(id: number): number {
+        return this.data[id * SkillStore.STRIDE + 2];
+    }
+
+    static setActiveTimer(id: number, value: number) {
+        this.data[id * SkillStore.STRIDE + 2] = value;
     }
 }
 
-export class ProjectileStore {
+// =============================================================================
+// TATTOO STORE (CJR-specific)
+// =============================================================================
+
+export class TattooStore {
     public static readonly STRIDE = 4;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    public static readonly data = new Float32Array(MAX_ENTITIES * TattooStore.STRIDE);
+    public static readonly flags = new Uint32Array(MAX_ENTITIES);
 
-    static resetCache(): void {
-        this._cache.store = null;
+    static set(id: number, flags: number, procChance: number) {
+        if (!isValidEntityId(id)) return;
+        this.flags[id] = flags;
+        const idx = id * TattooStore.STRIDE;
+        this.data[idx] = 0; // timer1
+        this.data[idx + 1] = 0; // timer2
+        this.data[idx + 2] = procChance;
     }
+}
 
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Projectile').data as Float32Array;
-    }
+// =============================================================================
+// PROJECTILE STORE
+// =============================================================================
+
+export class ProjectileStore {
+    // [ownerId (int), damage, duration, typeId]
+    public static readonly STRIDE = 4;
+    public static readonly data = new Float32Array(MAX_ENTITIES * ProjectileStore.STRIDE);
 
     static set(id: number, ownerId: number, damage: number, duration: number, typeId: number = 0) {
+        if (!isValidEntityId(id)) return;
         const idx = id * ProjectileStore.STRIDE;
         this.data[idx] = ownerId;
         this.data[idx + 1] = damage;
@@ -297,104 +308,122 @@ export class ProjectileStore {
     }
 }
 
+// =============================================================================
+// CONFIG STORE
+// =============================================================================
+
 export class ConfigStore {
-    public static readonly STRIDE = 4;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
+    // [magneticRadius, damageMult, speedMult, pickupRange, visionRange, _pad, _pad, _pad]
+    public static readonly STRIDE = 8;
+    public static readonly data = new Float32Array(MAX_ENTITIES * ConfigStore.STRIDE);
 
-    static resetCache(): void {
-        this._cache.store = null;
+    static set(
+        id: number,
+        magneticRadius: number,
+        damageMult: number,
+        speedMult: number,
+        pickupRange: number,
+        visionRange: number
+    ) {
+        if (!isValidEntityId(id)) return;
+        const idx = id * ConfigStore.STRIDE;
+        this.data[idx] = magneticRadius;
+        this.data[idx + 1] = damageMult;
+        this.data[idx + 2] = speedMult;
+        this.data[idx + 3] = pickupRange;
+        this.data[idx + 4] = visionRange;
     }
 
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Config').data as Float32Array;
-    }
-
-    static setMaxSpeed(id: number, value: number) {
-        this.data[id * ConfigStore.STRIDE] = value;
-    }
-
-    static getMaxSpeed(id: number): number {
+    // Accessors
+    static getMagneticRadius(id: number): number {
         return this.data[id * ConfigStore.STRIDE];
     }
 
-    static setSpeedMultiplier(id: number, value: number) {
-        this.data[id * ConfigStore.STRIDE + 1] = value;
+    static getMagnetRadius(id: number): number {
+        return this.data[id * ConfigStore.STRIDE];
+    }
+
+    static getDamageMultiplier(id: number): number {
+        return this.data[id * ConfigStore.STRIDE + 1];
     }
 
     static getSpeedMultiplier(id: number): number {
-        return this.data[id * ConfigStore.STRIDE + 1] || 1;
+        return this.data[id * ConfigStore.STRIDE + 2] || 1;
+    }
+
+    static getMaxSpeed(id: number): number {
+        // Alias for backward compatibility
+        return 150 * (this.data[id * ConfigStore.STRIDE + 2] || 1);
+    }
+
+    // Setters
+    static setMagneticRadius(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE] = value;
     }
 
     static setMagnetRadius(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE] = value;
+    }
+
+    static setDamageMultiplier(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 1] = value;
+    }
+
+    static setSpeedMultiplier(id: number, value: number) {
         this.data[id * ConfigStore.STRIDE + 2] = value;
     }
 
-    static getMagnetRadius(id: number): number {
-        return this.data[id * ConfigStore.STRIDE + 2];
+    static setMaxSpeed(id: number, value: number) {
+        // Derive speed multiplier from max speed
+        this.data[id * ConfigStore.STRIDE + 2] = value / 150;
+    }
+
+    static setPickupRange(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 3] = value;
+    }
+
+    static setVisionRange(id: number, value: number) {
+        this.data[id * ConfigStore.STRIDE + 4] = value;
     }
 }
 
+// =============================================================================
+// INPUT STORE
+// =============================================================================
+
 export class InputStore {
+    // [targetX, targetY, actions (bitmask), _pad]
     public static readonly STRIDE = 4;
-    private static _cache: { store: IRegisteredStore | null } = { store: null };
-
-    static resetCache(): void {
-        this._cache.store = null;
-    }
-
-    // Action bitmasks - CJR Module defines these bits:
-    // Bit 1 = ACTION_EJECT (0x02)
-    // Bit 2 = ACTION_SKILL (0x04)
-    // Games can define their own bits in higher positions
-
-    public static get data(): Float32Array {
-        return getCachedStore(this._cache, 'Input').data as Float32Array;
-    }
+    public static readonly data = new Float32Array(MAX_ENTITIES * InputStore.STRIDE);
 
     static setTarget(id: number, x: number, y: number) {
+        if (!isValidEntityId(id)) return;
         const idx = id * InputStore.STRIDE;
         this.data[idx] = x;
         this.data[idx + 1] = y;
     }
 
     static getTarget(id: number, out: { x: number; y: number }) {
+        if (!isValidEntityId(id)) return;
         const idx = id * InputStore.STRIDE;
         out.x = this.data[idx];
         out.y = this.data[idx + 1];
     }
 
-    /**
-     * Set an action bit in the actions bitmask
-     * @param id Entity ID
-     * @param actionBit Bit position (0-31)
-     * @param active Whether the action is active
-     */
-    static setAction(id: number, actionBit: number, active: boolean) {
-        const idx = id * InputStore.STRIDE + 2; // actions field at offset 2
-        const current = this.data[idx];
-        if (active) {
-            this.data[idx] = current | (1 << actionBit);
-        } else {
-            this.data[idx] = current & ~(1 << actionBit);
-        }
+    static setAction(id: number, bit: number, active: boolean): void {
+        if (!isValidEntityId(id)) return;
+        if (bit < 0 || bit > 31) return;
+        const idx = id * InputStore.STRIDE;
+        const currentActions = this.data[idx + 2];
+        const bitMask = 1 << bit;
+        this.data[idx + 2] = active ? (currentActions | bitMask) : (currentActions & ~bitMask);
     }
 
-    /**
-     * Check if an action bit is set
-     * @param id Entity ID
-     * @param actionBit Bit position (0-31)
-     */
     static isActionActive(id: number, actionBit: number): boolean {
         const idx = id * InputStore.STRIDE + 2;
         return (this.data[idx] & (1 << actionBit)) !== 0;
     }
 
-    /**
-     * Consume an action (check and clear)
-     * @param id Entity ID
-     * @param actionBit Bit position (0-31)
-     * @returns true if action was active and consumed
-     */
     static consumeAction(id: number, actionBit: number): boolean {
         const idx = id * InputStore.STRIDE + 2;
         const mask = 1 << actionBit;
@@ -405,37 +434,138 @@ export class InputStore {
         return false;
     }
 
-    /**
-     * Get full actions bitmask
-     * @param id Entity ID
-     */
     static getActions(id: number): number {
         return this.data[id * InputStore.STRIDE + 2];
     }
 
-    /**
-     * Set full actions bitmask
-     * @param id Entity ID
-     * @param actions Full bitmask value
-     */
     static setActions(id: number, actions: number) {
         this.data[id * InputStore.STRIDE + 2] = actions;
     }
-
-
 }
 
-/**
- * Reset all DOD stores to zero state
- */
+// =============================================================================
+// PIGMENT STORE (CJR-specific)
+// =============================================================================
+
+export class PigmentStore {
+    public static readonly STRIDE = 8;
+    public static readonly data = new Float32Array(MAX_ENTITIES * PigmentStore.STRIDE);
+
+    // Offset constants
+    static readonly R = 0;
+    static readonly G = 1;
+    static readonly B = 2;
+    static readonly TARGET_R = 3;
+    static readonly TARGET_G = 4;
+    static readonly TARGET_B = 5;
+    static readonly MATCH = 6;
+    static readonly COLOR_INT = 7;
+
+    static init(id: number, r: number, g: number, b: number,
+        targetR: number, targetG: number, targetB: number): void {
+        if (!isValidEntityId(id)) return;
+        const idx = id * PigmentStore.STRIDE;
+
+        this.data[idx + PigmentStore.R] = r;
+        this.data[idx + PigmentStore.G] = g;
+        this.data[idx + PigmentStore.B] = b;
+        this.data[idx + PigmentStore.TARGET_R] = targetR;
+        this.data[idx + PigmentStore.TARGET_G] = targetG;
+        this.data[idx + PigmentStore.TARGET_B] = targetB;
+
+        this.updateMatch(id);
+        this.updateColorInt(id);
+    }
+
+    static set(id: number, r: number, g: number, b: number): void {
+        if (!isValidEntityId(id)) return;
+        const idx = id * PigmentStore.STRIDE;
+
+        this.data[idx + PigmentStore.R] = r;
+        this.data[idx + PigmentStore.G] = g;
+        this.data[idx + PigmentStore.B] = b;
+
+        this.updateMatch(id);
+        this.updateColorInt(id);
+    }
+
+    static mix(id: number, addR: number, addG: number, addB: number, ratio: number): void {
+        if (!isValidEntityId(id)) return;
+        const idx = id * PigmentStore.STRIDE;
+
+        this.data[idx + PigmentStore.R] += (addR - this.data[idx + PigmentStore.R]) * ratio;
+        this.data[idx + PigmentStore.G] += (addG - this.data[idx + PigmentStore.G]) * ratio;
+        this.data[idx + PigmentStore.B] += (addB - this.data[idx + PigmentStore.B]) * ratio;
+
+        // Clamp
+        this.data[idx + PigmentStore.R] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.R]));
+        this.data[idx + PigmentStore.G] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.G]));
+        this.data[idx + PigmentStore.B] = Math.max(0, Math.min(1, this.data[idx + PigmentStore.B]));
+
+        this.updateMatch(id);
+        this.updateColorInt(id);
+    }
+
+    static updateMatch(id: number): void {
+        const idx = id * PigmentStore.STRIDE;
+        const dr = this.data[idx + PigmentStore.R] - this.data[idx + PigmentStore.TARGET_R];
+        const dg = this.data[idx + PigmentStore.G] - this.data[idx + PigmentStore.TARGET_G];
+        const db = this.data[idx + PigmentStore.B] - this.data[idx + PigmentStore.TARGET_B];
+        const distSq = dr * dr + dg * dg + db * db;
+        const thresholdSq = 0.09;
+        this.data[idx + PigmentStore.MATCH] = distSq >= thresholdSq ? 0 : 1.0 - distSq / thresholdSq;
+    }
+
+    static updateColorInt(id: number): void {
+        const idx = id * PigmentStore.STRIDE;
+        const r = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.R] * 255)));
+        const g = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.G] * 255)));
+        const b = Math.max(0, Math.min(255, Math.floor(this.data[idx + PigmentStore.B] * 255)));
+        this.data[idx + PigmentStore.COLOR_INT] = (r << 16) | (g << 8) | b;
+    }
+
+    static getPigment(id: number): { r: number; g: number; b: number } {
+        const idx = id * PigmentStore.STRIDE;
+        return {
+            r: this.data[idx + PigmentStore.R],
+            g: this.data[idx + PigmentStore.G],
+            b: this.data[idx + PigmentStore.B],
+        };
+    }
+
+    static getMatch(id: number): number {
+        return this.data[id * PigmentStore.STRIDE + PigmentStore.MATCH];
+    }
+
+    static getColorInt(id: number): number {
+        return this.data[id * PigmentStore.STRIDE + PigmentStore.COLOR_INT];
+    }
+}
+
+// =============================================================================
+// ENTITY LOOKUP (Bridge array: DOD Index -> Entity Object)
+// =============================================================================
+
+// EntityLookup stores entity objects for reverse lookup (DOD index -> entity)
+// Uses 'unknown' type to allow any entity shape from different game modules
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const EntityLookup: (unknown | null)[] = new Array(MAX_ENTITIES).fill(null);
+
+// =============================================================================
+// RESET ALL STORES
+// =============================================================================
+
 export function resetAllStores() {
     TransformStore.data.fill(0);
     PhysicsStore.data.fill(0);
     StatsStore.data.fill(0);
     SkillStore.data.fill(0);
-    // TattooStore removed - CJR-specific, managed by CJRModule
+    TattooStore.data.fill(0);
+    TattooStore.flags.fill(0);
     ProjectileStore.data.fill(0);
     ConfigStore.data.fill(0);
     InputStore.data.fill(0);
+    PigmentStore.data.fill(0);
     StateStore.flags.fill(0);
+    EntityLookup.fill(null);
 }

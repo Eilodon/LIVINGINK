@@ -112,10 +112,8 @@ export class Vector2Pool {
   }
 }
 
-// EIDOLON-V FORGE: Entity Pool Manager
 import { entityManager } from '../engine/dod/EntityManager';
-import { StateStore, EntityLookup } from '../engine/dod/ComponentStores';
-import { EntityFlags } from '../engine/dod/EntityFlags';
+import { StateStore, EntityLookup, EntityFlags } from '@cjr/engine';
 
 export class EntityPoolManager {
   private static instance: EntityPoolManager;

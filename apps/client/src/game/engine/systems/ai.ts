@@ -11,8 +11,8 @@ import {
   EntityLookup,
   StatsStore,
   InputStore,
-} from '../dod/ComponentStores';
-import { EntityFlags } from '../dod/EntityFlags';
+  EntityFlags,
+} from '@cjr/engine';
 import { SkillSystem } from '../dod/systems/SkillSystem';
 import { updateBotPersonality } from '../../cjr/botPersonalities';
 

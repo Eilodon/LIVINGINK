@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: cjr-game-server
+    runtime: docker
+    repo: https://github.com/yourusername/color-jelly-rush
+    branch: main
+    dockerfilePath: ./apps/server/Dockerfile.simple
+    dockerContext: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "2567"
+      - key: CORS_ORIGIN
+        value: "https://your-vercel-app.vercel.app"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: cjr-postgres
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: cjr-postgres
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: cjr-postgres
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: cjr-postgres
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: cjr-postgres
+          property: password
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: cjr-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: cjr-redis
+          property: port
+    healthCheckPath: /health
+    disk:
+      name: tmp
+      mountPath: /tmp
+      sizeGB: 1
+
+databases:
+  - name: cjr-postgres
+    databaseName: color_jelly_rush
+    user: cjr_user
+    plan: free
+
+redis:
+  - name: cjr-redis
+    plan: free
+    ipAllowList: []

@@ -9,6 +9,9 @@ import { MAX_ENTITIES, EntityFlags } from '../dod/EntityFlags';
 export const MAX_SPEED_BASE = 150;
 
 export class MovementSystem {
+    // EIDOLON-V DEBUG: Frame counter (REMOVE AFTER DEBUG)
+    private static debugFrameCount = 0;
+
     /**
      * DOD Movement Logic (Pure Index-Based)
      */
@@ -27,6 +30,11 @@ export class MovementSystem {
 
         const px = TransformStore.data[tIdx];
         const py = TransformStore.data[tIdx + 1];
+
+        // EIDOLON-V DEBUG: Log player movement data (REMOVE AFTER DEBUG)
+        if (id === 0 && this.debugFrameCount++ < 10) {
+            console.log(`[DEBUG] Movement id=0: target=(${tx.toFixed(1)}, ${ty.toFixed(1)}) pos=(${px.toFixed(1)}, ${py.toFixed(1)}) dt=${dt.toFixed(4)}`);
+        }
 
         // 3. Calculate direction
         const dx = tx - px;

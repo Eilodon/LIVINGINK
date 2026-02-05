@@ -1,6 +1,6 @@
 import { MAX_SPEED_BASE, MAX_ENTITY_RADIUS } from '../../../constants';
 import { Player, Bot, SizeTier } from '../../../types';
-import { PhysicsStore, StatsStore, EntityLookup } from '../dod/ComponentStores';
+import { PhysicsStore, StatsStore, EntityLookup } from '@cjr/engine';
 
 // Logic ported from legacy physics.ts
 export const applyGrowth = (entity: Player | Bot, amount: number) => {

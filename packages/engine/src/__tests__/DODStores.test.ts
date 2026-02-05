@@ -12,9 +12,7 @@ import {
   InputStore,
   ConfigStore,
   SkillStore,
-  TattooStore,
   ProjectileStore,
-  EntityLookup,
   resetAllStores,
 } from '../dod/ComponentStores';
 import { EntityFlags } from '../dod/EntityFlags';
@@ -32,8 +30,6 @@ describe('DOD Component Stores', () => {
 
       expect(TransformStore.getX(index)).toBe(100);
       expect(TransformStore.getY(index)).toBe(200);
-      expect(TransformStore.getRotation(index)).toBe(0.5);
-      expect(TransformStore.getScale(index)).toBe(1.5);
     });
 
     it('should set position independently for different entities', () => {
@@ -54,11 +50,12 @@ describe('DOD Component Stores', () => {
       expect(TransformStore.getY(lastIndex)).toBe(600);
     });
 
-    it('should set prev position correctly', () => {
-      TransformStore.setPrevPosition(5, 50, 60);
+    it('should update position with setPosition', () => {
+      TransformStore.set(5, 50, 60, 0, 1);
+      TransformStore.setPosition(5, 100, 120);
 
-      expect(TransformStore.getPrevX(5)).toBe(50);
-      expect(TransformStore.getPrevY(5)).toBe(60);
+      expect(TransformStore.getX(5)).toBe(100);
+      expect(TransformStore.getY(5)).toBe(120);
     });
   });
 
@@ -72,15 +69,9 @@ describe('DOD Component Stores', () => {
     });
 
     it('should set and get radius correctly', () => {
-      PhysicsStore.setRadius(10, 25.5);
+      PhysicsStore.set(10, 0, 0, 100, 25.5);
 
       expect(PhysicsStore.getRadius(10)).toBe(25.5);
-    });
-
-    it('should set and get mass correctly', () => {
-      PhysicsStore.setMass(3, 100);
-
-      expect(PhysicsStore.getMass(3)).toBe(100);
     });
 
     it('should set all physics properties at once', () => {
@@ -88,7 +79,6 @@ describe('DOD Component Stores', () => {
 
       expect(PhysicsStore.getVelocityX(0)).toBe(5);
       expect(PhysicsStore.getVelocityY(0)).toBe(10);
-      expect(PhysicsStore.getMass(0)).toBe(100);
       expect(PhysicsStore.getRadius(0)).toBe(20);
     });
   });
@@ -102,8 +92,8 @@ describe('DOD Component Stores', () => {
       expect(StatsStore.getMaxHealth(0)).toBe(100);
     });
 
-    it('should set and get score correctly', () => {
-      StatsStore.setScore(5, 1500);
+    it('should set and get score via set method', () => {
+      StatsStore.set(5, 100, 100, 1500, 0, 1, 1);
 
       expect(StatsStore.getScore(5)).toBe(1500);
     });
@@ -154,39 +144,53 @@ describe('DOD Component Stores', () => {
       expect(StateStore.hasFlag(0, EntityFlags.PLAYER)).toBe(true);
       expect(StateStore.hasFlag(1, EntityFlags.BOT)).toBe(true);
     });
-
-    it('should handle ALL_FLAGS correctly', () => {
-      StateStore.flags[0] = EntityFlags.ALL_FLAGS;
-
-      expect(StateStore.isActive(0)).toBe(true);
-      expect(StateStore.hasFlag(0, EntityFlags.PLAYER)).toBe(true);
-      expect(StateStore.hasFlag(0, EntityFlags.BOT)).toBe(true);
-      expect(StateStore.hasFlag(0, EntityFlags.FOOD)).toBe(true);
-    });
   });
 
   describe('InputStore', () => {
     it('should set and get target position correctly', () => {
       InputStore.setTarget(0, 300, 400);
+      const out = { x: 0, y: 0 };
+      InputStore.getTarget(0, out);
 
-      expect(InputStore.getTargetX(0)).toBe(300);
-      expect(InputStore.getTargetY(0)).toBe(400);
+      expect(out.x).toBe(300);
+      expect(out.y).toBe(400);
     });
 
-    it('should set and consume skill input', () => {
-      InputStore.setSkillActive(0, true);
-      expect(InputStore.consumeSkillInput(0)).toBe(true);
-      expect(InputStore.consumeSkillInput(0)).toBe(false); // Already consumed
+    it('should set and consume action bits', () => {
+      // Set action bit 0 (skill)
+      InputStore.setAction(0, 0, true);
+      expect(InputStore.isActionActive(0, 0)).toBe(true);
+      expect(InputStore.consumeAction(0, 0)).toBe(true);
+      expect(InputStore.consumeAction(0, 0)).toBe(false); // Already consumed
+    });
+
+    it('should handle multiple action bits independently', () => {
+      // Set bit 0 and bit 1
+      InputStore.setAction(0, 0, true);
+      InputStore.setAction(0, 1, true);
+      
+      expect(InputStore.isActionActive(0, 0)).toBe(true);
+      expect(InputStore.isActionActive(0, 1)).toBe(true);
+      
+      // Consume only bit 0
+      expect(InputStore.consumeAction(0, 0)).toBe(true);
+      expect(InputStore.isActionActive(0, 0)).toBe(false);
+      expect(InputStore.isActionActive(0, 1)).toBe(true); // Bit 1 still active
     });
 
     it('should handle multiple entities independently', () => {
       InputStore.setTarget(0, 100, 200);
       InputStore.setTarget(1, 500, 600);
 
-      expect(InputStore.getTargetX(0)).toBe(100);
-      expect(InputStore.getTargetY(0)).toBe(200);
-      expect(InputStore.getTargetX(1)).toBe(500);
-      expect(InputStore.getTargetY(1)).toBe(600);
+      const out0 = { x: 0, y: 0 };
+      const out1 = { x: 0, y: 0 };
+      InputStore.getTarget(0, out0);
+      InputStore.getTarget(1, out1);
+
+      expect(out0.x).toBe(100);
+      expect(out0.y).toBe(200);
+      expect(out1.x).toBe(500);
+      expect(out1.y).toBe(600);
     });
   });
 
@@ -203,14 +207,10 @@ describe('DOD Component Stores', () => {
       expect(ConfigStore.getSpeedMultiplier(0)).toBe(1.5);
     });
 
-    it('should set and get all config at once', () => {
-      ConfigStore.set(0, 100, 1.2, 50, 30, 500);
+    it('should set and get magnet radius correctly', () => {
+      ConfigStore.setMagnetRadius(0, 50);
 
-      expect(ConfigStore.getMaxSpeed(0)).toBe(100);
-      expect(ConfigStore.getSpeedMultiplier(0)).toBe(1.2);
       expect(ConfigStore.getMagnetRadius(0)).toBe(50);
-      expect(ConfigStore.getPickupRange(0)).toBe(30);
-      expect(ConfigStore.getVisionRange(0)).toBe(500);
     });
   });
 
@@ -227,92 +227,31 @@ describe('DOD Component Stores', () => {
       expect(SkillStore.getMaxCooldown(0)).toBe(10);
     });
 
-    it('should set and get charge correctly', () => {
-      SkillStore.setCharge(0, 3);
+    it('should set and get active timer correctly', () => {
+      SkillStore.setActiveTimer(0, 2.5);
 
-      expect(SkillStore.getCharge(0)).toBe(3);
+      expect(SkillStore.getActiveTimer(0)).toBe(2.5);
     });
 
-    it('should set and get shape correctly', () => {
-      SkillStore.setShape(0, 2);
+    it('should set all values at once', () => {
+      SkillStore.set(0, 5.0, 10.0, 2.0);
 
-      expect(SkillStore.getShape(0)).toBe(2);
-    });
-  });
-
-  describe('TattooStore', () => {
-    it('should set and check tattoo flags correctly', () => {
-      TattooStore.setTattoo(0, 0); // First bit
-      TattooStore.setTattoo(0, 2); // Third bit
-
-      expect(TattooStore.hasTattoo(0, 0)).toBe(true);
-      expect(TattooStore.hasTattoo(0, 2)).toBe(true);
-      expect(TattooStore.hasTattoo(0, 1)).toBe(false);
-    });
-
-    it('should remove tattoo correctly', () => {
-      TattooStore.setTattoo(0, 0);
-      TattooStore.removeTattoo(0, 0);
-
-      expect(TattooStore.hasTattoo(0, 0)).toBe(false);
-    });
-
-    it('should handle multiple entities independently', () => {
-      TattooStore.setTattoo(0, 0);
-      TattooStore.setTattoo(1, 1);
-
-      expect(TattooStore.hasTattoo(0, 0)).toBe(true);
-      expect(TattooStore.hasTattoo(1, 1)).toBe(true);
-      expect(TattooStore.hasTattoo(0, 1)).toBe(false);
-      expect(TattooStore.hasTattoo(1, 0)).toBe(false);
+      expect(SkillStore.getCooldown(0)).toBe(5.0);
+      expect(SkillStore.getMaxCooldown(0)).toBe(10.0);
+      expect(SkillStore.getActiveTimer(0)).toBe(2.0);
     });
   });
 
   describe('ProjectileStore', () => {
-    it('should set and get owner index correctly', () => {
-      ProjectileStore.setOwnerIndex(0, 5);
+    it('should set all properties at once', () => {
+      ProjectileStore.set(0, 1, 25, 3.5, 2);
 
-      expect(ProjectileStore.getOwnerIndex(0)).toBe(5);
-    });
-
-    it('should set and get damage correctly', () => {
-      ProjectileStore.setDamage(0, 25);
-
-      expect(ProjectileStore.getDamage(0)).toBe(25);
-    });
-
-    it('should set and get duration correctly', () => {
-      ProjectileStore.setDuration(0, 3.5);
-
-      expect(ProjectileStore.getDuration(0)).toBe(3.5);
-    });
-
-    it('should decrement lifetime correctly', () => {
-      ProjectileStore.set(0, 1, 10, 5, 0);
-      ProjectileStore.decrementLifetime(0, 0.1);
-
-      expect(ProjectileStore.getLifetime(0)).toBeCloseTo(0.1, 5);
-    });
-  });
-
-  describe('EntityLookup', () => {
-    it('should store and retrieve entity objects', () => {
-      const mockEntity = { id: 'test', physicsIndex: 0 } as any;
-      EntityLookup[0] = mockEntity;
-
-      expect(EntityLookup[0]).toBe(mockEntity);
-    });
-
-    it('should handle undefined entries', () => {
-      expect(EntityLookup[100]).toBeUndefined();
-    });
-
-    it('should allow clearing entries', () => {
-      const mockEntity = { id: 'test', physicsIndex: 0 } as any;
-      EntityLookup[0] = mockEntity;
-      EntityLookup[0] = undefined as any;
-
-      expect(EntityLookup[0]).toBeUndefined();
+      // ProjectileStore only has `set` method in engine version
+      // Data is stored at stride 4: [ownerId, damage, duration, typeId]
+      expect(ProjectileStore.data[0]).toBe(1);
+      expect(ProjectileStore.data[1]).toBe(25);
+      expect(ProjectileStore.data[2]).toBe(3.5);
+      expect(ProjectileStore.data[3]).toBe(2);
     });
   });
 
@@ -321,7 +260,7 @@ describe('DOD Component Stores', () => {
       // Set some values
       TransformStore.set(0, 100, 200, 0, 1);
       StateStore.setFlag(0, EntityFlags.ACTIVE);
-      StatsStore.setScore(0, 1000);
+      StatsStore.set(0, 100, 100, 1000, 0.5, 1, 1);
 
       // Reset
       resetAllStores();

@@ -4,7 +4,7 @@ import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
 import { vfxSystem } from '../vfx/vfxSystem';
-import { TransformStore, PhysicsStore } from '../engine/dod/ComponentStores';
+import { TransformStore, PhysicsStore } from '@cjr/engine';
 
 // EIDOLON-V: DOD helpers for tattoo synergies
 const getPlayerPos = (player: Player, out: { x: number; y: number }) => {

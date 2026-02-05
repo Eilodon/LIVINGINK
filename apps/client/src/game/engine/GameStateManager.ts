@@ -12,7 +12,7 @@ import { performanceMonitor } from '../../core/performance/PerformanceMonitor';
 
 // EIDOLON-V FIX: Dependency Injection
 import { BufferedInput } from '../input/BufferedInput';
-import { InputStore, TransformStore, PhysicsStore, resetAllStores } from './dod/ComponentStores';
+import { InputStore, TransformStore, PhysicsStore, resetAllStores } from '@cjr/engine';
 import {
   NetworkClient,
   networkClient as defaultNetworkClient,
@@ -175,6 +175,13 @@ export class GameStateManager {
         state.player.velocity.x = PhysicsStore.data[playerTIdx];
         state.player.velocity.y = PhysicsStore.data[playerTIdx + 1];
       }
+
+      // EIDOLON-V FIX: Camera follows player with smooth interpolation
+      const CAMERA_LERP = 0.1; // Smoothing factor (0 = no movement, 1 = instant snap)
+      const targetCamX = state.player.position.x;
+      const targetCamY = state.player.position.y;
+      state.camera.x += (targetCamX - state.camera.x) * CAMERA_LERP;
+      state.camera.y += (targetCamY - state.camera.y) * CAMERA_LERP;
     }
 
     // Audio Sync - EIDOLON-V: Read from DOD first
@@ -410,6 +417,11 @@ export class GameStateManager {
     }
 
     this.stopGameLoop();
+
+    // EIDOLON-V FIX: Initialize CJRClientRunner to enable simulation (sets running = true)
+    console.log('[DEBUG] startGameLoop: Calling cjrClientRunner.initialize()');
+    cjrClientRunner.initialize();
+    console.log('[DEBUG] startGameLoop: initialize() completed');
 
     // Bind tick to this
     this.gameLoop = new FixedGameLoop(

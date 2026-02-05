@@ -5,9 +5,9 @@ import {
     StateStore,
     StatsStore,
     EntityFlags,
-    MAX_ENTITIES
+    MAX_ENTITIES,
+    EntityLookup
 } from '@cjr/engine';
-import { EntityLookup } from '../game/engine/dod/ComponentStores';
 
 interface EntitySnapshot {
     id: number; // Index

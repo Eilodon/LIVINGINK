@@ -3,8 +3,7 @@
  * Authoritative server implementation using Colyseus
  */
 
-import colyseus from 'colyseus';
-const { Room } = colyseus;
+import { Room } from 'colyseus';
 import type { Client, Delayed } from 'colyseus';
 import { logger } from '../logging/Logger';
 import {

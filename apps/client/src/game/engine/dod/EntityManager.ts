@@ -1,4 +1,4 @@
-import { MAX_ENTITIES } from './EntityFlags';
+import { MAX_ENTITIES } from '@cjr/engine';
 
 export class EntityManager {
   private static instance: EntityManager;
