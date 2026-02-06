@@ -111,9 +111,10 @@ export class InputValidator {
     // Validate sequence number
     if (typedInput.seq !== undefined) {
       const seq = Number(typedInput.seq);
-      if (isNaN(seq) || seq < 0 || seq > 1000000) {
+      if (isNaN(seq) || seq < 0 || seq > Number.MAX_SAFE_INTEGER) {
         errors.push('Invalid sequence number');
       } else {
+        // EIDOLON-V FIX: Allow full safe integer range for long sessions
         sanitized.seq = Math.floor(seq);
       }
     }

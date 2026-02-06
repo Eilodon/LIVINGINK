@@ -262,8 +262,27 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
         const interpAlpha = alphaRef.current;
 
         // D. Render Food
+        // EIDOLON-V OPTIMIZATION: Viewport Culling
+        const viewX = camX - window.innerWidth / 2;
+        const viewY = camY - window.innerHeight / 2;
+        const viewW = window.innerWidth;
+        const viewH = window.innerHeight;
+        const CULL_MARGIN = 100;
+
         for (const f of state.food) {
           if (f.isDead) continue;
+
+          // Pre-check culling (using raw pos or approximated)
+          // Simple AABB check against viewport
+          if (
+            f.position.x < viewX - CULL_MARGIN ||
+            f.position.x > viewX + viewW + CULL_MARGIN ||
+            f.position.y < viewY - CULL_MARGIN ||
+            f.position.y > viewY + viewH + CULL_MARGIN
+          ) {
+            continue;
+          }
+
           const gfx = foodPoolRef.current!.get();
           const idx = f.physicsIndex ?? idToIndex.get(f.id);
           let fx = f.position.x;
@@ -310,6 +329,16 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
         }
         for (const u of units) {
           if (!u || u.isDead) continue;
+
+          // Culling for units
+          if (
+            u.position.x < viewX - CULL_MARGIN ||
+            u.position.x > viewX + viewW + CULL_MARGIN ||
+            u.position.y < viewY - CULL_MARGIN ||
+            u.position.y > viewY + viewH + CULL_MARGIN
+          ) {
+            continue;
+          }
 
           const idx = u.physicsIndex ?? idToIndex.get(u.id);
           let ux = u.position.x;

@@ -585,7 +585,7 @@ export class AudioEngine {
       currentVolume: 0,
     });
 
-    // Start update loop
+    // Initial volume set
     this.updateBGM();
 
     // EIDOLON-V FIX: Use proper logging system instead of console.log
@@ -621,20 +621,29 @@ export class AudioEngine {
     if (actionLayer) {
       actionLayer.targetVolume = intensity >= 3 ? 0.15 : 0;
     }
+
+    // Trigger update immediately
+    this.updateBGM();
   }
 
   private updateBGM(): void {
     if (!this.isPlaying) return;
 
-    // Smoothly interpolate layer volumes
-    this.bgmLayers.forEach(layer => {
-      const diff = layer.targetVolume - layer.currentVolume;
-      layer.currentVolume += diff * 0.02; // Smooth transition
-      layer.gainNode.gain.value = layer.currentVolume;
-    });
+    if (!this.isPlaying) return;
 
-    // Schedule next update
-    requestAnimationFrame(() => this.updateBGM());
+    // EIDOLON-V FIX: Use Web Audio API automation instead of RAF loop
+    // This decouples audio fading from the main thread/framerate.
+    const now = this.ctx?.currentTime || 0;
+
+    this.bgmLayers.forEach(layer => {
+      // Smoothly interpolate to target volume using exponential approach
+      // Time constant of 0.5s gives a nice smooth transition
+      layer.gainNode.gain.cancelScheduledValues(now);
+      layer.gainNode.gain.setTargetAtTime(layer.targetVolume, now, 0.5);
+
+      // Update local tracker for debug/reference (approximate)
+      layer.currentVolume = layer.targetVolume;
+    });
   }
 
   // -------------------- LISTENER POSITION --------------------

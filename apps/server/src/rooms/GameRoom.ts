@@ -428,25 +428,22 @@ export class GameRoom extends Room<GameRoomState> {
       // Prevents ABA problem: entity recycled and assigned to different player
       const storedHandle = this.entityHandleMap.get(sessionId);
       if (storedHandle === undefined || !this.isValidEntityHandle(storedHandle)) {
-        logger.warn('Invalid entity handle - possible ABA attack or stale data', {
-          sessionId,
-          storedHandle,
-          entityIndex,
-        });
-        return; // Drop input for invalid entity
+        // Only log warning if not just starting up (handle 0)
+        if (storedHandle !== undefined) {
+          logger.warn('Invalid entity handle caught (ABA Guard)', { sessionId, storedHandle });
+        }
+        return; // Drop input
       }
 
       // Verify handle matches current index
       const currentHandle = this.makeEntityHandle(entityIndex);
       if (storedHandle !== currentHandle) {
-        logger.warn('Entity handle mismatch - entity was recycled', {
-          sessionId,
-          storedHandle,
-          currentHandle,
-        });
-        // Update handle map and continue processing
+        // This is normal during respawns, so use DEBUG log instead of WARN
+        logger.debug('Entity handle updated (Respawn/Recycle)', { sessionId, old: storedHandle, new: currentHandle });
+
+        // Update handle map so next frame inputs work
         this.entityHandleMap.set(sessionId, currentHandle);
-        return; // EIDOLON-V FIX: Stop processing input for mismatched entity!
+        return; // EIDOLON-V SEQ: Drop this frame's input as it targets the dead entity
       }
 
       // EIDOLON-V FIX: Atomic input consumption - get and delete immediately

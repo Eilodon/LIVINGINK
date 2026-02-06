@@ -16,6 +16,8 @@ import {
 } from '@cjr/engine';
 import { GameState } from '../../../types';
 
+import { cjrClientRunner } from '../runner/CJRClientRunner';
+
 export class PhysicsCoordinator {
   private lastUpdateTime = 0;
 
@@ -24,9 +26,9 @@ export class PhysicsCoordinator {
    * Reads input from DOD InputStore, updates physics, writes to TransformStore
    */
   public updateSingleplayer(dt: number, state: GameState): void {
-    void dt; // dt handled by CJRClientRunner.update()
-    // Physics update is handled by cjrClientRunner in GameStateManager
-    // This coordinator just syncs data from DOD stores to state objects
+    // EIDOLON-V FIX: Actually drive the simulation
+    cjrClientRunner.setGameState(state);
+    cjrClientRunner.update(dt);
 
     // Sync player position from DOD store to state object
     // Note: This is only for UI/debugging - rendering uses DOD directly
@@ -44,9 +46,9 @@ export class PhysicsCoordinator {
    * Server authoritative - client just interpolates
    */
   public updateMultiplayerVisuals(dt: number, state: GameState): void {
-    // In multiplayer, physics is server-authoritative
-    // Client only updates visual interpolation and VFX
-    // Position comes from network, not local physics
+    // EIDOLON-V FIX: Update visual systems (particles, etc)
+    cjrClientRunner.setGameState(state);
+    cjrClientRunner.updateVisualsOnly(dt);
 
     // Update local player visuals from DOD if needed
     if (state.player.physicsIndex !== undefined) {
