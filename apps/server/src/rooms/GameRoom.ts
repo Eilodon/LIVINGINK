@@ -594,6 +594,10 @@ export class GameRoom extends Room<GameRoomState> {
     StateStore.setFlag(this.world, idx, 0); // Correct way to clear flag
     this.world.input.fill(0, idx * 4, idx * 4 + 4);
     this.world.config.fill(0, idx * 4, idx * 4 + 4);
+    this.world.skill.fill(0, idx * 4, idx * 4 + 4);
+    this.world.projectile.fill(0, idx * 4, idx * 4 + 4);
+    this.world.tattoo.fill(0, idx * 4, idx * 4 + 4);
+    this.world.pigment.fill(0, stride8, stride8 + 8);
 
     // Return to free list
     this.freeEntityIndices.push(idx);
