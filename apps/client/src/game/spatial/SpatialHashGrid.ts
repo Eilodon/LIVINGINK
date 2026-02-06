@@ -247,9 +247,16 @@ export class SpatialHashGrid {
     const MAX_RESULTS = 10000;
     const MAX_ITERATIONS = this.config.maxEntities * 2; // Safety limit for linked list traversal
 
-    // EIDOLON ARCHITECT: Zero-allocation iteration
-    // Note: May produce duplicates if entity spans multiple cells
-    // Consumers (collision system) already handle duplicate checks
+    // EIDOLON-V AUDIT FIX: Move epoch increment OUTSIDE the cell loop
+    // Was incrementing per-cell, which broke cross-cell duplicate detection entirely
+    let epoch = (this.visitEpoch + 1) >>> 0;
+    if (epoch === 0 || epoch === 0xffffffff) {
+      this.visitMark.fill(0);
+      epoch = 1;
+    }
+    this.visitEpoch = epoch;
+
+    // EIDOLON ARCHITECT: Zero-allocation iteration with proper cross-cell dedup
     for (let c = 0; c < this.tempCellArray.length; c++) {
       const cellIndex = this.tempCellArray[c];
       if (cellIndex < 0 || cellIndex >= this.totalCells) continue; // Validate cell index
@@ -257,33 +264,28 @@ export class SpatialHashGrid {
       // CRITICAL: Traverse linked list (zero allocation)
       let currentEntityIndex = this.cellHead[cellIndex];
       let iterationCount = 0;
-      let epoch = (this.visitEpoch + 1) >>> 0;
-      if (epoch === 0 || epoch === 0xffffffff) {
-        this.visitMark.fill(0);
-        epoch = 1;
-      }
-      this.visitEpoch = epoch;
 
       while (
         currentEntityIndex !== -1 &&
         iterationCount < MAX_ITERATIONS &&
         outResults.length < MAX_RESULTS
       ) {
-        // Safety check: prevent infinite loops from corrupted linked lists
-        if (this.visitMark[currentEntityIndex] === epoch) {
-          warnOnce(
-            'SpatialHashGrid: Detected cycle in linked list at entity',
-            currentEntityIndex
-          );
-          break;
-        }
-        this.visitMark[currentEntityIndex] = epoch;
-
-        // Validate entity index
+        // EIDOLON-V AUDIT FIX: Validate entity index BEFORE visitMark access (was OOB read)
         if (currentEntityIndex < 0 || currentEntityIndex >= this.config.maxEntities) {
           warnOnce('SpatialHashGrid: Invalid entity index', currentEntityIndex);
           break;
         }
+
+        // Safety check: prevent infinite loops from corrupted linked lists
+        // and deduplicate entities spanning multiple cells
+        if (this.visitMark[currentEntityIndex] === epoch) {
+          // Skip already-visited entity (cross-cell duplicate or cycle)
+          const nextIndex = this.nextEntity[currentEntityIndex];
+          currentEntityIndex = nextIndex;
+          iterationCount++;
+          continue;
+        }
+        this.visitMark[currentEntityIndex] = epoch;
 
         // DOD Distance Check (direct array access)
         const tIdx = currentEntityIndex * 8;

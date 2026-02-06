@@ -426,21 +426,37 @@ export class WebGL2Backend implements IRenderBackend {
         this.gl.uniformMatrix4fv(uView, false, view);
     }
 
+    // EIDOLON-V AUDIT FIX: Detach and delete shaders after linking to prevent GPU resource leak
     private createProgram(vsSource: string, fsSource: string): WebGLProgram | null {
         if (!this.gl) return null;
         const vs = this.compileShader(vsSource, this.gl.VERTEX_SHADER);
         const fs = this.compileShader(fsSource, this.gl.FRAGMENT_SHADER);
-        if (!vs || !fs) return null;
+        if (!vs || !fs) {
+            if (vs) this.gl.deleteShader(vs);
+            if (fs) this.gl.deleteShader(fs);
+            return null;
+        }
 
         const program = this.gl.createProgram();
-        if (!program) return null;
+        if (!program) {
+            this.gl.deleteShader(vs);
+            this.gl.deleteShader(fs);
+            return null;
+        }
 
         this.gl.attachShader(program, vs);
         this.gl.attachShader(program, fs);
         this.gl.linkProgram(program);
 
+        // Always detach and delete shaders after linking (GPU retains internal copy)
+        this.gl.detachShader(program, vs);
+        this.gl.detachShader(program, fs);
+        this.gl.deleteShader(vs);
+        this.gl.deleteShader(fs);
+
         if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
             console.error(this.gl.getProgramInfoLog(program));
+            this.gl.deleteProgram(program);
             return null;
         }
         return program;
@@ -456,6 +472,7 @@ export class WebGL2Backend implements IRenderBackend {
 
         if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
             console.error(this.gl.getShaderInfoLog(shader));
+            this.gl.deleteShader(shader);
             return null;
         }
         return shader;

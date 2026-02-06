@@ -6,7 +6,7 @@
  * =============================================================================
  */
 
-import { NetworkClient, NetworkStatus } from '../../../network/NetworkClient';
+import { NetworkClient, NetworkStatus, networkClient as sharedNetworkClient } from '../../../network/NetworkClient';
 import { GameState } from '../../../types';
 import { clientLogger } from '../../../core/logging/ClientLogger';
 import { getCurrentEngine } from '../context';
@@ -128,5 +128,5 @@ export class NetworkSync {
   }
 }
 
-// Export singleton instance
-export const networkSync = new NetworkSync(new NetworkClient());
+// EIDOLON-V AUDIT FIX: Use the shared NetworkClient singleton instead of creating a disconnected instance
+export const networkSync = new NetworkSync(sharedNetworkClient);

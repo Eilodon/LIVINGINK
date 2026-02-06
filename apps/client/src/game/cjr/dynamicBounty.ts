@@ -31,7 +31,7 @@ const spawnCandyVein = (state: GameState) => {
   const r = randomRange(0, RING_RADII.R3 * 0.8); // Near center
 
   const vein: Food = {
-    id: `vein_${Date.now()} `,
+    id: `vein_${Date.now()}`,
     position: { x: Math.cos(angle) * r, y: Math.sin(angle) * r },
     velocity: { x: 0, y: 0 },
     radius: 30, // Big
@@ -42,8 +42,7 @@ const spawnCandyVein = (state: GameState) => {
     isDead: false,
   };
 
-  state.food.push(vein);
-  state.engine.spatialGrid.insert(vein);
+  // EIDOLON-V AUDIT FIX: Removed duplicate push+insert (was causing double collision/render)
   state.food.push(vein);
   state.engine.spatialGrid.insert(vein);
 

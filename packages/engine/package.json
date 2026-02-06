@@ -7,7 +7,7 @@
     "exports": {
         ".": "./src/index.ts",
         "./events": "./src/events/index.ts",
-        "./dod": "./src/dod/index.ts",
+        "./networking": "./src/networking/index.ts",
         "./systems": "./src/systems/index.ts",
         "./config": "./src/config/index.ts",
         "./math": "./src/math/index.ts",

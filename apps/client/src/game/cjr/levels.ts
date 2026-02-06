@@ -57,9 +57,10 @@ const tutorialLevels: LevelConfig[] = [
     winHoldSeconds: 1.0,
     timeLimit: 180,
     waveIntervals: { ring1: 7.6, ring2: 9.8, ring3: 12.8 },
-    burstSizes: { ring1: 30, ring2: 20, ring3: 15 }, // INCREASED FOR TESTING
+    // EIDOLON-V AUDIT FIX: Reverted from inflated test values to proper tutorial difficulty
+    burstSizes: { ring1: 6, ring2: 4, ring3: 3 },
     spawnWeights: { pigment: 0.8, neutral: 0.18, special: 0.02 },
-    botCount: 12, // INCREASED FOR TESTING
+    botCount: 3,
     boss: {
       boss1Enabled: false,
       boss2Enabled: false,
@@ -79,9 +80,9 @@ const tutorialLevels: LevelConfig[] = [
     winHoldSeconds: 1.1,
     timeLimit: 170,
     waveIntervals: { ring1: 7.9, ring2: 10, ring3: 13.2 },
-    burstSizes: { ring1: 25, ring2: 18, ring3: 12 }, // INCREASED FOR TESTING
+    burstSizes: { ring1: 7, ring2: 5, ring3: 3 },
     spawnWeights: { pigment: 0.74, neutral: 0.22, special: 0.04 },
-    botCount: 15, // INCREASED FOR TESTING
+    botCount: 5,
     boss: {
       boss1Enabled: false,
       boss2Enabled: false,
@@ -101,9 +102,9 @@ const tutorialLevels: LevelConfig[] = [
     winHoldSeconds: 1.2,
     timeLimit: 160,
     waveIntervals: { ring1: 8.2, ring2: 10.3, ring3: 13.5 },
-    burstSizes: { ring1: 20, ring2: 15, ring3: 10 }, // INCREASED FOR TESTING
+    burstSizes: { ring1: 8, ring2: 6, ring3: 4 },
     spawnWeights: { pigment: 0.7, neutral: 0.23, special: 0.07 },
-    botCount: 18, // INCREASED FOR TESTING
+    botCount: 6,
     boss: {
       boss1Enabled: false,
       boss2Enabled: false,
@@ -276,7 +277,8 @@ const generatedLevels: LevelConfig[] = Array.from({ length: 3 }, (_, i) => {
 
 export const LEVELS: LevelConfig[] = [...tutorialLevels, ...generatedLevels];
 
+// EIDOLON-V AUDIT FIX: Clamp to actual array length (was allowing level 10 -> LEVELS[9] which is undefined)
 export const getLevelConfig = (level: number): LevelConfig => {
-  const clamped = Math.max(1, Math.min(10, Math.round(level)));
+  const clamped = Math.max(1, Math.min(LEVELS.length, Math.round(level)));
   return LEVELS[clamped - 1];
 };

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GameState } from '../types';
 import { gameStateManager, GameEvent } from '../game/engine/GameStateManager';
-import { NetworkStatus } from '../game/networking/NetworkClient';
+// EIDOLON-V AUDIT FIX: Corrected import path (was ../game/networking/ which doesn't exist)
+import { NetworkStatus } from '../network/NetworkClient';
 import {
   loadSettings,
   loadProgression,

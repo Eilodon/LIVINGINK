@@ -91,11 +91,12 @@ export class GameRoom extends Room<GameRoomState> {
   private roomCreateRates = new Map<string, number>(); // IP -> count
   private roomCreateLastReset = new Map<string, number>(); // IP -> timestamp
 
-  // EIDOLON-V FIX: Wave spawner state for food generation
+  // EIDOLON-V AUDIT FIX: Convert ms to seconds (WAVE_CONFIG.INTERVAL is in ms but update() passes dtSec)
+  // Was: 8000/10000/14000 ms used with dt in seconds, causing ~2.3 hour wait before first wave
   private waveState = {
-    ring1: WAVE_CONFIG.INTERVAL[1],
-    ring2: WAVE_CONFIG.INTERVAL[2],
-    ring3: WAVE_CONFIG.INTERVAL[3],
+    ring1: WAVE_CONFIG.INTERVAL[1] / 1000,
+    ring2: WAVE_CONFIG.INTERVAL[2] / 1000,
+    ring3: WAVE_CONFIG.INTERVAL[3] / 1000,
   };
   private nextFoodId: number = 0;
 
@@ -103,15 +104,17 @@ export class GameRoom extends Room<GameRoomState> {
   // Composite handle: (generation << 16) | index
   private entityHandleMap = new Map<string, number>(); // sessionId -> composite handle
 
+  // EIDOLON-V AUDIT FIX: Use unsigned right shift (>>>) to prevent sign bit issues
+  // when generation > 32767 (was using signed >> which preserves sign bit)
   private makeEntityHandle(index: number): number {
     const gen = this.entityGenerations[index];
-    return (gen << 16) | index;
+    return ((gen << 16) | index) >>> 0; // Force unsigned 32-bit
   }
 
   // Validate entity handle is still valid (not recycled)
   private isValidEntityHandle(handle: number): boolean {
     const index = handle & 0xFFFF;
-    const expectedGen = handle >> 16;
+    const expectedGen = (handle >>> 16) & 0xFFFF; // Unsigned shift to extract generation
 
     if (index < 0 || index >= MAX_ENTITIES) return false;
 
@@ -750,31 +753,38 @@ export class GameRoom extends Room<GameRoomState> {
     });
   }
 
+  // EIDOLON-V AUDIT FIX: Use async delay so client sees isDead=true for death animation
+  // Was synchronous (isDead set true then immediately false in same tick - client never saw death)
   private handlePlayerDeath(player: PlayerState, sessionId: string) {
     const entityIndex = this.entityIndices.get(sessionId);
 
-    // Mark as dead briefly for respawn animation
+    // Mark as dead - client will see this in the next state patch
     player.isDead = true;
 
-    // Respawn after brief delay (synchronous for now)
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * (MAP_RADIUS * 0.8);
-    const x = Math.cos(angle) * r;
-    const y = Math.sin(angle) * r;
+    // Respawn after 1.5 second delay (allows death animation to play on client)
+    this.clock.setTimeout(() => {
+      // Guard: player may have disconnected during the delay
+      if (!this.entityIndices.has(sessionId)) return;
 
-    player.position.x = x;
-    player.position.y = y;
-    player.radius = PLAYER_START_RADIUS;
-    player.currentHealth = 100;
-    player.isDead = false;
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * (MAP_RADIUS * 0.8);
+      const x = Math.cos(angle) * r;
+      const y = Math.sin(angle) * r;
 
-    // EIDOLON-V P2: Sync respawn to DOD stores
-    if (entityIndex !== undefined) {
-      TransformStore.setPosition(this.world, entityIndex, x, y);
-      PhysicsStore.setVelocity(this.world, entityIndex, 0, 0);
-      StatsStore.setCurrentHealth(this.world, entityIndex, 100);
-    }
+      player.position.x = x;
+      player.position.y = y;
+      player.radius = PLAYER_START_RADIUS;
+      player.currentHealth = 100;
+      player.isDead = false;
 
-    logger.info('Player respawned', { sessionId, position: { x, y } });
+      // Sync respawn to DOD stores
+      if (entityIndex !== undefined) {
+        TransformStore.setPosition(this.world, entityIndex, x, y);
+        PhysicsStore.setVelocity(this.world, entityIndex, 0, 0);
+        StatsStore.setCurrentHealth(this.world, entityIndex, 100);
+      }
+
+      logger.info('Player respawned', { sessionId, position: { x, y } });
+    }, 1500);
   }
 }

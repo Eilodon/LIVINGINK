@@ -6,7 +6,8 @@ export const WORLD_HEIGHT = 3400;
 export const MAP_RADIUS = 1600;
 export const INITIAL_ZONE_RADIUS = 1600;
 export const CENTER_RADIUS = 320;
-export const GAME_DURATION = 150;
+// EIDOLON-V AUDIT FIX: Synced with @cjr/shared (was 150, server uses 480)
+export const GAME_DURATION = 480;
 export const SPAWN_PROTECTION_TIME = 5;
 export const GRID_CELL_SIZE = 300;
 
@@ -58,11 +59,12 @@ export const MUTATION_CHOICES = 3;
 
 // EIDOLON-V FIX: Add CJR constants to main file for single source of truth
 // These were previously duplicated in services/cjr/cjrConstants.ts
+// EIDOLON-V AUDIT FIX: Synced with @cjr/shared (R3 was 400, CENTER was 100)
 export const RING_RADII = {
   R1: 1600,
   R2: 1000,
-  R3: 400,
-  CENTER: 100,
+  R3: 500,
+  CENTER: 150,
 };
 
 export const THRESHOLDS = {

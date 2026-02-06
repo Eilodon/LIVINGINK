@@ -335,8 +335,8 @@ export class AudioEngine {
 
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = this.config.sfxVolume;
-    this.masterGain.gain.value = this.config.masterVolume;
-    this.sfxGain.gain.value = this.config.sfxVolume;
+    // EIDOLON-V AUDIT FIX: Connect sfxGain to masterGain (was disconnected - all SFX were silent)
+    this.sfxGain.connect(this.masterGain);
     this.bgmGain = this.ctx.createGain();
     this.bgmGain.gain.value = this.config.bgmVolume;
     this.bgmGain.connect(this.masterGain);
@@ -627,8 +627,6 @@ export class AudioEngine {
   }
 
   private updateBGM(): void {
-    if (!this.isPlaying) return;
-
     if (!this.isPlaying) return;
 
     // EIDOLON-V FIX: Use Web Audio API automation instead of RAF loop
