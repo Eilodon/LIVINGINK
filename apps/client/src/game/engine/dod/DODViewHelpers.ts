@@ -5,9 +5,10 @@
  */
 
 // EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { TransformStore, PhysicsStore, StateStore } from '@cjr/engine';
-import { EntityFlags } from '@cjr/engine/dod/EntityFlags';
+import { TransformStore, PhysicsStore, StateStore, defaultWorld } from '@cjr/engine';
+import { EntityFlags } from '@cjr/engine';
 import { entityManager } from './EntityManager';
+const w = defaultWorld;
 
 // Pre-allocated output buffer for position sampling
 const _positionBuffer = new Float32Array(4096 * 2); // x,y pairs for up to 4096 entities
@@ -21,8 +22,8 @@ const _positionBuffer = new Float32Array(4096 * 2); // x,y pairs for up to 4096 
  * @returns Number of entities sampled (out array contains 2x this many floats)
  */
 export function sampleEntityPositionsToArray(out: Float32Array, filterFlags: number = 0): number {
-  const tData = TransformStore.data;
-  const flags = StateStore.flags;
+  const tData = w.transform;
+  const flags = w.stateFlags;
   const count = entityManager.count;
   const stride = TransformStore.STRIDE;
 
@@ -98,9 +99,9 @@ export function sampleEntityPositionsWithRadiusToArray(
   out: Float32Array,
   filterFlags: number = 0
 ): number {
-  const tData = TransformStore.data;
-  const pData = PhysicsStore.data;
-  const flags = StateStore.flags;
+  const tData = w.transform;
+  const pData = w.physics;
+  const flags = w.stateFlags;
   const count = entityManager.count;
   const tStride = TransformStore.STRIDE;
   const pStride = PhysicsStore.STRIDE;

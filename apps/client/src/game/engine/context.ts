@@ -14,7 +14,8 @@ import { SpatialHashGrid, SpatialQueryResult } from '../spatial/SpatialHashGrid'
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
-import { EntityLookup, TransformStore } from '@cjr/engine';
+import { EntityLookup, TransformStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 // --- Optimization: Persistent Spatial Grid ---
 // ADAPTER: Wraps the new SOTA SpatialHashGrid to match legacy API used in OptimizedEngine
@@ -100,8 +101,8 @@ export class SpatialGrid implements ISpatialGrid {
     let y = entity.position.y;
     if (entity.physicsIndex !== undefined) {
       const tIdx = entity.physicsIndex * 8;
-      x = TransformStore.data[tIdx];
-      y = TransformStore.data[tIdx + 1];
+      x = w.transform[tIdx];
+      y = w.transform[tIdx + 1];
     }
     this.grid.queryRadiusInto(x, y, maxDistance, indices);
 

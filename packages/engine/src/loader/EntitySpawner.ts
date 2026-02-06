@@ -63,8 +63,7 @@ export class EntitySpawner {
      * @returns Entity ID or -1 if no slots available
      */
     findAvailableSlot(world: WorldState): number {
-        const flags = StateStore.flags; // Warn: This is legacy global access, but flags is a getter on WorldState? No, it was static.
-        // EIDOLON-V: use world.stateFlags
+        // EIDOLON-V AUDIT FIX: Removed deprecated StateStore.flags (throws). Use world.stateFlags directly.
         const stateFlags = world.stateFlags;
 
         // Try to find an inactive slot

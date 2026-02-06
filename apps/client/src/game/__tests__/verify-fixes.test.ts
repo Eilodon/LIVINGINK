@@ -15,12 +15,15 @@ import {
   MovementSystem,
   PhysicsSystem,
   EntityLookup,
+  defaultWorld,
 } from '@cjr/engine';
 // Keep local imports for client-specific modules
 // EIDOLON-V AUDIT FIX: Corrected relative paths (test is in __tests__/, needs ../)
 import { entityManager } from '../engine/dod/EntityManager';
 import { createInitialState } from '../engine/index';
 import { createPlayer, createFood, createBot } from '../engine/factories';
+
+const w = defaultWorld;
 
 describe('EntityFlags Fix Verification', () => {
   it('DEAD and OBSTACLE should have different bit values', () => {
@@ -58,18 +61,18 @@ describe('EntityFlags Fix Verification', () => {
 
   it('Setting DEAD flag should not affect OBSTACLE and vice versa', () => {
     const testId = 0;
-    StateStore.flags[testId] = 0;
+    w.stateFlags[testId] = 0;
 
     // Set DEAD
-    StateStore.setFlag(testId, EntityFlags.DEAD);
-    expect(StateStore.hasFlag(testId, EntityFlags.DEAD)).toBe(true);
-    expect(StateStore.hasFlag(testId, EntityFlags.OBSTACLE)).toBe(false);
+    StateStore.setFlag(w, testId, EntityFlags.DEAD);
+    expect(StateStore.hasFlag(w, testId, EntityFlags.DEAD)).toBe(true);
+    expect(StateStore.hasFlag(w, testId, EntityFlags.OBSTACLE)).toBe(false);
 
     // Clear and set OBSTACLE
-    StateStore.flags[testId] = 0;
-    StateStore.setFlag(testId, EntityFlags.OBSTACLE);
-    expect(StateStore.hasFlag(testId, EntityFlags.OBSTACLE)).toBe(true);
-    expect(StateStore.hasFlag(testId, EntityFlags.DEAD)).toBe(false);
+    w.stateFlags[testId] = 0;
+    StateStore.setFlag(w, testId, EntityFlags.OBSTACLE);
+    expect(StateStore.hasFlag(w, testId, EntityFlags.OBSTACLE)).toBe(true);
+    expect(StateStore.hasFlag(w, testId, EntityFlags.DEAD)).toBe(false);
   });
 });
 
@@ -81,18 +84,18 @@ describe('DOD Stores Reset Fix Verification', () => {
 
   it('resetAllStores should clear all data', () => {
     // Set some data first
-    TransformStore.set(0, 100, 200, 0);
-    PhysicsStore.set(0, 10, 20, 1, 30);
-    StateStore.setFlag(0, EntityFlags.ACTIVE | EntityFlags.PLAYER);
+    TransformStore.set(w, 0, 100, 200, 0);
+    PhysicsStore.set(w, 0, 10, 20, 1, 30);
+    StateStore.setFlag(w, 0, EntityFlags.ACTIVE | EntityFlags.PLAYER);
 
     // Reset
     resetAllStores();
 
     // Verify cleared
-    expect(TransformStore.data[0]).toBe(0);
-    expect(TransformStore.data[1]).toBe(0);
-    expect(PhysicsStore.data[0]).toBe(0);
-    expect(StateStore.flags[0]).toBe(0);
+    expect(w.transform[0]).toBe(0);
+    expect(w.transform[1]).toBe(0);
+    expect(w.physics[0]).toBe(0);
+    expect(w.stateFlags[0]).toBe(0);
   });
 
   it('entityManager.reset should reset entity count and free list', () => {
@@ -115,8 +118,8 @@ describe('DOD Stores Reset Fix Verification', () => {
 
   it('createInitialState should reset stores before creating entities', () => {
     // Create some stale data
-    TransformStore.set(0, 9999, 9999, 0);
-    StateStore.setFlag(0, EntityFlags.DEAD);
+    TransformStore.set(w, 0, 9999, 9999, 0);
+    StateStore.setFlag(w, 0, EntityFlags.DEAD);
 
     // Create new game state
     const state = createInitialState(1);
@@ -128,8 +131,8 @@ describe('DOD Stores Reset Fix Verification', () => {
     // Entity at index 0 should be ACTIVE PLAYER, not DEAD
     const playerIdx = state.player.physicsIndex;
     if (playerIdx !== undefined) {
-      expect(StateStore.hasFlag(playerIdx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(playerIdx, EntityFlags.DEAD)).toBe(false);
+      expect(StateStore.hasFlag(w, playerIdx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateStore.hasFlag(w, playerIdx, EntityFlags.DEAD)).toBe(false);
     }
   });
 });
@@ -150,22 +153,22 @@ describe('Entity Loop Fix Verification', () => {
     // Remove middle entities
     for (let i = 10; i < 90; i++) {
       entityManager.removeEntity(ids[i]);
-      StateStore.flags[ids[i]] = 0;
+      w.stateFlags[ids[i]] = 0;
     }
 
     // Entity 99 should still be processed
     const highIdx = ids[99];
-    StateStore.setFlag(highIdx, EntityFlags.ACTIVE);
-    TransformStore.set(highIdx, 100, 100, 0);
-    PhysicsStore.set(highIdx, 10, 10, 1, 20, 0.5, 0.9);
+    StateStore.setFlag(w, highIdx, EntityFlags.ACTIVE);
+    TransformStore.set(w, highIdx, 100, 100, 0);
+    PhysicsStore.set(w, highIdx, 10, 10, 1, 20, 0.5, 0.9);
 
-    const initialX = TransformStore.data[highIdx * 8];
+    const initialX = w.transform[highIdx * 8];
 
     // Run physics
-    PhysicsSystem.update(1 / 60);
+    PhysicsSystem.update(w, 1 / 60);
 
     // Position should have changed (velocity applied)
-    const newX = TransformStore.data[highIdx * 8];
+    const newX = w.transform[highIdx * 8];
     expect(newX).not.toBe(initialX);
   });
 });
@@ -184,9 +187,9 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(player.physicsIndex).toBeDefined();
 
       const idx = player.physicsIndex!;
-      expect(StateStore.hasFlag(idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.PLAYER)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
       expect(EntityLookup[idx]).toBe(player);
     }
   });
@@ -199,9 +202,9 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(food.physicsIndex).toBeDefined();
 
       const idx = food.physicsIndex!;
-      expect(StateStore.hasFlag(idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.FOOD)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.FOOD)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
       expect(EntityLookup[idx]).toBe(food);
     }
   });
@@ -214,10 +217,10 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(bot.physicsIndex).toBeDefined();
 
       const idx = bot.physicsIndex!;
-      expect(StateStore.hasFlag(idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.BOT)).toBe(true);
-      expect(StateStore.hasFlag(idx, EntityFlags.PLAYER)).toBe(false); // Should NOT have PLAYER flag
-      expect(StateStore.hasFlag(idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.BOT)).toBe(true);
+      expect(StateStore.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(false); // Should NOT have PLAYER flag
+      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
     }
   });
 });
@@ -236,18 +239,18 @@ describe('Movement System Verification', () => {
       const idx = player.physicsIndex;
 
       // Set initial position
-      TransformStore.set(idx, 0, 0, 0);
-      PhysicsStore.set(idx, 0, 0, 10, 28, 0.5, 0.9);
+      TransformStore.set(w, idx, 0, 0, 0);
+      PhysicsStore.set(w, idx, 0, 0, 10, 28, 0.5, 0.9);
 
       // Set target in InputStore (player wants to move to 100, 100)
-      InputStore.setTarget(idx, 100, 100);
+      InputStore.setTarget(w, idx, 100, 100);
 
       // Run movement system
-      MovementSystem.update(idx, 1 / 60);
+      MovementSystem.update(w, idx, 1 / 60);
 
       // Velocity should be updated towards target
-      const vx = PhysicsStore.data[idx * 8];
-      const vy = PhysicsStore.data[idx * 8 + 1];
+      const vx = w.physics[idx * 8];
+      const vy = w.physics[idx * 8 + 1];
 
       // Should have velocity towards target (positive in both x and y)
       expect(vx).toBeGreaterThan(0);

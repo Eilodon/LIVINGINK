@@ -11,7 +11,8 @@
  */
 
 import { getPhysicsWorld } from './context';
-import { TransformStore } from '@cjr/engine';
+import { TransformStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 import { vfxBuffer } from './VFXRingBuffer';
 
 const STRIDE = 8;
@@ -38,7 +39,7 @@ export const getInterpolatedPositionByIndex = (
   alpha: number,
   out?: RenderPoint
 ): RenderPoint => {
-  const data = TransformStore.data;
+  const data = w.transform;
   const baseIdx = entityIdx * STRIDE;
 
   const currX = data[baseIdx + X_OFFSET];
@@ -64,7 +65,7 @@ export const getInterpolatedPositionsBatchByIndices = (
 ): Float32Array => {
   const count = indices.length;
   const result = output || new Float32Array(count * 2);
-  const data = TransformStore.data;
+  const data = w.transform;
 
   for (let i = 0; i < count; i++) {
     const idx = indices[i];
@@ -100,7 +101,7 @@ export const getInterpolatedPositionsBatch = (
   const count = entityIds.length;
   // Output is packed tight [x, y, x, y...] so output stride is 2
   const result = output || new Float32Array(count * 2);
-  const data = TransformStore.data;
+  const data = w.transform;
 
   for (let i = 0; i < count; i++) {
     const idx = world.idToIndex.get(entityIds[i]);

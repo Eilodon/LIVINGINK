@@ -1,6 +1,7 @@
 import { MAX_SPEED_BASE, MAX_ENTITY_RADIUS } from '../../../constants';
 import { Player, Bot, SizeTier } from '../../../types';
-import { PhysicsStore, StatsStore, EntityLookup } from '@cjr/engine';
+import { PhysicsStore, StatsStore, EntityLookup, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 // Logic ported from legacy physics.ts
 export const applyGrowth = (entity: Player | Bot, amount: number) => {
@@ -9,7 +10,7 @@ export const applyGrowth = (entity: Player | Bot, amount: number) => {
     applyGrowthDOD(entity.physicsIndex, amount);
     // Sync back (Optional, for UI)
     const pIdx = entity.physicsIndex * 8;
-    entity.radius = PhysicsStore.data[pIdx + 4];
+    entity.radius = w.physics[pIdx + 4];
     // Tier update is purely visual/logic, keep locally or move?
     updateTier(entity);
   } else {
@@ -24,7 +25,7 @@ export const applyGrowth = (entity: Player | Bot, amount: number) => {
 
 export const applyGrowthDOD = (id: number, amount: number) => {
   const pIdx = id * 8; // PhysicsStore.STRIDE
-  const currentRadius = PhysicsStore.data[pIdx + 4];
+  const currentRadius = w.physics[pIdx + 4];
 
   const currentArea = Math.PI * currentRadius * currentRadius;
   const newArea = currentArea + amount * 25; // Magic number from constants
@@ -32,9 +33,9 @@ export const applyGrowthDOD = (id: number, amount: number) => {
 
   if (newRadius > MAX_ENTITY_RADIUS) newRadius = MAX_ENTITY_RADIUS;
 
-  PhysicsStore.data[pIdx + 4] = newRadius;
+  w.physics[pIdx + 4] = newRadius;
   // Update Mass? Mass usually ~ Area or Radius.
-  PhysicsStore.data[pIdx + 3] = newRadius; // Simplification: Mass = Radius
+  w.physics[pIdx + 3] = newRadius; // Simplification: Mass = Radius
 };
 
 export const updateTier = (entity: Player | Bot) => {

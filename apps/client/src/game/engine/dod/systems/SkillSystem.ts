@@ -1,5 +1,6 @@
-import { SkillStore, TransformStore, PhysicsStore, StateStore, MAX_ENTITIES, EntityFlags } from '@cjr/engine';
+import { SkillStore, TransformStore, PhysicsStore, StateStore, MAX_ENTITIES, EntityFlags, defaultWorld } from '@cjr/engine';
 import { vfxBuffer, VFX_TYPES } from '../../VFXRingBuffer'; // Import trực tiếp Buffer
+const w = defaultWorld;
 
 // EIDOLON-V: CONST ENUM để Inline số nguyên (Tối ưu biên dịch)
 export const enum ShapeEnum {
@@ -16,7 +17,7 @@ export class SkillSystem {
     state: any
   ) {
     // Validation nhanh bằng Bitmask
-    if ((StateStore.flags[id] & EntityFlags.ACTIVE) === 0) return;
+    if ((w.stateFlags[id] & EntityFlags.ACTIVE) === 0) return;
 
     if (!input.space) return;
 
@@ -34,7 +35,7 @@ export class SkillSystem {
 
   static update(dt: number) {
     const count = MAX_ENTITIES;
-    const flags = StateStore.flags;
+    const flags = w.stateFlags;
     const data = SkillStore.data;
 
     // Vòng lặp đơn giản, CPU branch prediction sẽ làm việc tốt
@@ -51,8 +52,8 @@ export class SkillSystem {
   private static executeSkillDOD(id: number, shapeId: number, target: { x: number; y: number }) {
     const tIdx = id * 8;
     const pIdx = id * 8;
-    const tData = TransformStore.data;
-    const pData = PhysicsStore.data;
+    const tData = w.transform;
+    const pData = w.physics;
 
     const x = tData[tIdx];
     const y = tData[tIdx + 1];

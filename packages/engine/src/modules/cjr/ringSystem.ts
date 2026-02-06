@@ -5,9 +5,13 @@
  */
 
 import { TransformStore, PhysicsStore } from '../../compat';
+import { defaultWorld } from '../../generated/WorldState';
 import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants';
 import { fastMath } from '../../math/FastMath';
 import type { RingId } from './types';
+
+// EIDOLON-V AUDIT: Cache world reference for DOD store access
+const w = defaultWorld;
 
 /**
  * Entity interface for ring system operations
@@ -29,8 +33,8 @@ export interface IRingEntity {
 const getEntityPos = (entity: IRingEntity, out: { x: number; y: number }) => {
     if (entity.physicsIndex !== undefined) {
         const idx = entity.physicsIndex * 8;
-        out.x = TransformStore.data[idx];
-        out.y = TransformStore.data[idx + 1];
+        out.x = w.transform[idx];
+        out.y = w.transform[idx + 1];
     } else {
         out.x = entity.position.x;
         out.y = entity.position.y;
@@ -40,8 +44,8 @@ const getEntityPos = (entity: IRingEntity, out: { x: number; y: number }) => {
 const getEntityVel = (entity: IRingEntity, out: { x: number; y: number }) => {
     if (entity.physicsIndex !== undefined) {
         const idx = entity.physicsIndex * 8;
-        out.x = PhysicsStore.data[idx];
-        out.y = PhysicsStore.data[idx + 1];
+        out.x = w.physics[idx];
+        out.y = w.physics[idx + 1];
     } else {
         out.x = entity.velocity.x;
         out.y = entity.velocity.y;
@@ -51,8 +55,8 @@ const getEntityVel = (entity: IRingEntity, out: { x: number; y: number }) => {
 const setEntityVel = (entity: IRingEntity, vx: number, vy: number) => {
     if (entity.physicsIndex !== undefined) {
         const idx = entity.physicsIndex * 8;
-        PhysicsStore.data[idx] = vx;
-        PhysicsStore.data[idx + 1] = vy;
+        w.physics[idx] = vx;
+        w.physics[idx + 1] = vy;
     }
     entity.velocity.x = vx;
     entity.velocity.y = vy;
@@ -61,8 +65,8 @@ const setEntityVel = (entity: IRingEntity, vx: number, vy: number) => {
 const setEntityPos = (entity: IRingEntity, x: number, y: number) => {
     if (entity.physicsIndex !== undefined) {
         const idx = entity.physicsIndex * 8;
-        TransformStore.data[idx] = x;
-        TransformStore.data[idx + 1] = y;
+        w.transform[idx] = x;
+        w.transform[idx + 1] = y;
     }
     entity.position.x = x;
     entity.position.y = y;

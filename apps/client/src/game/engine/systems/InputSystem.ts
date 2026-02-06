@@ -1,7 +1,8 @@
 import { BufferedInput } from '../../input/BufferedInput';
 import { NetworkClient } from '../../../network/NetworkClient';
 import { GameState } from '../../../types';
-import { InputStore, TransformStore } from '@cjr/engine';
+import { InputStore, TransformStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 export class InputSystem {
     private bufferedInput: BufferedInput;
@@ -33,8 +34,8 @@ export class InputSystem {
             // Get player position from DOD Store
             const pIdx = state.player.physicsIndex ?? 0;
             const tIdx = pIdx * 8;
-            const playerWorldX = TransformStore.data[tIdx];
-            const playerWorldY = TransformStore.data[tIdx + 1];
+            const playerWorldX = w.transform[tIdx];
+            const playerWorldY = w.transform[tIdx + 1];
 
             // Sync Input directly to DOD Store
             this.bufferedInput.syncToStore(
@@ -45,7 +46,7 @@ export class InputSystem {
 
             // Verify Target consistency (Optional, for legacy support)
             const inputTarget = { x: 0, y: 0 };
-            InputStore.getTarget(0, inputTarget);
+            InputStore.getTarget(w, 0, inputTarget);
             state.player.targetPosition.x = inputTarget.x;
             state.player.targetPosition.y = inputTarget.y;
         }

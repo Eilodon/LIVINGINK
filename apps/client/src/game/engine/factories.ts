@@ -49,6 +49,9 @@ import { pigmentToInt, intToHex, hexToInt } from '../cjr/colorMath'; // EIDOLON-
 import { visualSystem } from './systems/VisualSystem';
 import { ShapeId as VisualShapeId } from './systems/VisualSystem';
 
+// EIDOLON-V AUDIT: Cache world reference for DOD store access
+const w = defaultWorld;
+
 export const createPlayer = (
   name: string,
   shape: ShapeId = 'circle',
@@ -63,7 +66,7 @@ export const createPlayer = (
   if (entId === -1) return null; // Safety Check: Pool Full
 
   // EIDOLON-V FIX: Immediately RESET flags to remove potential DEAD status from reused IDs
-  StateStore.flags[entId] = 0;
+  w.stateFlags[entId] = 0;
 
   const id = entId.toString(); // Integer Identity as String for backward compatibility
 
@@ -227,7 +230,7 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
   if (entId === -1) return null; // Safety Check: Pool Full
 
   // EIDOLON-V FIX: Immediately RESET flags to remove potential DEAD status from reused IDs
-  StateStore.flags[entId] = 0;
+  w.stateFlags[entId] = 0;
 
   // Maintain legacy string identity
   const name = `Bot ${id.substr(0, 4)}`;
@@ -397,8 +400,8 @@ export const createBotCreeps = (count: number): Bot[] => {
 
     if (creep.physicsIndex !== undefined) {
       const pIdx = creep.physicsIndex * 8;
-      PhysicsStore.data[pIdx + 3] = 5; // Mass
-      PhysicsStore.data[pIdx + 4] = 15; // Radius
+      w.physics[pIdx + 3] = 5; // Mass
+      w.physics[pIdx + 4] = 15; // Radius
       // Update Stats (HP/Score might be different? For now inherit from createBot defaults which is Player default)
       // Creeps usually weak?
       // Assuming defaults are okay for now unless we want weaker creeps.
@@ -422,7 +425,7 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food | nu
   }
 
   // EIDOLON-V FIX: Reset flags immediately after acquiring ID
-  StateStore.flags[entId] = 0;
+  w.stateFlags[entId] = 0;
 
   food.physicsIndex = entId; // Note: Need to add physicsIndex to Food type if missing (it IS in Entity interface)
 
@@ -530,7 +533,7 @@ export const createProjectile = (
   }
 
   // EIDOLON-V FIX: Reset flags immediately after acquiring ID
-  StateStore.flags[entId] = 0;
+  w.stateFlags[entId] = 0;
   projectile.physicsIndex = entId;
 
   // Calculate velocity toward target
@@ -608,26 +611,26 @@ const bindToLiveView = (entity: any, entId: number) => {
 
   Object.defineProperties(posProxy, {
     x: {
-      get() { return TransformStore.data[pBase]; },
-      set(v: number) { TransformStore.data[pBase] = v; },
+      get() { return w.transform[pBase]; },
+      set(v: number) { w.transform[pBase] = v; },
       enumerable: true
     },
     y: {
-      get() { return TransformStore.data[pBase + 1]; },
-      set(v: number) { TransformStore.data[pBase + 1] = v; },
+      get() { return w.transform[pBase + 1]; },
+      set(v: number) { w.transform[pBase + 1] = v; },
       enumerable: true
     }
   });
 
   Object.defineProperties(velProxy, {
     x: {
-      get() { return PhysicsStore.data[vBase]; },
-      set(v: number) { PhysicsStore.data[vBase] = v; },
+      get() { return w.physics[vBase]; },
+      set(v: number) { w.physics[vBase] = v; },
       enumerable: true
     },
     y: {
-      get() { return PhysicsStore.data[vBase + 1]; },
-      set(v: number) { PhysicsStore.data[vBase + 1] = v; },
+      get() { return w.physics[vBase + 1]; },
+      set(v: number) { w.physics[vBase + 1] = v; },
       enumerable: true
     }
   });

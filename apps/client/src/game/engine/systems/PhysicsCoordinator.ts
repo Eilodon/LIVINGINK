@@ -13,10 +13,12 @@ import {
   StatsStore,
   MAX_ENTITIES,
   EntityFlags,
+  defaultWorld,
 } from '@cjr/engine';
 import { GameState } from '../../../types';
 
 import { cjrClientRunner } from '../runner/CJRClientRunner';
+const w = defaultWorld;
 
 export class PhysicsCoordinator {
   private lastUpdateTime = 0;
@@ -34,10 +36,10 @@ export class PhysicsCoordinator {
     // Note: This is only for UI/debugging - rendering uses DOD directly
     if (state.player.physicsIndex !== undefined) {
       const idx = state.player.physicsIndex;
-      state.player.position.x = TransformStore.getX(idx);
-      state.player.position.y = TransformStore.getY(idx);
-      state.player.velocity.x = PhysicsStore.getVelocityX(idx);
-      state.player.velocity.y = PhysicsStore.getVelocityY(idx);
+      state.player.position.x = TransformStore.getX(w, idx);
+      state.player.position.y = TransformStore.getY(w, idx);
+      state.player.velocity.x = PhysicsStore.getVelocityX(w, idx);
+      state.player.velocity.y = PhysicsStore.getVelocityY(w, idx);
     }
   }
 
@@ -55,8 +57,8 @@ export class PhysicsCoordinator {
       const idx = state.player.physicsIndex;
       // Note: Position is set by NetworkClient reconciliation, not here
       // But we can update derived values
-      state.player.velocity.x = PhysicsStore.getVelocityX(idx);
-      state.player.velocity.y = PhysicsStore.getVelocityY(idx);
+      state.player.velocity.x = PhysicsStore.getVelocityX(w, idx);
+      state.player.velocity.y = PhysicsStore.getVelocityY(w, idx);
     }
   }
 
@@ -67,13 +69,13 @@ export class PhysicsCoordinator {
     const maxEntities = MAX_ENTITIES;
 
     for (let i = 0; i < maxEntities; i++) {
-      const flags = StateStore.flags[i];
+      const flags = w.stateFlags[i];
       if (!(flags & EntityFlags.ACTIVE)) continue;
 
-      const health = StatsStore.getCurrentHealth(i);
+      const health = StatsStore.getCurrentHealth(w, i);
       if (health <= 0) {
         // Mark as dead in DOD
-        StateStore.flags[i] &= ~EntityFlags.ACTIVE;
+        w.stateFlags[i] &= ~EntityFlags.ACTIVE;
 
         // Find and mark corresponding entity in state
         this.markEntityDead(state, i);
@@ -113,7 +115,7 @@ export class PhysicsCoordinator {
     const maxEntities = MAX_ENTITIES;
 
     for (let i = 0; i < maxEntities; i++) {
-      if (StateStore.flags[i] & EntityFlags.ACTIVE) {
+      if (w.stateFlags[i] & EntityFlags.ACTIVE) {
         activeEntities++;
       }
     }

@@ -1,12 +1,13 @@
 // EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { TattooStore, StatsStore, StateStore } from '@cjr/engine';
-import { MAX_ENTITIES, EntityFlags } from '@cjr/engine/dod/EntityFlags';
+import { TattooStore, StatsStore, StateStore, defaultWorld } from '@cjr/engine';
+import { MAX_ENTITIES, EntityFlags } from '@cjr/engine';
 import { TattooFlag } from '../../statusFlags';
+const w = defaultWorld;
 
 export class TattooSystem {
   static update(dt: number) {
     const count = MAX_ENTITIES;
-    const flags = StateStore.flags;
+    const flags = w.stateFlags;
     const tFlags = TattooStore.flags;
     const tData = TattooStore.data;
 

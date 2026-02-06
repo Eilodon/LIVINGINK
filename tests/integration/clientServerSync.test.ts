@@ -19,9 +19,12 @@ import {
   RING_RADII_SQ,
   THRESHOLDS,
   checkRingTransition,
+  defaultWorld,
 } from '@cjr/engine';
 // EIDOLON-V AUDIT FIX: BinaryPacker was deleted, replaced by SchemaBinaryPacker in networking subpath
 import { SchemaBinaryPacker as BinaryPacker } from '@cjr/engine/networking';
+
+const w = defaultWorld;
 
 describe('Client-Server Sync', () => {
   beforeEach(() => {
@@ -32,17 +35,17 @@ describe('Client-Server Sync', () => {
     it('should sync position from TransformStore to network buffer', () => {
       // Setup: Create entity at position (100, 200)
       const entityId = 0;
-      TransformStore.set(entityId, 100, 200, 0, 1);
-      PhysicsStore.set(entityId, 50, 0, 100, 28);
-      StateStore.setFlag(entityId, EntityFlags.ACTIVE);
+      TransformStore.set(w, entityId, 100, 200, 0, 1);
+      PhysicsStore.set(w, entityId, 50, 0, 100, 28);
+      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
 
       // Pack transform for network
       const updates = [{
         id: 'player1',
-        x: TransformStore.getX(entityId),
-        y: TransformStore.getY(entityId),
-        vx: PhysicsStore.getVelocityX(entityId),
-        vy: PhysicsStore.getVelocityY(entityId),
+        x: TransformStore.getX(w, entityId),
+        y: TransformStore.getY(w, entityId),
+        vx: PhysicsStore.getVelocityX(w, entityId),
+        vy: PhysicsStore.getVelocityY(w, entityId),
       }];
 
       const buffer = BinaryPacker.packTransforms(updates, 0);
@@ -69,16 +72,16 @@ describe('Client-Server Sync', () => {
 
       // Create multiple entities
       for (let i = 0; i < entityCount; i++) {
-        TransformStore.set(i, i * 100, i * 50, 0, 1);
-        PhysicsStore.set(i, i * 10, i * 5, 100, 28);
-        StateStore.setFlag(i, EntityFlags.ACTIVE);
+        TransformStore.set(w, i, i * 100, i * 50, 0, 1);
+        PhysicsStore.set(w, i, i * 10, i * 5, 100, 28);
+        StateStore.setFlag(w, i, EntityFlags.ACTIVE);
 
         updates.push({
           id: `player${i}`,
-          x: TransformStore.getX(i),
-          y: TransformStore.getY(i),
-          vx: PhysicsStore.getVelocityX(i),
-          vy: PhysicsStore.getVelocityY(i),
+          x: TransformStore.getX(w, i),
+          y: TransformStore.getY(w, i),
+          vx: PhysicsStore.getVelocityX(w, i),
+          vy: PhysicsStore.getVelocityY(w, i),
         });
       }
 
@@ -101,20 +104,20 @@ describe('Client-Server Sync', () => {
       const startX = 0, startY = 0;
 
       // Setup entity
-      TransformStore.set(entityId, startX, startY, 0, 1);
-      PhysicsStore.set(entityId, 0, 0, 100, 28);
-      InputStore.setTarget(entityId, 500, 0); // Target at (500, 0)
+      TransformStore.set(w, entityId, startX, startY, 0, 1);
+      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
+      InputStore.setTarget(w, entityId, 500, 0); // Target at (500, 0)
       ConfigStore.setMaxSpeed(entityId, 150);
-      StateStore.setFlag(entityId, EntityFlags.ACTIVE);
+      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
 
       // Run physics for 60 frames (1 second at 60fps)
       for (let i = 0; i < 60; i++) {
-        MovementSystem.update(entityId, 1 / 60);
-        PhysicsSystem.update(1 / 60);
+        MovementSystem.update(w, entityId, 1 / 60);
+        PhysicsSystem.update(w, 1 / 60);
       }
 
       // Entity should have moved towards target
-      const finalX = TransformStore.getX(entityId);
+      const finalX = TransformStore.getX(w, entityId);
       expect(finalX).toBeGreaterThan(startX);
       expect(finalX).toBeLessThan(500); // Shouldn't overshoot in 1 second
     });
@@ -123,17 +126,17 @@ describe('Client-Server Sync', () => {
       const entityId = 0;
       const maxSpeed = 100;
 
-      TransformStore.set(entityId, 0, 0, 0, 1);
-      PhysicsStore.set(entityId, 0, 0, 100, 28);
-      InputStore.setTarget(entityId, 1000, 0);
+      TransformStore.set(w, entityId, 0, 0, 0, 1);
+      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
+      InputStore.setTarget(w, entityId, 1000, 0);
       ConfigStore.setMaxSpeed(entityId, maxSpeed);
-      StateStore.setFlag(entityId, EntityFlags.ACTIVE);
+      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
 
       // Apply movement
-      MovementSystem.update(entityId, 1 / 60);
+      MovementSystem.update(w, entityId, 1 / 60);
 
-      const vx = PhysicsStore.getVelocityX(entityId);
-      const vy = PhysicsStore.getVelocityY(entityId);
+      const vx = PhysicsStore.getVelocityX(w, entityId);
+      const vy = PhysicsStore.getVelocityY(w, entityId);
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       expect(speed).toBeLessThanOrEqual(maxSpeed * 1.01); // Allow small tolerance
@@ -146,7 +149,7 @@ describe('Client-Server Sync', () => {
 
       // Setup entity at ring 1 (outer)
       const ring1X = 1200; // Between R2 (1000) and R1 (1600)
-      TransformStore.set(entityId, ring1X, 0, 0, 1);
+      TransformStore.set(w, entityId, ring1X, 0, 0, 1);
 
       const entity = {
         physicsIndex: entityId,
@@ -162,7 +165,7 @@ describe('Client-Server Sync', () => {
 
       // Move entity to ring 2 position
       entity.position.x = 800; // Inside R2
-      TransformStore.setPosition(entityId, 800, 0);
+      TransformStore.setPosition(w, entityId, 800, 0);
 
       const result = checkRingTransition(entity);
 
@@ -173,7 +176,7 @@ describe('Client-Server Sync', () => {
     it('should block transition without sufficient match percent', () => {
       const entityId = 0;
 
-      TransformStore.set(entityId, 800, 0, 0, 1);
+      TransformStore.set(w, entityId, 800, 0, 0, 1);
 
       const entity = {
         physicsIndex: entityId,
@@ -200,13 +203,13 @@ describe('Client-Server Sync', () => {
       const maxAllowedSpeed = 150;
       const tolerance = 1.15;
 
-      TransformStore.set(entityId, 0, 0, 0, 1);
+      TransformStore.set(w, entityId, 0, 0, 0, 1);
       // Set velocity above limit (simulating client hack)
-      PhysicsStore.set(entityId, 200, 0, 100, 28);
-      StateStore.setFlag(entityId, EntityFlags.ACTIVE);
+      PhysicsStore.set(w, entityId, 200, 0, 100, 28);
+      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
 
-      const vx = PhysicsStore.getVelocityX(entityId);
-      const vy = PhysicsStore.getVelocityY(entityId);
+      const vx = PhysicsStore.getVelocityX(w, entityId);
+      const vy = PhysicsStore.getVelocityY(w, entityId);
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       // Server validation check
@@ -216,12 +219,12 @@ describe('Client-Server Sync', () => {
       // Apply clamp
       if (isViolating) {
         const scale = (maxAllowedSpeed * tolerance) / speed;
-        PhysicsStore.setVelocity(entityId, vx * scale, vy * scale);
+        PhysicsStore.setVelocity(w, entityId, vx * scale, vy * scale);
       }
 
       const newSpeed = Math.sqrt(
-        PhysicsStore.getVelocityX(entityId) ** 2 +
-        PhysicsStore.getVelocityY(entityId) ** 2
+        PhysicsStore.getVelocityX(w, entityId) ** 2 +
+        PhysicsStore.getVelocityY(w, entityId) ** 2
       );
       expect(newSpeed).toBeLessThanOrEqual(maxAllowedSpeed * tolerance * 1.01);
     });

@@ -1,6 +1,7 @@
 import { AudioEngine } from '../../audio/AudioEngine';
 import { GameState } from '../../../types';
-import { TransformStore } from '@cjr/engine';
+import { TransformStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 export class AudioSyncSystem {
     constructor(private audioEngine: AudioEngine) { }
@@ -12,8 +13,8 @@ export class AudioSyncSystem {
         // Read from DOD Store if available (SSOT)
         if (state.player.physicsIndex !== undefined) {
             const tIdx = state.player.physicsIndex * 8;
-            listenerX = TransformStore.data[tIdx];
-            listenerY = TransformStore.data[tIdx + 1];
+            listenerX = w.transform[tIdx];
+            listenerY = w.transform[tIdx + 1];
         }
 
         this.audioEngine.setListenerPosition(listenerX, listenerY);

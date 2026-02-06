@@ -22,31 +22,35 @@ import {
   EntityLookup,
   PigmentStore,
   EntityFlags,
+  // EIDOLON-V AUDIT: Import defaultWorld for DOD store access (replaces deprecated .data/.flags)
+  defaultWorld,
 } from '@cjr/engine';
 import { audioEngine } from '../../audio/AudioEngine';
+
+// EIDOLON-V AUDIT: Cache world reference for zero-overhead access in hot paths
+const w = defaultWorld;
 
 // EIDOLON-V PHASE 6: Pure DOD Logic for Consumption
 // Uses PigmentStore instead of EntityLookup - Zero Object Access!
 // NOTE: Internal function - exported for future collision system integration
 export const consumePickupDOD = (entityId: number, foodId: number, _state: GameState) => {
-  // Safety checks
-  const fFlags = StateStore.flags[foodId];
+  // Safety checks - AUDIT FIX: use world.stateFlags instead of deprecated StateStore.flags
+  const fFlags = w.stateFlags[foodId];
   if ((fFlags & EntityFlags.ACTIVE) === 0 || fFlags & EntityFlags.DEAD) return;
 
   // Mark Food Dead
-  StateStore.clearFlag(foodId, EntityFlags.ACTIVE);
-  StateStore.setFlag(foodId, EntityFlags.DEAD);
+  StateStore.clearFlag(w, foodId, EntityFlags.ACTIVE);
+  StateStore.setFlag(w, foodId, EntityFlags.DEAD);
 
-  // Read Stats
-  // STATS STRIDE = 8: [curHP, maxHP, score, match, def, dmg, pad, pad]
+  // Read Stats via world.stats (stride=8: [curHP, maxHP, score, match, def, dmg, pad, pad])
   const eIdx = entityId * 8;
   const fIdx = foodId * 8;
 
-  const foodValue = StatsStore.data[fIdx + 2]; // Score slot holds value for food
+  const foodValue = w.stats[fIdx + 2]; // Score slot holds value for food
 
   // Growth Logic
   const growth = foodValue * FOOD_GROWTH_MULTIPLIER;
-  StatsStore.data[eIdx + 2] += foodValue; // Add Score to Player
+  w.stats[eIdx + 2] += foodValue; // Add Score to Player
 
   // Apply Growth
   applyGrowthDOD(entityId, growth);
@@ -55,11 +59,10 @@ export const consumePickupDOD = (entityId: number, foodId: number, _state: GameS
   audioEngine.playEat(entityId);
 
   // VFX - get color from PigmentStore instead of object
-  const tIdx = entityId * 8;
-  const entityColor = PigmentStore.getColorInt(entityId) || 0xffffff;
+  const entityColor = PigmentStore.getColorInt(w, entityId) || 0xffffff;
   vfxBuffer.push(
-    TransformStore.data[tIdx],
-    TransformStore.data[tIdx + 1],
+    w.transform[entityId * 8],
+    w.transform[entityId * 8 + 1],
     entityColor,
     VFX_TYPES.EXPLODE,
     6
@@ -67,22 +70,22 @@ export const consumePickupDOD = (entityId: number, foodId: number, _state: GameS
 
   // PHASE 6: Pure DOD Pigment Mixing
   // Food pigment stored in PigmentStore at foodId index
-  const fPigIdx = foodId * PigmentStore.STRIDE;
-  const foodR = PigmentStore.data[fPigIdx + PigmentStore.R];
-  const foodG = PigmentStore.data[fPigIdx + PigmentStore.G];
-  const foodB = PigmentStore.data[fPigIdx + PigmentStore.B];
+  const fPigIdx = foodId * 8; // PIGMENT stride = 8
+  const foodR = w.pigment[fPigIdx + 0];
+  const foodG = w.pigment[fPigIdx + 1];
+  const foodB = w.pigment[fPigIdx + 2];
 
   // Only mix if food has pigment data (non-zero)
   if (foodR !== 0 || foodG !== 0 || foodB !== 0) {
     // Base ratio calculation (simplified from legacy)
-    const eRadius = PhysicsStore.data[entityId * 8 + 4] || 15;
+    const eRadius = w.physics[entityId * 8 + 4] || 15;
     const baseRatio = Math.min(0.2, 0.1 * (15 / Math.max(15, eRadius)));
 
     // Mix pigment directly in DOD store
-    PigmentStore.mix(entityId, foodR, foodG, foodB, baseRatio);
+    PigmentStore.mix(w, entityId, foodR, foodG, foodB, baseRatio);
 
     // Sync match back to StatsStore for compatibility
-    StatsStore.data[eIdx + 3] = PigmentStore.getMatch(entityId);
+    w.stats[eIdx + 3] = PigmentStore.getMatch(w, entityId);
   }
 
   // Legacy fallback for complex food types (catalyst, shield, solvent)
@@ -103,9 +106,8 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
   let ex = e.position.x;
   let ey = e.position.y;
   if (e.physicsIndex !== undefined) {
-    const tIdx = e.physicsIndex * 8;
-    ex = TransformStore.data[tIdx];
-    ey = TransformStore.data[tIdx + 1];
+    ex = w.transform[e.physicsIndex * 8];
+    ey = w.transform[e.physicsIndex * 8 + 1];
   }
 
   switch (food.kind) {
@@ -135,7 +137,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
         // Sync to Store (SSOT)
         if (e.physicsIndex !== undefined) {
-          PigmentStore.set(e.physicsIndex, mixed.r, mixed.g, mixed.b);
+          PigmentStore.set(w, e.physicsIndex, mixed.r, mixed.g, mixed.b);
         }
 
         e.color = pigmentToInt(e.pigment);
@@ -143,7 +145,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
         // Sync MATCH back to StatsStore
         if (e.physicsIndex !== undefined) {
-          StatsStore.data[e.physicsIndex * 8 + 3] = e.matchPercent;
+          w.stats[e.physicsIndex * 8 + 3] = e.matchPercent;
         }
       }
       break;
@@ -154,7 +156,6 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
       e.statusMultipliers.colorBoost = Math.max(e.statusMultipliers.colorBoost || 1, 1.5);
       e.statusTimers.colorBoost = 4.0;
-      // Legacy: pity multiplier logic was here, assuming handled logic side
 
       // createFloatingText call replaced by Zero-GC VFX
       vfxBuffer.push(ex, ey, packHex('#ff00ff'), VFX_TYPES.FLOATING_TEXT, TEXT_IDS.CATALYST);
@@ -180,7 +181,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
       // Sync to Store (SSOT)
       if (e.physicsIndex !== undefined) {
-        PigmentStore.set(e.physicsIndex, mixedSolvent.r, mixedSolvent.g, mixedSolvent.b);
+        PigmentStore.set(w, e.physicsIndex, mixedSolvent.r, mixedSolvent.g, mixedSolvent.b);
       }
 
       e.color = pigmentToInt(e.pigment);
@@ -200,30 +201,29 @@ export const reduceHealthDOD = (
   attackerId: number | -1,
   state: GameState
 ) => {
-  const vFlags = StateStore.flags[victimId];
+  const vFlags = w.stateFlags[victimId];
   if (vFlags & EntityFlags.DEAD || (vFlags & EntityFlags.ACTIVE) === 0) return;
 
   const vIdx = victimId * 8; // StatsStore.STRIDE
-  const currentHealth = StatsStore.data[vIdx];
-  const defense = StatsStore.data[vIdx + 4] || 1;
+  const currentHealth = w.stats[vIdx];
+  const defense = w.stats[vIdx + 4] || 1;
 
   // Simple Damage Calc
   const actualDamage = amount / defense;
   const newHealth = currentHealth - actualDamage;
 
   // Update Store
-  StatsStore.data[vIdx] = newHealth;
+  w.stats[vIdx] = newHealth;
 
   // Death Check
   if (newHealth <= 0) {
-    StatsStore.data[vIdx] = 0;
-    StateStore.setFlag(victimId, EntityFlags.DEAD);
+    w.stats[vIdx] = 0;
+    StateStore.setFlag(w, victimId, EntityFlags.DEAD);
 
     // Death VFX
-    const tIdx = victimId * 8;
     vfxBuffer.push(
-      TransformStore.data[tIdx],
-      TransformStore.data[tIdx + 1],
+      w.transform[victimId * 8],
+      w.transform[victimId * 8 + 1],
       0xff0000,
       VFX_TYPES.EXPLODE,
       15
@@ -231,14 +231,13 @@ export const reduceHealthDOD = (
 
     // Score for Attacker
     if (attackerId !== -1) {
-      StatsStore.data[attackerId * 8 + 2] += 50;
+      w.stats[attackerId * 8 + 2] += 50;
     }
   } else {
     // Hit VFX
-    const tIdx = victimId * 8;
     vfxBuffer.push(
-      TransformStore.data[tIdx],
-      TransformStore.data[tIdx + 1],
+      w.transform[victimId * 8],
+      w.transform[victimId * 8 + 1],
       0xffffff,
       VFX_TYPES.EXPLODE,
       3
@@ -260,8 +259,8 @@ export const resolveCombat = (
   const id2 = e2.physicsIndex;
 
   // Radius from Physics
-  const r1 = PhysicsStore.data[id1 * 8 + 4];
-  const r2 = PhysicsStore.data[id2 * 8 + 4];
+  const r1 = w.physics[id1 * 8 + 4];
+  const r2 = w.physics[id2 * 8 + 4];
 
   // Eat Logic
   if (r1 > r2 * 1.2 && c1) {

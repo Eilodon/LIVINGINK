@@ -3,7 +3,7 @@
 
 import { fastMath } from '../math/FastMath';
 import { Entity } from '../../types';
-import { TransformStore, PhysicsStore, EntityLookup } from '@cjr/engine';
+import { TransformStore, PhysicsStore, EntityLookup, defaultWorld } from '@cjr/engine';
 
 // EIDOLON-V P0 FIX: __DEV__ guard for hot path warnings
 declare const __DEV__: boolean;
@@ -20,6 +20,8 @@ const warnOnce = (msg: string, data?: unknown) => {
     }
   }
 };
+
+const w = defaultWorld;
 
 export interface SpatialHashConfig {
   worldSize: number;
@@ -134,18 +136,18 @@ export class SpatialHashGrid {
 
     // Validate TransformStore bounds
     const tIdx = entityIndex * 8;
-    if (tIdx + 1 >= TransformStore.data.length) {
+    if (tIdx + 1 >= w.transform.length) {
       warnOnce('SpatialHashGrid.add: TransformStore index out of bounds', {
         entityIndex,
         tIdx,
-        tDataLength: TransformStore.data.length,
+        tDataLength: w.transform.length,
       });
       return;
     }
 
     // Read entity position
-    const x = TransformStore.data[tIdx];
-    const y = TransformStore.data[tIdx + 1];
+    const x = w.transform[tIdx];
+    const y = w.transform[tIdx + 1];
 
     // Validate position
     if (!isFinite(x) || !isFinite(y)) {
@@ -240,8 +242,8 @@ export class SpatialHashGrid {
     this.getCellsForBounds(x - radius, x + radius, y - radius, y + radius, this.tempCellArray);
 
     const radiusSq = radius * radius;
-    const tData = TransformStore.data;
-    const pData = PhysicsStore.data;
+    const tData = w.transform;
+    const pData = w.physics;
 
     // Safety limit to prevent infinite loops or excessive results
     const MAX_RESULTS = 10000;
@@ -410,8 +412,8 @@ export class SpatialHashGrid {
     if (idx === undefined) return [];
 
     const tIdx = idx * 8;
-    const x = TransformStore.data[tIdx];
-    const y = TransformStore.data[tIdx + 1];
+    const x = w.transform[tIdx];
+    const y = w.transform[tIdx + 1];
 
     const indices: number[] = [];
     const r = radiusOverride || entity.radius;

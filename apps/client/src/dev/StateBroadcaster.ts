@@ -6,8 +6,10 @@ import {
     StatsStore,
     EntityFlags,
     MAX_ENTITIES,
-    EntityLookup
+    EntityLookup,
+    defaultWorld
 } from '@cjr/engine';
+const w = defaultWorld;
 
 interface EntitySnapshot {
     id: number; // Index
@@ -83,10 +85,10 @@ export class StateBroadcaster {
 
     private captureSnapshot() {
         const entities: EntitySnapshot[] = [];
-        const tData = TransformStore.data;
-        const pData = PhysicsStore.data;
-        const sData = StatsStore.data;
-        const flags = StateStore.flags;
+        const tData = w.transform;
+        const pData = w.physics;
+        const sData = w.stats;
+        const flags = w.stateFlags;
 
         for (let i = 0; i < MAX_ENTITIES; i++) {
             const flag = flags[i];

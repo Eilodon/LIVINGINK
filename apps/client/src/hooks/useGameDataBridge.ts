@@ -1,6 +1,7 @@
 import { MutableRefObject, useCallback, useRef } from 'react';
 import { GameState, Player } from '../types';
-import { StatsStore } from '@cjr/engine';
+import { StatsStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 export interface BridgedStats {
   score: number;
@@ -28,11 +29,11 @@ export const useGameDataBridge = (gameStateRef: MutableRefObject<GameState | nul
     // "The Blind Fix": Read directly from memory if available
     if (idx !== undefined) {
       const base = idx * StatsStore.STRIDE;
-      if (base + 3 < StatsStore.data.length) {
-        statsRef.current.currentHealth = StatsStore.data[base];
-        statsRef.current.maxHealth = StatsStore.data[base + 1];
-        statsRef.current.score = StatsStore.data[base + 2];
-        statsRef.current.matchPercent = StatsStore.data[base + 3];
+      if (base + 3 < w.stats.length) {
+        statsRef.current.currentHealth = w.stats[base];
+        statsRef.current.maxHealth = w.stats[base + 1];
+        statsRef.current.score = w.stats[base + 2];
+        statsRef.current.matchPercent = w.stats[base + 3];
       } else {
         // Fallback to Object (Legacy/Sync issues)
         statsRef.current.currentHealth = player.currentHealth;

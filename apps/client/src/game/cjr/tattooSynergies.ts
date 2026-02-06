@@ -4,14 +4,15 @@ import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
 import { vfxSystem } from '../vfx/vfxSystem';
-import { TransformStore, PhysicsStore } from '@cjr/engine';
+import { TransformStore, PhysicsStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 // EIDOLON-V: DOD helpers for tattoo synergies
 const getPlayerPos = (player: Player, out: { x: number; y: number }) => {
   if (player.physicsIndex !== undefined) {
     const idx = player.physicsIndex * 8;
-    out.x = TransformStore.data[idx];
-    out.y = TransformStore.data[idx + 1];
+    out.x = w.transform[idx];
+    out.y = w.transform[idx + 1];
   } else {
     out.x = player.position.x;
     out.y = player.position.y;
@@ -21,8 +22,8 @@ const getPlayerPos = (player: Player, out: { x: number; y: number }) => {
 const getPlayerVel = (player: Player, out: { x: number; y: number }) => {
   if (player.physicsIndex !== undefined) {
     const idx = player.physicsIndex * 8;
-    out.x = PhysicsStore.data[idx];
-    out.y = PhysicsStore.data[idx + 1];
+    out.x = w.physics[idx];
+    out.y = w.physics[idx + 1];
   } else {
     out.x = player.velocity.x;
     out.y = player.velocity.y;
@@ -32,8 +33,8 @@ const getPlayerVel = (player: Player, out: { x: number; y: number }) => {
 const getFoodPos = (food: Food, out: { x: number; y: number }) => {
   if (food.physicsIndex !== undefined) {
     const idx = food.physicsIndex * 8;
-    out.x = TransformStore.data[idx];
-    out.y = TransformStore.data[idx + 1];
+    out.x = w.transform[idx];
+    out.y = w.transform[idx + 1];
   } else {
     out.x = food.position.x;
     out.y = food.position.y;
@@ -43,8 +44,8 @@ const getFoodPos = (food: Food, out: { x: number; y: number }) => {
 const setFoodVel = (food: Food, vx: number, vy: number) => {
   if (food.physicsIndex !== undefined) {
     const idx = food.physicsIndex * 8;
-    PhysicsStore.data[idx] = vx;
-    PhysicsStore.data[idx + 1] = vy;
+    w.physics[idx] = vx;
+    w.physics[idx + 1] = vy;
   }
   // Keep object in sync for legacy
   food.velocity.x = vx;

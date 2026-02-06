@@ -257,8 +257,8 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
         unitPoolRef.current!.reset();
         projectilePoolRef.current!.reset();
 
-        const tData = TransformStore.data;
-        const pData = PhysicsStore.data;
+        const tData = defaultWorld.transform;
+        const pData = defaultWorld.physics;
         const idToIndex = getPhysicsWorld().idToIndex;
         const interpAlpha = alphaRef.current;
 

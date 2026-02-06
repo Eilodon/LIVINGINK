@@ -16,7 +16,8 @@
 // ============================================
 
 // EIDOLON-V FIX: Import TransformStore for Spatial Audio
-import { TransformStore } from '@cjr/engine';
+import { TransformStore, defaultWorld } from '@cjr/engine';
+const w = defaultWorld;
 
 export interface AudioConfig {
   masterVolume: number;
@@ -390,8 +391,8 @@ export class AudioEngine {
     // This ensures we play sound at the EXACT physics location,
     // not the potentially stale JS object position.
     const idx = physicsIndex * 8; // TransformStore.STRIDE
-    const x = TransformStore.data[idx];
-    const y = TransformStore.data[idx + 1];
+    const x = w.transform[idx];
+    const y = w.transform[idx + 1];
 
     this.play(soundId, {
       ...options,
