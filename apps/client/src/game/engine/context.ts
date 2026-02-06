@@ -171,15 +171,19 @@ class ParticlePool implements IParticlePool {
 // Each GameState owns its own engine instance, preventing multi-mount issues.
 import { PhysicsWorld } from './PhysicsWorld';
 
+import { WorldState } from '@cjr/engine';
+
 export class GameEngine implements IGameEngine {
+  public world: WorldState;
   public spatialGrid: SpatialGrid;
   public particlePool: ParticlePool;
   public physicsWorld: PhysicsWorld;
 
   constructor() {
+    this.world = new WorldState();
     this.spatialGrid = new SpatialGrid();
     this.particlePool = new ParticlePool();
-    this.physicsWorld = new PhysicsWorld(); // EIDOLON-V: DOD Adapter manages capacity
+    this.physicsWorld = new PhysicsWorld(this.world); // EIDOLON-V: Inject world
   }
 }
 
@@ -218,4 +222,20 @@ export const getPhysicsWorld = (): PhysicsWorld => {
     throw new Error('PhysicsWorld not bound to update loop');
   }
   return currentEngine.physicsWorld;
+};
+
+// EIDOLON-V FIX: EntityStateBridge accessor bound to current engine's world
+import { createEntityStateBridge, type EntityStateBridgeType } from './dod/EntityStateBridge';
+
+let cachedBridge: EntityStateBridgeType | null = null;
+let cachedBridgeWorld: WorldState | null = null;
+
+export const getEntityStateBridge = (): EntityStateBridgeType => {
+  const engine = getCurrentEngine();
+  // Recreate bridge if world changed (new game session)
+  if (!cachedBridge || cachedBridgeWorld !== engine.world) {
+    cachedBridge = createEntityStateBridge(engine.world);
+    cachedBridgeWorld = engine.world;
+  }
+  return cachedBridge;
 };

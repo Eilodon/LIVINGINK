@@ -25,6 +25,7 @@ import {
   InputStore,
   EntityFlags,
   CJRFoodFlags,
+  WorldState,
 } from '@cjr/engine';
 import { SkillSystem } from './SkillSystem';
 import { updateBotPersonality } from '../../../cjr/botPersonalities';
@@ -85,35 +86,36 @@ export class AISystem {
    * Update all AI entities
    * Called by CJRClientRunner.updateEntities() when legacy mode is disabled
    */
-  update(state: GameState, dt: number): void {
+  update(state: GameState, world: WorldState, dt: number): void {
     if (!this.spatialGrid) return;
 
-    const flags = StateStore.flags;
+    const count = world.activeCount;
+    const activeEntities = world.activeEntities;
 
-    // Iterate all entities with BOT flag
-    for (let i = 0; i < flags.length; i++) {
-      const flag = flags[i];
-      if ((flag & (EntityFlags.ACTIVE | EntityFlags.BOT)) !== (EntityFlags.ACTIVE | EntityFlags.BOT)) {
-        continue;
-      }
+    // Iterate all entities via Sparse Set (O(Active))
+    for (let i = 0; i < count; i++) {
+      const id = activeEntities[i];
+      const flag = world.stateFlags[id]; // Direct access faster than Accessor inside loop
+
+      if ((flag & EntityFlags.BOT) === 0) continue;
       if (flag & EntityFlags.DEAD) continue;
 
-      const bot = EntityLookup[i] as Bot | null;
+      const bot = EntityLookup[id] as Bot | null;
       if (!bot) continue;
 
-      this.updateBot(bot, i, state, dt);
+      this.updateBot(bot, id, state, world, dt);
     }
   }
 
   /**
    * Update single bot AI
    */
-  private updateBot(bot: Bot, botId: number, state: GameState, dt: number): void {
+  private updateBot(bot: Bot, botId: number, state: GameState, world: WorldState, dt: number): void {
     // Safety checks
     if (bot.isDead) return;
 
     // 1. READ POS FROM DOD (Cache Hot)
-    const tData = TransformStore.data;
+    const tData = world.transform;
     const tIdx = botId * 8;
     const botX = tData[tIdx];
     const botY = tData[tIdx + 1];
@@ -148,8 +150,8 @@ export class AISystem {
 
       // Read Bot Size from Physics (Mass/Radius)
       const pIdx = botId * 8;
-      const botRadius = PhysicsStore.data[pIdx + 4];
-      const sFlags = StateStore.flags;
+      const botRadius = world.physics[pIdx + 4];
+      const sFlags = world.stateFlags;
 
       // 3. ITERATE INDICES (FAST)
       const count = this.sensingIndices.length;
@@ -172,7 +174,7 @@ export class AISystem {
         // A. THREATS & PREY (Players/Bots)
         if (flags & (EntityFlags.PLAYER | EntityFlags.BOT)) {
           const oPIdx = idx * 8;
-          const otherRadius = PhysicsStore.data[oPIdx + 4];
+          const otherRadius = world.physics[oPIdx + 4];
 
           if (otherRadius > botRadius * 1.1) {
             // Threat
@@ -211,7 +213,7 @@ export class AISystem {
 
         // Panic Skill
         if (closestThreatDistSq < 150 * 150) {
-          SkillSystem.handleInput(botId, { space: true, target: bot.targetPosition || { x: 0, y: 0 } }, state);
+          SkillSystem.handleInput(botId, { space: true, target: bot.targetPosition || { x: 0, y: 0 } }, world);
         }
       } else if (targetEntityIndex !== -1 && closestPreyDistSq < this.config.preyDistance ** 2) {
         bot.aiState = 'chase';
@@ -221,24 +223,24 @@ export class AISystem {
         bot.aiState = 'forage';
         // Write target directly to InputStore (ZERO allocation)
         const fTIdx = targetFoodIndex * 8;
-        InputStore.setTarget(botId, tData[fTIdx], tData[fTIdx + 1]);
+        InputStore.setTarget(world, botId, tData[fTIdx], tData[fTIdx + 1]);
       } else {
         bot.aiState = 'wander';
       }
     }
 
     // 5. EXECUTE MOVEMENT (DOD Force)
-    this.executeMovement(bot, botId, botX, botY, dt);
+    this.executeMovement(bot, botId, botX, botY, world, dt);
   }
 
   /**
    * Execute movement based on current AI state
    */
-  private executeMovement(bot: Bot, botId: number, botX: number, botY: number, _dt: number): void {
+  private executeMovement(bot: Bot, botId: number, botX: number, botY: number, world: WorldState, _dt: number): void {
     const speed = bot.maxSpeed;
     let tx = 0, ty = 0;
 
-    const tData = TransformStore.data;
+    const tData = world.transform;
     const pIdx = botId * 8;
 
     switch (bot.aiState) {
@@ -246,7 +248,7 @@ export class AISystem {
         // Find threat by targetEntityId
         if (bot.targetEntityId) {
           // Find threat index
-          const threatIdx = this.findEntityIndex(bot.targetEntityId);
+          const threatIdx = this.findEntityIndex(world, bot.targetEntityId);
           if (threatIdx !== -1) {
             const tIdx = threatIdx * 8;
             const dx = botX - tData[tIdx];
@@ -263,7 +265,7 @@ export class AISystem {
 
       case 'chase': {
         if (bot.targetEntityId) {
-          const targetIdx = this.findEntityIndex(bot.targetEntityId);
+          const targetIdx = this.findEntityIndex(world, bot.targetEntityId);
           if (targetIdx !== -1) {
             const tIdx = targetIdx * 8;
             const dx = tData[tIdx] - botX;
@@ -281,8 +283,8 @@ export class AISystem {
       case 'forage': {
         // Read target directly from InputStore (ZERO allocation)
         const iIdx = botId * InputStore.STRIDE;
-        const targetX = InputStore.data[iIdx];
-        const targetY = InputStore.data[iIdx + 1];
+        const targetX = world.input[iIdx];
+        const targetY = world.input[iIdx + 1];
         const dx = targetX - botX;
         const dy = targetY - botY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -311,15 +313,15 @@ export class AISystem {
     }
 
     // Steering - Write directly to PhysicsStore
-    PhysicsStore.data[pIdx] += (tx - PhysicsStore.data[pIdx]) * this.config.steerFactor;
-    PhysicsStore.data[pIdx + 1] += (ty - PhysicsStore.data[pIdx + 1]) * this.config.steerFactor;
+    world.physics[pIdx] += (tx - world.physics[pIdx]) * this.config.steerFactor;
+    world.physics[pIdx + 1] += (ty - world.physics[pIdx + 1]) * this.config.steerFactor;
   }
 
   /**
    * Find entity index by ID (O(N) fallback - optimize later)
    */
-  private findEntityIndex(id: string): number {
-    const flags = StateStore.flags;
+  private findEntityIndex(world: WorldState, id: string): number {
+    const flags = world.stateFlags;
     for (let i = 0; i < flags.length; i++) {
       if ((flags[i] & EntityFlags.ACTIVE) === 0) continue;
 

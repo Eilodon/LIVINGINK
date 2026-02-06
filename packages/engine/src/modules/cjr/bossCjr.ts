@@ -5,7 +5,7 @@
 
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
 import { distanceSquared } from '../../math/FastMath';
-import { PhysicsStore } from '../../compat';
+import { PhysicsStore, WorldState } from '../../compat';
 
 /**
  * Minimal entity interfaces
@@ -47,6 +47,7 @@ export interface IBossState {
 export const updateBossLogic = (
     boss: IBossEntity | null,
     players: IPlayerEntity[],
+    world: WorldState, // EIDOLON-V: Added WorldState injection
     dt: number
 ): void => {
     if (!boss || boss.isDead) {
@@ -68,7 +69,7 @@ export const updateBossLogic = (
 
             // EIDOLON-V P1: Sync to DOD if boss has physicsIndex
             if (boss.physicsIndex !== undefined) {
-                PhysicsStore.setVelocity(boss.physicsIndex, vx, vy);
+                PhysicsStore.setVelocity(world, boss.physicsIndex, vx, vy);
             }
             boss.velocity.x = vx;
             boss.velocity.y = vy;
@@ -84,7 +85,7 @@ export const updateBossLogic = (
             const dashVy = boss.velocity.y * 3;
 
             if (boss.physicsIndex !== undefined) {
-                PhysicsStore.setVelocity(boss.physicsIndex, dashVx, dashVy);
+                PhysicsStore.setVelocity(world, boss.physicsIndex, dashVx, dashVy);
             }
             boss.velocity.x = dashVx;
             boss.velocity.y = dashVy;
@@ -160,27 +161,5 @@ export const onBossDeath = (
 };
 
 // ============================================================================
-// LEGACY-COMPATIBLE WRAPPERS (for client migration)
+// LEGACY-COMPATIBLE WRAPPERS (REMOVED)
 // ============================================================================
-
-/**
- * Legacy-compatible updateBossLogic
- * Matches client signature: (state: GameState, dt: number) => void
- */
-export const updateBossLogicLegacy = (
-    state: {
-        boss: IBossEntity | null;
-        players: IPlayerEntity[];
-    },
-    dt: number
-): void => {
-    updateBossLogic(state.boss, state.players, dt);
-};
-
-/**
- * Legacy-compatible resetBossState  
- * Matches client signature: (runtime: any) => void
- */
-export const resetBossStateLegacy = (runtime: IBossState['runtime']): void => {
-    resetBossState(runtime);
-};

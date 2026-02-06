@@ -72,25 +72,25 @@ export class TransformStore {
     static readonly STRIDE = STRIDES.TRANSFORM;
 
     static get data(): Float32Array {
-        return defaultWorld.transform;
+        throw new Error("TransformStore.data is deprecated. Use WorldState.transform directly.");
     }
 
-    static getX(id: number): number {
-        return TransformAccess.getX(defaultWorld, id);
+    static getX(world: WorldState, id: number): number {
+        return TransformAccess.getX(world, id);
     }
 
-    static getY(id: number): number {
-        return TransformAccess.getY(defaultWorld, id);
+    static getY(world: WorldState, id: number): number {
+        return TransformAccess.getY(world, id);
     }
 
-    static set(id: number, x: number, y: number, rotation: number, scale: number = 1): void {
+    static set(world: WorldState, id: number, x: number, y: number, rotation: number, scale: number = 1): void {
         // Init prev values to current values
-        TransformAccess.set(defaultWorld, id, x, y, rotation, scale, x, y, rotation);
+        TransformAccess.set(world, id, x, y, rotation, scale, x, y, rotation);
     }
 
-    static setPosition(id: number, x: number, y: number): void {
-        TransformAccess.setX(defaultWorld, id, x);
-        TransformAccess.setY(defaultWorld, id, y);
+    static setPosition(world: WorldState, id: number, x: number, y: number): void {
+        TransformAccess.setX(world, id, x);
+        TransformAccess.setY(world, id, y);
     }
 }
 
@@ -98,40 +98,40 @@ export class PhysicsStore {
     static readonly STRIDE = STRIDES.PHYSICS;
 
     static get data(): Float32Array {
-        return defaultWorld.physics;
+        throw new Error("PhysicsStore.data is deprecated. Use WorldState.physics directly.");
     }
 
-    static getVx(id: number): number {
-        return PhysicsAccess.getVx(defaultWorld, id);
+    static getVx(world: WorldState, id: number): number {
+        return PhysicsAccess.getVx(world, id);
     }
 
-    static getVy(id: number): number {
-        return PhysicsAccess.getVy(defaultWorld, id);
+    static getVy(world: WorldState, id: number): number {
+        return PhysicsAccess.getVy(world, id);
     }
 
-    static getRadius(id: number): number {
-        return PhysicsAccess.getRadius(defaultWorld, id);
+    static getRadius(world: WorldState, id: number): number {
+        return PhysicsAccess.getRadius(world, id);
     }
 
-    static getVelocityX(id: number): number {
-        return PhysicsAccess.getVx(defaultWorld, id);
+    static getVelocityX(world: WorldState, id: number): number {
+        return PhysicsAccess.getVx(world, id);
     }
 
-    static getVelocityY(id: number): number {
-        return PhysicsAccess.getVy(defaultWorld, id);
+    static getVelocityY(world: WorldState, id: number): number {
+        return PhysicsAccess.getVy(world, id);
     }
 
-    static set(id: number, vx: number, vy: number, mass: number, radius: number, restitution: number = 0.5, friction: number = 0.9): void {
-        PhysicsAccess.set(defaultWorld, id, vx, vy, 0, mass, radius, restitution, friction);
+    static set(world: WorldState, id: number, vx: number, vy: number, mass: number, radius: number, restitution: number = 0.5, friction: number = 0.9): void {
+        PhysicsAccess.set(world, id, vx, vy, 0, mass, radius, restitution, friction);
     }
 
-    static setVelocity(id: number, vx: number, vy: number): void {
-        PhysicsAccess.setVx(defaultWorld, id, vx);
-        PhysicsAccess.setVy(defaultWorld, id, vy);
+    static setVelocity(world: WorldState, id: number, vx: number, vy: number): void {
+        PhysicsAccess.setVx(world, id, vx);
+        PhysicsAccess.setVy(world, id, vy);
     }
 
-    static setRadius(id: number, radius: number): void {
-        PhysicsAccess.setRadius(defaultWorld, id, radius);
+    static setRadius(world: WorldState, id: number, radius: number): void {
+        PhysicsAccess.setRadius(world, id, radius);
     }
 }
 
@@ -139,65 +139,65 @@ export class StatsStore {
     static readonly STRIDE = STRIDES.STATS;
 
     static get data(): Float32Array {
-        return defaultWorld.stats;
+        throw new Error("StatsStore.data is deprecated. Use WorldState.stats directly.");
     }
 
-    static getCurrentHealth(id: number): number {
-        return StatsAccess.getHp(defaultWorld, id);
+    static getCurrentHealth(world: WorldState, id: number): number {
+        return StatsAccess.getHp(world, id);
     }
 
-    static getMaxHealth(id: number): number {
-        return StatsAccess.getMaxHp(defaultWorld, id);
+    static getMaxHealth(world: WorldState, id: number): number {
+        return StatsAccess.getMaxHp(world, id);
     }
 
-    static getScore(id: number): number {
-        return StatsAccess.getScore(defaultWorld, id);
+    static getScore(world: WorldState, id: number): number {
+        return StatsAccess.getScore(world, id);
     }
 
-    static getMatchPercent(id: number): number {
-        return StatsAccess.getMatchPercent(defaultWorld, id);
+    static getMatchPercent(world: WorldState, id: number): number {
+        return StatsAccess.getMatchPercent(world, id);
     }
 
-    static getDamageMultiplier(id: number): number {
-        return StatsAccess.getDamageMultiplier(defaultWorld, id);
+    static getDamageMultiplier(world: WorldState, id: number): number {
+        return StatsAccess.getDamageMultiplier(world, id);
     }
 
-    static set(id: number, hp: number, maxHp: number, score: number, matchPercent: number, defense: number, damageMultiplier: number): void {
-        StatsAccess.set(defaultWorld, id, hp, maxHp, score, matchPercent, defense, damageMultiplier);
+    static set(world: WorldState, id: number, hp: number, maxHp: number, score: number, matchPercent: number, defense: number, damageMultiplier: number): void {
+        StatsAccess.set(world, id, hp, maxHp, score, matchPercent, defense, damageMultiplier);
     }
 
-    static setCurrentHealth(id: number, value: number): void {
-        StatsAccess.setHp(defaultWorld, id, value);
+    static setCurrentHealth(world: WorldState, id: number, value: number): void {
+        StatsAccess.setHp(world, id, value);
     }
 
-    static setMaxHealth(id: number, value: number): void {
-        StatsAccess.setMaxHp(defaultWorld, id, value);
+    static setMaxHealth(world: WorldState, id: number, value: number): void {
+        StatsAccess.setMaxHp(world, id, value);
     }
 }
 
 export class StateStore {
     static get flags(): Uint8Array {
-        return defaultWorld.stateFlags;
+        throw new Error("StateStore.flags is deprecated. Use WorldState.stateFlags directly.");
     }
 
     static get data(): Uint8Array {
-        return defaultWorld.stateFlags;
+        throw new Error("StateStore.data is deprecated. Use WorldState.stateFlags directly.");
     }
 
-    static isActive(id: number): boolean {
-        return StateAccess.isActive(defaultWorld, id);
+    static isActive(world: WorldState, id: number): boolean {
+        return StateAccess.isActive(world, id);
     }
 
-    static hasFlag(id: number, flag: number): boolean {
-        return StateAccess.hasFlag(defaultWorld, id, flag);
+    static hasFlag(world: WorldState, id: number, flag: number): boolean {
+        return StateAccess.hasFlag(world, id, flag);
     }
 
-    static setFlag(id: number, flag: number): void {
-        StateAccess.setFlag(defaultWorld, id, flag);
+    static setFlag(world: WorldState, id: number, flag: number): void {
+        StateAccess.setFlag(world, id, flag);
     }
 
-    static clearFlag(id: number, flag: number): void {
-        StateAccess.clearFlag(defaultWorld, id, flag);
+    static clearFlag(world: WorldState, id: number, flag: number): void {
+        StateAccess.clearFlag(world, id, flag);
     }
 }
 
@@ -205,66 +205,66 @@ export class InputStore {
     static readonly STRIDE = STRIDES.INPUT;
 
     static get data(): Float32Array {
-        return defaultWorld.input;
+        throw new Error("InputStore.data is deprecated. Use WorldState.input directly.");
     }
 
-    static setTarget(id: number, x: number, y: number): void {
-        InputAccess.setTargetX(defaultWorld, id, x);
-        InputAccess.setTargetY(defaultWorld, id, y);
+    static setTarget(world: WorldState, id: number, x: number, y: number): void {
+        InputAccess.setTargetX(world, id, x);
+        InputAccess.setTargetY(world, id, y);
     }
 
-    static getTarget(id: number, out: { x: number, y: number }): void {
-        out.x = InputAccess.getTargetX(defaultWorld, id);
-        out.y = InputAccess.getTargetY(defaultWorld, id);
+    static getTarget(world: WorldState, id: number, out: { x: number, y: number }): void {
+        out.x = InputAccess.getTargetX(world, id);
+        out.y = InputAccess.getTargetY(world, id);
     }
 
-    static setAction(id: number, bit: number, active: boolean): void {
-        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
+    static setAction(world: WorldState, id: number, bit: number, active: boolean): void {
+        let actions = world.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
         if (active) actions |= (1 << bit);
         else actions &= ~(1 << bit);
-        defaultWorld.inputView.setUint32(id * STRIDES.INPUT * 4 + 8, actions, true);
+        world.inputView.setUint32(id * STRIDES.INPUT * 4 + 8, actions, true);
     }
 
-    static isActionActive(id: number, bit: number): boolean {
-        let actions = defaultWorld.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
+    static isActionActive(world: WorldState, id: number, bit: number): boolean {
+        let actions = world.inputView.getUint32(id * STRIDES.INPUT * 4 + 8, true);
         return (actions & (1 << bit)) !== 0;
     }
 }
 
 export class ConfigStore {
     static readonly STRIDE = STRIDES.CONFIG;
-    static get data(): Float32Array { return defaultWorld.config; }
+    static get data(): Float32Array { throw new Error("ConfigStore.data is deprecated. Use WorldState.config directly."); }
 
-    static setMaxSpeed(id: number, speed: number) { /* unused in generated? */ }
-    static setSpeedMultiplier(id: number, value: number) { ConfigAccess.setSpeedMult(defaultWorld, id, value); }
-    static setMagnetRadius(id: number, value: number) { ConfigAccess.setMagneticRadius(defaultWorld, id, value); }
+    static setMaxSpeed(world: WorldState, id: number, speed: number) { /* unused in generated? */ }
+    static setSpeedMultiplier(world: WorldState, id: number, value: number) { ConfigAccess.setSpeedMult(world, id, value); }
+    static setMagnetRadius(world: WorldState, id: number, value: number) { ConfigAccess.setMagneticRadius(world, id, value); }
 
-    static set(id: number, magneticRadius: number, damageMult: number, speedMult: number, pickupRange: number, visionRange: number) {
-        ConfigAccess.set(defaultWorld, id, magneticRadius, damageMult, speedMult, pickupRange, visionRange);
+    static set(world: WorldState, id: number, magneticRadius: number, damageMult: number, speedMult: number, pickupRange: number, visionRange: number) {
+        ConfigAccess.set(world, id, magneticRadius, damageMult, speedMult, pickupRange, visionRange);
     }
 }
 
 export class SkillStore {
     static readonly STRIDE = STRIDES.SKILL;
-    static get data(): Float32Array { return defaultWorld.skill; }
+    static get data(): Float32Array { throw new Error("SkillStore.data is deprecated. Use WorldState.skill directly."); }
 
     static update(dt: number) { /* Global update logic moved to System? This store just proxies data */ }
 
     // Required by legacy usage
-    static set(id: number, cooldown: number, maxCooldown: number, activeTimer: number): void {
-        SkillAccess.set(defaultWorld, id, cooldown, maxCooldown, activeTimer, 0);
+    static set(world: WorldState, id: number, cooldown: number, maxCooldown: number, activeTimer: number): void {
+        SkillAccess.set(world, id, cooldown, maxCooldown, activeTimer, 0);
     }
 
-    static setCooldown(id: number, val: number) { SkillAccess.setCooldown(defaultWorld, id, val); }
-    static setMaxCooldown(id: number, val: number) { SkillAccess.setMaxCooldown(defaultWorld, id, val); }
-    static setActiveTimer(id: number, val: number) { SkillAccess.setActiveTimer(defaultWorld, id, val); }
+    static setCooldown(world: WorldState, id: number, val: number) { SkillAccess.setCooldown(world, id, val); }
+    static setMaxCooldown(world: WorldState, id: number, val: number) { SkillAccess.setMaxCooldown(world, id, val); }
+    static setActiveTimer(world: WorldState, id: number, val: number) { SkillAccess.setActiveTimer(world, id, val); }
 }
 
 export class ProjectileStore {
     static readonly STRIDE = STRIDES.PROJECTILE;
-    static get data(): Float32Array { return defaultWorld.projectile; }
-    static set(id: number, ownerId: number, damage: number, duration: number, typeId: number): void {
-        ProjectileAccess.set(defaultWorld, id, ownerId, damage, duration, typeId);
+    static get data(): Float32Array { throw new Error("ProjectileStore.data is deprecated. Use WorldState.projectile directly."); }
+    static set(world: WorldState, id: number, ownerId: number, damage: number, duration: number, typeId: number): void {
+        ProjectileAccess.set(world, id, ownerId, damage, duration, typeId);
     }
 }
 
@@ -276,33 +276,33 @@ export class PigmentStore {
     static readonly B = 2;
     static readonly MATCH = 3;
 
-    static get data(): Float32Array { return defaultWorld.pigment; }
+    static get data(): Float32Array { throw new Error("PigmentStore.data is deprecated. Use WorldState.pigment directly."); }
 
-    static getColorInt(id: number): number {
-        const r = Math.floor(PigmentAccess.getR(defaultWorld, id) * 255);
-        const g = Math.floor(PigmentAccess.getG(defaultWorld, id) * 255);
-        const b = Math.floor(PigmentAccess.getB(defaultWorld, id) * 255);
+    static getColorInt(world: WorldState, id: number): number {
+        const r = Math.floor(PigmentAccess.getR(world, id) * 255);
+        const g = Math.floor(PigmentAccess.getG(world, id) * 255);
+        const b = Math.floor(PigmentAccess.getB(world, id) * 255);
         return (r << 16) | (g << 8) | b;
     }
 
-    static getMatch(id: number): number {
-        return PigmentAccess.getMatchPercent(defaultWorld, id);
+    static getMatch(world: WorldState, id: number): number {
+        return PigmentAccess.getMatchPercent(world, id);
     }
 
-    static set(id: number, r: number, g: number, b: number): void {
-        PigmentAccess.setR(defaultWorld, id, r);
-        PigmentAccess.setG(defaultWorld, id, g);
-        PigmentAccess.setB(defaultWorld, id, b);
+    static set(world: WorldState, id: number, r: number, g: number, b: number): void {
+        PigmentAccess.setR(world, id, r);
+        PigmentAccess.setG(world, id, g);
+        PigmentAccess.setB(world, id, b);
     }
 
-    static mix(id: number, r: number, g: number, b: number, ratio: number): void {
-        const currentR = PigmentAccess.getR(defaultWorld, id);
-        const currentG = PigmentAccess.getG(defaultWorld, id);
-        const currentB = PigmentAccess.getB(defaultWorld, id);
+    static mix(world: WorldState, id: number, r: number, g: number, b: number, ratio: number): void {
+        const currentR = PigmentAccess.getR(world, id);
+        const currentG = PigmentAccess.getG(world, id);
+        const currentB = PigmentAccess.getB(world, id);
 
-        PigmentAccess.setR(defaultWorld, id, currentR + (r - currentR) * ratio);
-        PigmentAccess.setG(defaultWorld, id, currentG + (g - currentG) * ratio);
-        PigmentAccess.setB(defaultWorld, id, currentB + (b - currentB) * ratio);
+        PigmentAccess.setR(world, id, currentR + (r - currentR) * ratio);
+        PigmentAccess.setG(world, id, currentG + (g - currentG) * ratio);
+        PigmentAccess.setB(world, id, currentB + (b - currentB) * ratio);
     }
 }
 
@@ -316,7 +316,7 @@ export class TattooStore {
 
     // New Float32 data from WorldState
     static get data(): Float32Array {
-        return defaultWorld.tattoo;
+        throw new Error("TattooStore.data is deprecated. Use WorldState.tattoo directly.");
     }
 }
 

@@ -27,17 +27,8 @@ export class PhysicsSystem {
      * Update physics for all active entities
      * Uses active list for zero-overhead skipping of empty slots
      */
-    static update(worldOrDt: WorldState | number, dt?: number, activeIndices?: number[]): void {
-        let world: WorldState;
-        let deltaTime: number;
-
-        if (typeof worldOrDt === 'number') {
-            world = defaultWorld;
-            deltaTime = worldOrDt;
-        } else {
-            world = worldOrDt;
-            deltaTime = dt!;
-        }
+    static update(world: WorldState, dt: number): void {
+        const deltaTime = dt;
 
         // Time scaling
         const timeScale = deltaTime * 60;
@@ -45,25 +36,13 @@ export class PhysicsSystem {
         const defaultFrictionUnstable = Math.pow(FRICTION_BASE, timeScale);
 
         // ITERATION STRATEGY:
-        // 1. If activeIndices provided: Iterate ONLY active entities (O(Active)) - FASTEST
-        // 2. Fallback: Iterate 0..maxEntities (O(Max))
+        // Use WorldState Sparse Set (O(Active)) - ZERO OVERHEAD
+        const count = world.activeCount;
+        const activeEntities = world.activeEntities;
 
-        if (activeIndices) {
-            const count = activeIndices.length;
-            for (let i = 0; i < count; i++) {
-                const id = activeIndices[i];
-                // Double check active flag just in case (fast bitwise)
-                // if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
-
-                PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
-            }
-        } else {
-            const count = world.maxEntities;
-            for (let id = 0; id < count; id++) {
-                if ((world.stateFlags[id] & EntityFlags.ACTIVE) === 0) continue;
-
-                PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
-            }
+        for (let i = 0; i < count; i++) {
+            const id = activeEntities[i];
+            PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
         }
     }
 
@@ -93,35 +72,19 @@ export class PhysicsSystem {
     }
 
     static integrateEntity(
-        worldOrId: WorldState | number,
-        idOrDt: number,
-        dtOrFriction: number,
-        friction?: number
+        world: WorldState,
+        id: number,
+        dt: number,
+        friction: number
     ): void {
-        let world: WorldState;
-        let id: number;
-        let dt: number;
-        let fric: number;
-
-        if (typeof worldOrId === 'number') {
-            world = defaultWorld;
-            id = worldOrId;
-            dt = idOrDt;
-            fric = dtOrFriction;
-        } else {
-            world = worldOrId;
-            id = idOrDt;
-            dt = dtOrFriction;
-            fric = friction!;
-        }
 
         // 1. Get Velocity
         let vx = PhysicsAccess.getVx(world, id);
         let vy = PhysicsAccess.getVy(world, id);
 
         // 2. Apply Friction
-        vx *= fric;
-        vy *= fric;
+        vx *= friction;
+        vy *= friction;
 
         // 3. Snapshot for interpolation (Prev = Current)
         const currX = TransformAccess.getX(world, id);

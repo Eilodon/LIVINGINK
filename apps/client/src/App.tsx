@@ -93,6 +93,29 @@ const App: React.FC = () => {
     );
   }
 
+  // EIDOLON-V: Global Keybinds for Dev Tools
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.shiftKey && e.code === 'KeyS') {
+        const { stressTestController } = await import('./dev/StressTestController');
+        const state = gameStateManager.getCurrentState();
+        if (state) {
+          stressTestController.start(state);
+          console.log('Stress Test START');
+        } else {
+          console.warn('Cannot start Stress Test: No State');
+        }
+      }
+      if (e.shiftKey && e.code === 'KeyD') {
+        const { stressTestController } = await import('./dev/StressTestController');
+        stressTestController.stop();
+        console.log('Stress Test STOP');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="app-shell select-none relative w-full h-full bg-ink-950 overflow-hidden">
       {/* EIDOLON-V: Screen reader announcements for accessibility */}

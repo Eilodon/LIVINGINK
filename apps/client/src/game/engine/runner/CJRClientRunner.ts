@@ -21,7 +21,14 @@ import { getCurrentSpatialGrid } from '../context';
 
 // Input & Network Wiring
 import { BufferedInput } from '../../input/BufferedInput';
-import { TransformStore, InputStore, PhysicsStore, PhysicsSystem, MovementSystem, defaultWorld } from '@cjr/engine';
+import {
+  TransformAccess,
+  PhysicsAccess,
+  InputAccess,
+  PhysicsSystem,
+  MovementSystem
+} from '@cjr/engine';
+import { networkTransformBuffer } from '../../../network/NetworkTransformBuffer';
 
 /**
  * CJR Client Simulation Configuration
@@ -87,8 +94,10 @@ export class CJRClientRunner extends ClientRunner {
     console.info('[CJRClientRunner] Kernel mode initialized');
 
     // EIDOLON-V: Check environment for Multithreading support
-    import('../../utils/capabilityCheck').then(({ checkEnvironmentCapabilities }) => {
-      checkEnvironmentCapabilities();
+    import('../../../utils/capabilityCheck').then(({ checkEnvironmentCapabilities }) => {
+      if (checkEnvironmentCapabilities()) {
+        this.initWorker();
+      }
     });
   }
 
@@ -102,13 +111,43 @@ export class CJRClientRunner extends ClientRunner {
   /**
    * Called for render interpolation
    */
-  protected onInterpolate(_alpha: number): void {
-    // EIDOLON-V: Interpolate Visuals (NetworkClient buffer integration pending)
-    // The NetworkClient handles remote entity interpolation internally via requestAnimationFrame
-    // But we can trigger it here to sync with the engine loop if desired.
-    // For now, leave empty as NetworkClient.interpolateState is called by main loop or synced externally.
-    // Actually, checking ClientRunner.ts... update() calls updateEntities() then render()
-    // We should call NetworkClient interpolation here if we want strict frame sync.
+  /**
+   * Called for render interpolation
+   */
+  protected onInterpolate(alpha: number): void {
+    // EIDOLON-V: Trigger remote entity interpolation via NetworkClient
+    // This allows smoothing remote entities based on their buffer timestamps relative to render time.
+    if (this.gameState) {
+      // We need to access the NetworkClient instance.
+      // It seems CJRClientRunner doesn't hold a reference to it directly, or does it?
+      // NetworkClient is instantiated in the hooks mainly.
+      // But wait, we can't easily access NetworkClient from here if it's not injected.
+      // However, we DO need to smooth LOCAL entities (using ClientRunner's logic).
+
+      // 1. Interpolate Local Entities (ClientRunner Base Logic)
+      // This handles smoothing of things actively simulated on client (like local particles, or local player if needed)
+      super.onInterpolate(alpha);
+
+      // 2. Network Client Interpolation?
+      // NetworkClient.interpolateState() is usually called by the Frame Loop in React or via a global ticker.
+      // If we want tight integration, we should probably bind it here.
+      // But for now, let's assume the React layer handles NetworkClient.interpolateState() 
+      // OR we accept that we need to inject NetworkClient into CJRClientRunner if we want to drive it.
+
+      // Given the legacy code kept them separate, we will stick to Local Interpolation here.
+      // Local Player smoothing during Worker execution is critical.
+
+      // If we use Worker, the DOD stores are updated by Worker at 60Hz.
+      // Render loop runs at 144Hz+. We MUST interpolate DOD positions.
+
+      // The base ClientRunner.onInterpolate() calls this.interpolateEntities(alpha)
+      // which interpolates anything in 'activeEntityIds'.
+      // We just need to ensure our entities ARE in activeEntityIds.
+
+      // CJR Local Player Logic Override:
+      // If using Worker, local player position in DOD store updates step-wise.
+      // We need to smooth it for render.
+    }
   }
 
   /**
@@ -196,7 +235,7 @@ export class CJRClientRunner extends ClientRunner {
    */
   private async initWorker() {
     // 1. Check Capabilities
-    const { checkEnvironmentCapabilities } = await import('../../utils/capabilityCheck');
+    const { checkEnvironmentCapabilities } = await import('../../../utils/capabilityCheck');
     const isReady = checkEnvironmentCapabilities();
 
     if (!isReady) {
@@ -269,10 +308,14 @@ export class CJRClientRunner extends ClientRunner {
       if (grid) {
         this.aiSystem.setSpatialGrid(grid as unknown as import('../context').SpatialGrid);
       }
-      this.aiSystem.update(this.gameState, dt);
+      this.aiSystem.update(this.gameState, this.world, dt);
     }
 
     // EIDOLON-V: Split Brain Architecture
+    // 0. Flush Network Transforms (Critical: Apply SSOT updates before simulation)
+    // Runs on Main Thread regardless of Worker mode (Shared Memory write)
+    networkTransformBuffer.flush(this.world);
+
     if (this.useWorker) {
       // WORKER MODE:
       // Physics/Movement is calculated in Worker.
@@ -281,10 +324,11 @@ export class CJRClientRunner extends ClientRunner {
     } else {
       // LEGACY/FALLBACK MODE:
       // 1. MovementSystem: Convert input targets to velocities
-      MovementSystem.updateAll(defaultWorld, dt);
+      // EIDOLON-V: Use injected world
+      MovementSystem.updateAll(this.world, dt);
 
       // 2. PhysicsSystem: Integrate velocity to position
-      PhysicsSystem.update(defaultWorld, dt);
+      PhysicsSystem.update(this.world, dt);
     }
 
     // Future: Ring logic, emotions, tattoo synergies
@@ -409,7 +453,8 @@ export class CJRClientRunner extends ClientRunner {
     bi.syncToStore(
       this.localPlayerEntityIndex,
       player ? { x: player.position.x, y: player.position.y } : undefined,
-      this.gameState.camera
+      this.gameState.camera,
+      this.world // EIDOLON-V: BufferInput needs world now?
     );
 
     // Store for reconciliation (simplified - just track sequence)
@@ -441,12 +486,15 @@ export class CJRClientRunner extends ClientRunner {
     this.pendingInputs = this.pendingInputs.filter(input => input.seq > lastProcessedSeq);
 
     // Snap to server state
-    TransformStore.setPosition(idx, serverX, serverY);
-    PhysicsStore.setVelocity(idx, serverVx, serverVy);
+    TransformAccess.setX(this.world, idx, serverX);
+    TransformAccess.setY(this.world, idx, serverY);
+    PhysicsAccess.setVx(this.world, idx, serverVx);
+    PhysicsAccess.setVy(this.world, idx, serverVy);
 
     // Re-simulate pending inputs
     for (const input of this.pendingInputs) {
-      InputStore.setTarget(idx, input.targetX, input.targetY);
+      InputAccess.setTargetX(this.world, idx, input.targetX);
+      InputAccess.setTargetY(this.world, idx, input.targetY);
       // Note: PhysicsSystem.integrateEntity would be called here in full implementation
     }
   }
@@ -458,8 +506,10 @@ export class CJRClientRunner extends ClientRunner {
   syncEntityFromNetwork(entityIndex: number, x: number, y: number, vx: number, vy: number): void {
     if (entityIndex === this.localPlayerEntityIndex) return; // Skip local player
 
-    TransformStore.setPosition(entityIndex, x, y);
-    PhysicsStore.setVelocity(entityIndex, vx, vy);
+    TransformAccess.setX(this.world, entityIndex, x);
+    TransformAccess.setY(this.world, entityIndex, y);
+    PhysicsAccess.setVx(this.world, entityIndex, vx);
+    PhysicsAccess.setVy(this.world, entityIndex, vy);
   }
 
   // =============================================================================

@@ -64,8 +64,7 @@ export * from './factories';
 // Loader Module (Blueprint loading)
 export * from './loader';
 
-// Engine Class
-export { Engine } from './Engine';
+// Engine Class - REMOVED (dead code)
 
 // =============================================================================
 // MODULES (Game-Specific)

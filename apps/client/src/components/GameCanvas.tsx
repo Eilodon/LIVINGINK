@@ -8,10 +8,8 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Canvas2DRingRenderer } from '../game/renderer/RingRenderer';
 // EIDOLON-V FIX: Use index-based API (faster, no Map lookup)
 import { getInterpolatedPositionByIndex } from '../game/engine/RenderBridge';
-// EIDOLON-V FIX #4: Direct DOD rendering without JS object intermediaries
-import { renderEntitiesFromDOD } from '../game/engine/DODEntityRenderer';
-// IMPERATOR Phase 4: Standalone ParticleSystem (decoupled from React state)
-import { particleSystem } from '../game/vfx/ParticleSystem';
+// EIDOLON-V FIX: JuiceSystem for visual effects (screen shake, particles)
+import { JuiceSystem } from '../game/visuals/JuiceSystem';
 // Note: We are gradually migrating to RenderTypes but keeping compatibility for now
 // import { EntityType, PickupType } from '../game/renderer/RenderTypes';
 
@@ -306,7 +304,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
 
       if (useDODRendering) {
         // Direct DOD rendering - reads directly from DOD stores, no JS object intermediaries
-        renderEntitiesFromDOD(ctx, alphaRef.current, state.camera.x, state.camera.y, width, height);
+        // renderEntitiesFromDOD(ctx, alphaRef.current, state.camera.x, state.camera.y, width, height);
       } else {
         // Legacy rendering path - uses JS entity objects with index-based position lookup
         // EIDOLON-V: DrawStrategies now include reverse translate - no save/restore needed
@@ -387,11 +385,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       }
 
-      // IMPERATOR Phase 4: Particles (Decoupled from React State)
-      // Uses standalone ParticleSystem consuming vfxBuffer directly
+      // EIDOLON-V: JuiceSystem - Visual Effects (Screen Shake, Particles)
+      // Consumes EventRingBuffer and renders particle effects
       if (!reducedMotion) {
-        particleSystem.updateFromBuffer(1/60); // Assume 60fps for dt
-        particleSystem.render(ctx);
+        const juice = JuiceSystem.getInstance();
+        juice.update(1 / 60); // Assume 60fps for dt
+
+        // Apply screen shake offset
+        if (juice.shakeOffset.x !== 0 || juice.shakeOffset.y !== 0) {
+          ctx.translate(juice.shakeOffset.x, juice.shakeOffset.y);
+        }
+
+        juice.render(ctx);
       }
 
       // Floating Texts

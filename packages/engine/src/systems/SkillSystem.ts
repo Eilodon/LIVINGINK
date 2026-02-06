@@ -48,11 +48,12 @@ export class SkillSystem {
     /**
      * Update cooldowns for all entities
      */
-    static update(dt: number, world: WorldState = defaultWorld) {
-        const count = world.maxEntities;
+    static update(world: WorldState, dt: number) {
+        const count = world.activeCount;
+        const activeEntities = world.activeEntities;
 
-        for (let id = 0; id < count; id++) {
-            if (!StateAccess.isActive(world, id)) continue;
+        for (let i = 0; i < count; i++) {
+            const id = activeEntities[i];
 
             const cooldown = SkillAccess.getCooldown(world, id);
             if (cooldown > 0) {

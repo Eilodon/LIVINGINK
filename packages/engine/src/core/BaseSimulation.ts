@@ -190,7 +190,7 @@ export abstract class BaseSimulation {
         MovementSystem.updateAll(this.world, dt);
 
         // Update skill system
-        SkillSystem.update(dt);
+        SkillSystem.update(this.world, dt);
     }
 
     /**
@@ -207,14 +207,18 @@ export abstract class BaseSimulation {
 
     /**
      * Update entity lifecycle (spawn/despawn)
+     * EIDOLON-V FIX: O(Active) instead of O(N) using Sparse Set
      */
     protected updateLifecycle(_dt: number): void {
         // Mark dead entities for cleanup
-        const maxEntities = this.world.maxEntities;
+        // Uses Sparse Set for O(activeCount) instead of O(maxEntities)
+        const activeEntities = this.world.activeEntities;
+        const activeCount = this.world.activeCount;
 
-        for (let i = 0; i < maxEntities; i++) {
-            if (StateAccess.isDead(this.world, i)) {
-                this.onEntityDeath(i);
+        for (let i = 0; i < activeCount; i++) {
+            const entityId = activeEntities[i];
+            if (StateAccess.isDead(this.world, entityId)) {
+                this.onEntityDeath(entityId);
             }
         }
     }

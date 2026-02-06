@@ -27,10 +27,11 @@ import {
   SkillSystem,
   TransformStore,
   PhysicsStore,
-  StateStore,
-  InputStore,
-  StatsStore,
+  StateStore, // Restored
+  InputStore, // Restored
+  StatsStore, // Restored
   ConfigStore,
+  StateAccess, // EIDOLON-V: Added StateAccess
   SkillAccess, // EIDOLON-V P1: For server-authoritative cooldown check
   checkRingTransition,
   calcMatchPercentFast,
@@ -66,8 +67,6 @@ export class GameRoom extends Room<GameRoomState> {
   private nextEntityIndex: number = 0;
   // EIDOLON-V P0: Entity pool recycling with generation for safe ID reuse
   private freeEntityIndices: number[] = [];
-  // EIDOLON-V P5 FIX: Active entity list for O(N) iteration
-  private activeEntityIndices: number[] = [];
   private entityGenerations: Uint16Array = new Uint16Array(MAX_ENTITIES);
 
   // EIDOLON-V P6 FIX: Instance-based WorldState (No Global Singleton)
@@ -320,24 +319,24 @@ export class GameRoom extends Room<GameRoomState> {
 
     // Initialize DOD Component Stores
     // Transform: [x, y, rotation, scale, prevX, prevY, prevRotation, _pad]
-    TransformStore.set(entityIndex, x, y, angle, 1.0);
+    TransformStore.set(this.world, entityIndex, x, y, angle, 1.0);
 
     // Physics: [vx, vy, vRotation, mass, radius, restitution, friction, _pad]
     const mass = Math.PI * PLAYER_START_RADIUS * PLAYER_START_RADIUS;
-    PhysicsStore.set(entityIndex, 0, 0, mass, PLAYER_START_RADIUS, 0.5, 0.93);
+    PhysicsStore.set(this.world, entityIndex, 0, 0, mass, PLAYER_START_RADIUS, 0.5, 0.93);
 
     // Stats: [currentHealth, maxHealth, score, matchPercent, defense, damageMultiplier, _pad, _pad]
-    StatsStore.set(entityIndex, 100, 100, 0, player.matchPercent, 1, 1);
+    StatsStore.set(this.world, entityIndex, 100, 100, 0, player.matchPercent, 1, 1);
 
     // Input: [targetX, targetY, isSkillActive, isEjectActive]
-    InputStore.setTarget(entityIndex, x, y);
+    InputStore.setTarget(this.world, entityIndex, x, y);
 
     // Config: [maxSpeed, speedMultiplier, magnetRadius, _pad]
-    ConfigStore.setMaxSpeed(entityIndex, GameRoom.MAX_SPEED_BASE);
-    ConfigStore.setSpeedMultiplier(entityIndex, 1.0);
+    ConfigStore.setMaxSpeed(this.world, entityIndex, GameRoom.MAX_SPEED_BASE);
+    ConfigStore.setSpeedMultiplier(this.world, entityIndex, 1.0);
 
     // Activate entity
-    StateStore.setFlag(entityIndex, EntityFlags.ACTIVE);
+    StateAccess.activate(this.world, entityIndex);
 
     // Add to engine bridge for high-level logic
     this.serverEngine.addPlayer(client.sessionId, player.name, player.shape);
@@ -399,9 +398,9 @@ export class GameRoom extends Room<GameRoomState> {
     MovementSystem.updateAll(this.world, dtSec);
 
     // EIDOLON-V P5 FIX: Pass active indices for O(N) iteration
-    PhysicsSystem.update(this.world, dtSec, this.activeEntityIndices);
+    PhysicsSystem.update(this.world, dtSec);
 
-    SkillSystem.update(dtSec, this.world);
+    SkillSystem.update(this.world, dtSec);
 
     // 3. Update Ring Logic (CJR specific)
     this.updateRingLogicForAll();
@@ -461,14 +460,14 @@ export class GameRoom extends Room<GameRoomState> {
       const clampedY = Math.max(-MAP_RADIUS, Math.min(MAP_RADIUS, input.targetY));
 
       // Apply to DOD InputStore
-      InputStore.setTarget(entityIndex, clampedX, clampedY);
+      InputStore.setTarget(this.world, entityIndex, clampedX, clampedY);
 
       // Handle skill input with server-authoritative cooldown check
       if (input.space) {
         // EIDOLON-V P1 SECURITY: Check cooldown from DOD store (not Colyseus schema)
         const currentCooldown = SkillAccess.getCooldown(this.world, entityIndex);
         if (currentCooldown <= 0) {
-          InputStore.setAction(entityIndex, 0, true); // Bit 0 = Primary/Skill
+          InputStore.setAction(this.world, entityIndex, 0, true); // Bit 0 = Primary/Skill
         } else {
           logger.debug('Skill input rejected - cooldown active', {
             sessionId,
@@ -477,7 +476,7 @@ export class GameRoom extends Room<GameRoomState> {
         }
       }
       if (input.w) {
-        InputStore.setAction(entityIndex, 1, true); // Bit 1 = Secondary/Eject
+        InputStore.setAction(this.world, entityIndex, 1, true); // Bit 1 = Secondary/Eject
       }
 
       // Mark input as processed using normalized sequence
@@ -497,12 +496,12 @@ export class GameRoom extends Room<GameRoomState> {
       const ringEntity = {
         physicsIndex: entityIndex,
         position: {
-          x: TransformStore.getX(entityIndex),
-          y: TransformStore.getY(entityIndex),
+          x: TransformStore.getX(this.world, entityIndex),
+          y: TransformStore.getY(this.world, entityIndex),
         },
         velocity: {
-          x: PhysicsStore.getVelocityX(entityIndex),
-          y: PhysicsStore.getVelocityY(entityIndex),
+          x: PhysicsStore.getVelocityX(this.world, entityIndex),
+          y: PhysicsStore.getVelocityY(this.world, entityIndex),
         },
         ring: player.ring as 1 | 2 | 3,
         matchPercent: player.matchPercent,
@@ -527,8 +526,8 @@ export class GameRoom extends Room<GameRoomState> {
 
       // Sync position/velocity back from ring logic
       if (ringEntity.physicsIndex !== undefined) {
-        TransformStore.setPosition(entityIndex, ringEntity.position.x, ringEntity.position.y);
-        PhysicsStore.setVelocity(entityIndex, ringEntity.velocity.x, ringEntity.velocity.y);
+        TransformStore.setPosition(this.world, entityIndex, ringEntity.position.x, ringEntity.position.y);
+        PhysicsStore.setVelocity(this.world, entityIndex, ringEntity.velocity.x, ringEntity.velocity.y);
       }
     });
   }
@@ -561,7 +560,6 @@ export class GameRoom extends Room<GameRoomState> {
         return -1;
       }
       this.entityGenerations[idx]++;  // Increment generation on reuse
-      this.activeEntityIndices.push(idx);
       return idx;
     }
 
@@ -571,7 +569,6 @@ export class GameRoom extends Room<GameRoomState> {
     }
 
     const idx = this.nextEntityIndex++;
-    this.activeEntityIndices.push(idx);
     return idx;
   }
 
@@ -579,24 +576,21 @@ export class GameRoom extends Room<GameRoomState> {
   private releaseEntityIndex(idx: number): void {
     // Zero ALL DOD stores to prevent stale data reads
     const stride8 = idx * 8;
-    TransformStore.data.fill(0, stride8, stride8 + 8);
-    PhysicsStore.data.fill(0, stride8, stride8 + 8);
-    StatsStore.data.fill(0, stride8, stride8 + 8);
-    StateStore.flags[idx] = 0;
-    InputStore.data.fill(0, idx * 4, idx * 4 + 4);
-    ConfigStore.data.fill(0, idx * 4, idx * 4 + 4);
+    // Direct buffer access is faster, but we should use accessors or stores to be safe if possible
+    // But Stores don't have bulk clear. We'll rely on the typed arrays being available via this.world.
+    this.world.transform.fill(0, stride8, stride8 + 8);
+    this.world.physics.fill(0, stride8, stride8 + 8);
+    this.world.stats.fill(0, stride8, stride8 + 8);
+    StateStore.setFlag(this.world, idx, 0); // Correct way to clear flag
+    this.world.input.fill(0, idx * 4, idx * 4 + 4);
+    this.world.config.fill(0, idx * 4, idx * 4 + 4);
 
     // Return to free list
     this.freeEntityIndices.push(idx);
 
+
     // EIDOLON-V P5 FIX: Remove from active list (swap-remove O(1))
-    const listIndex = this.activeEntityIndices.indexOf(idx);
-    if (listIndex !== -1) {
-      const last = this.activeEntityIndices.pop();
-      if (last !== undefined && listIndex < this.activeEntityIndices.length) {
-        this.activeEntityIndices[listIndex] = last;
-      }
-    }
+    StateAccess.deactivate(this.world, idx);
   }
 
   // EIDOLON-V BOT DOD: Spawn a bot with DOD entity allocation
@@ -635,11 +629,11 @@ export class GameRoom extends Room<GameRoomState> {
     }
 
     // Initialize DOD stores
-    TransformStore.set(entityIndex, x, y, 0, 1.0);
-    PhysicsStore.set(entityIndex, 0, 0, 100, PLAYER_START_RADIUS);
-    StatsStore.set(entityIndex, 100, 100, 0, 0, 1, 1);
-    ConfigStore.setMaxSpeed(entityIndex, GameRoom.MAX_SPEED_BASE * 0.8); // Bots slightly slower
-    StateStore.setFlag(entityIndex, EntityFlags.ACTIVE);
+    TransformStore.set(this.world, entityIndex, x, y, 0, 1.0);
+    PhysicsStore.set(this.world, entityIndex, 0, 0, 100, PLAYER_START_RADIUS);
+    StatsStore.set(this.world, entityIndex, 100, 100, 0, 0, 1, 1);
+    ConfigStore.setMaxSpeed(this.world, entityIndex, GameRoom.MAX_SPEED_BASE * 0.8); // Bots slightly slower
+    StateAccess.activate(this.world, entityIndex);
 
     this.botEntityIndices.set(botId, entityIndex);
 
@@ -741,8 +735,8 @@ export class GameRoom extends Room<GameRoomState> {
       if (entityIndex === undefined) return;
 
       // Check death state from DOD
-      const currentHealth = StatsStore.getCurrentHealth(entityIndex);
-      const isActive = StateStore.isActive(entityIndex);
+      const currentHealth = StatsStore.getCurrentHealth(this.world, entityIndex);
+      const isActive = StateStore.isActive(this.world, entityIndex);
 
       // Sync death state to Colyseus schema
       if (!isActive && !player.isDead) {
@@ -776,9 +770,9 @@ export class GameRoom extends Room<GameRoomState> {
 
     // EIDOLON-V P2: Sync respawn to DOD stores
     if (entityIndex !== undefined) {
-      TransformStore.setPosition(entityIndex, x, y);
-      PhysicsStore.setVelocity(entityIndex, 0, 0);
-      StatsStore.setCurrentHealth(entityIndex, 100);
+      TransformStore.setPosition(this.world, entityIndex, x, y);
+      PhysicsStore.setVelocity(this.world, entityIndex, 0, 0);
+      StatsStore.setCurrentHealth(this.world, entityIndex, 100);
     }
 
     logger.info('Player respawned', { sessionId, position: { x, y } });

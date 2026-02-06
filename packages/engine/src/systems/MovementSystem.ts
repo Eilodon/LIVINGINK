@@ -82,11 +82,12 @@ export class MovementSystem {
     /**
      * Update all active entities
      */
-    static updateAll(world: WorldState = defaultWorld, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED) {
-        const count = world.maxEntities;
+    static updateAll(world: WorldState, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED) {
+        const count = world.activeCount;
+        const activeEntities = world.activeEntities;
 
-        for (let id = 0; id < count; id++) {
-            if (!StateAccess.isActive(world, id)) continue;
+        for (let i = 0; i < count; i++) {
+            const id = activeEntities[i];
             this.update(world, id, dt, defaultMaxSpeed);
         }
     }

@@ -1,43 +1,37 @@
 import { MAX_ENTITIES } from '@cjr/engine';
 
+/**
+ * EIDOLON-V: Generational Index Pattern
+ * Prevents ABA problem when entity IDs are reused.
+ * Stale references can be detected by comparing generation.
+ */
+export interface EntityHandle {
+  index: number;
+  generation: number;
+}
+
 export class EntityManager {
   private static instance: EntityManager;
 
   // Free list using a simple stack array
-  // We can use Int16Array for indices if < 32k, or plain array
   private freeIndices: Int32Array;
   private freeHead: number; // pointer to top of stack
+
+  // EIDOLON-V: Generation counter per slot (ABA protection)
+  private generations: Uint16Array;
 
   public count: number = 0;
 
   private constructor() {
     this.freeIndices = new Int32Array(MAX_ENTITIES);
+    this.generations = new Uint16Array(MAX_ENTITIES); // Init to 0
     this.freeHead = 0;
 
-    // Initialize free list: 0, 1, 2, ... MAX-1
-    // We push them in reverse order so we pop 0 first? Or just simple push.
-    // Actually, populating 0 to MAX-1.
-    // When we alloc, we take from [freeHead].
-    // Default state: freeIndices[i] = i
-    for (let i = 0; i < MAX_ENTITIES; i++) {
-      this.freeIndices[i] = i;
-    }
-    this.freeHead = MAX_ENTITIES; // Top of stack is at the end?
-    // Let's implement standard stack:
-    // Stack grows from 0.
-    // Initial state: Stack has all indices.
-    // freeHead = MAX_ENTITIES.
-    // Pop: return freeIndices[--freeHead]
-    // Push: freeIndices[freeHead++] = id
-
-    // Wait, let's verify.
-    // If indices are [0, 1, ... MAX-1]
-    // Pop() -> index MAX-1? No we want simple IDs first usually.
-    // Let's reverse init: [MAX-1, ... 1, 0] at 0..MAX-1
-    // Pop() -> 0.
+    // Reverse init so we pop 0 first: [MAX-1, ... 1, 0]
     for (let i = 0; i < MAX_ENTITIES; i++) {
       this.freeIndices[i] = MAX_ENTITIES - 1 - i;
     }
+    this.freeHead = MAX_ENTITIES;
   }
 
   public static getInstance(): EntityManager {
@@ -50,23 +44,54 @@ export class EntityManager {
   public createEntity(): number {
     if (this.freeHead <= 0) {
       console.warn('EntityManager: Max entities reached!');
-      return -1; // Or throw?
+      return -1;
     }
 
-    const id = this.freeIndices[--this.freeHead];
+    const index = this.freeIndices[--this.freeHead];
     this.count++;
-    return id;
+    return index;
+  }
+
+  /**
+   * EIDOLON-V: Create entity with generational handle
+   * Use this for systems that need to detect stale references
+   */
+  public createEntityHandle(): EntityHandle | null {
+    if (this.freeHead <= 0) {
+      console.warn('EntityManager: Max entities reached!');
+      return null;
+    }
+
+    const index = this.freeIndices[--this.freeHead];
+    this.count++;
+    return { index, generation: this.generations[index] };
   }
 
   public removeEntity(id: number): void {
     if (this.count <= 0) return;
+    if (id < 0 || id >= MAX_ENTITIES) return;
 
-    // Double free check?
-    // Only if we maintain a 'live' bitset, but here we assume caller is correct.
-    // Validation is expensive.
+    // EIDOLON-V: Increment generation on removal (ABA protection)
+    this.generations[id]++;
 
     this.freeIndices[this.freeHead++] = id;
     this.count--;
+  }
+
+  /**
+   * EIDOLON-V: Check if entity handle is still valid
+   * Returns false if entity was recycled since handle was created
+   */
+  public isValid(handle: EntityHandle): boolean {
+    if (handle.index < 0 || handle.index >= MAX_ENTITIES) return false;
+    return this.generations[handle.index] === handle.generation;
+  }
+
+  /**
+   * Get current generation for an entity index
+   */
+  public getGeneration(index: number): number {
+    return this.generations[index];
   }
 
   public reset(): void {
@@ -75,7 +100,9 @@ export class EntityManager {
     for (let i = 0; i < MAX_ENTITIES; i++) {
       this.freeIndices[i] = MAX_ENTITIES - 1 - i;
     }
+    // Note: generations are NOT reset - stale handles should still be invalid
   }
 }
 
 export const entityManager = EntityManager.getInstance();
+

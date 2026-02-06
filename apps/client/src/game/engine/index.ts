@@ -10,9 +10,7 @@ import { Bot, Entity, Food, GameState, Player } from '../../types';
 import { bindEngine, createGameEngine, getCurrentSpatialGrid } from './context';
 import { createBot, createFood, createPlayer } from './factories';
 
-import { resetWaveTimersLegacy as resetWaveTimers } from '@cjr/engine/modules/cjr';
-
-import { resetBossStateLegacy as resetBossState } from '@cjr/engine/modules/cjr';
+import { resetWaveTimersLegacy as resetWaveTimers, resetBossState } from '@cjr/engine/modules/cjr';
 
 import { assignRandomPersonality } from '../cjr/botPersonalities';
 import { getTattooChoices } from '../cjr/tattoos';

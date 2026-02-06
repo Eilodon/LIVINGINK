@@ -19,7 +19,7 @@ import { cjrModule } from './CJRModule';
 export function registerCJRComponents(): void {
     const registry = getComponentRegistry();
     const schemas = cjrModule.getComponentSchemas();
-    
+
     console.info('[CJRModule] Registering CJR components...');
     for (const schema of schemas) {
         if (registry.has(schema.id)) {
@@ -97,8 +97,6 @@ export {
 export {
     updateBossLogic,
     resetBossState,
-    updateBossLogicLegacy,
-    resetBossStateLegacy,
     isRushWindowActive,
     getRushThreshold,
     onBossDeath,

@@ -39,6 +39,9 @@ export class VFXIntegrationManager {
 
     // Update VFX effects (shake, particles via Pixi)
     vfxSystem.updateEffects(state, dt);
+
+    // EIDOLON-V: Sync Physics/Logic Shake to Visual State for Renderer
+    state.shakeIntensity = vfxSystem.getShakeIntensity();
   }
 
   getScreenShakeOffset() {

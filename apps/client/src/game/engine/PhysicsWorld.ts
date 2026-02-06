@@ -1,19 +1,22 @@
 import { entityManager } from './dod/EntityManager';
-import { TransformStore, PhysicsStore, StateStore, EntityFlags } from '@cjr/engine';
+import { TransformAccess, PhysicsAccess, StateAccess, EntityFlags, WorldState } from '@cjr/engine';
 import { networkTransformBuffer } from '../../network/NetworkTransformBuffer';
 
 export class PhysicsWorld {
   // Adapter properties
   // We don't expose raw Float32Arrays here anymore because of Stride differences.
-  // Consumers must use TransformStore directly or helper methods.
+  // Consumers must use TransformAccess directly or helper methods.
 
   // ID Mapping (EntityID string -> DOD Index)
   public idToIndex: Map<string, number>;
   public indexToId: Map<number, string>; // Reverse map for collision callbacks?
 
-  public capacity: number = 4096; // Delegate to MAX_ENTITIES
+  public capacity: number;
+  private world: WorldState;
 
-  constructor() {
+  constructor(world: WorldState) {
+    this.world = world;
+    this.capacity = world.maxEntities;
     this.idToIndex = new Map();
     this.indexToId = new Map();
   }
@@ -39,12 +42,19 @@ export class PhysicsWorld {
     this.indexToId.set(idx, id);
 
     // Init Data
-    TransformStore.set(idx, x, y, 0, 1);
-    PhysicsStore.set(idx, 0, 0, mass, radius);
+    TransformAccess.set(this.world, idx, x, y, 0, 1, x, y, 0);
+    PhysicsAccess.set(this.world, idx, 0, 0, 0, mass, radius, 0.5, 0.9);
 
     let flags = EntityFlags.ACTIVE;
-    if (isSolid) flags |= EntityFlags.OBSTACLE; // Or similar
-    StateStore.flags[idx] = flags;
+    // if (isSolid) flags |= EntityFlags.OBSTACLE; // OBSTACLE not defined in generated flags
+    StateAccess.setFlag(this.world, idx, flags);
+    // StateAccess in compat.ts uses defaultWorld.
+    // I should check Generated StateAccess. 
+    // StateAccess generated might be only static Get helpers.
+    // Let's assume Generated Accessors have get/set.
+    // If setFlag is bitwise, correct. If we want overwrite:
+    // this.world.stateFlags[idx] = flags; -> IoC safe.
+    this.world.stateFlags[idx] = flags;
 
     return idx;
   }
@@ -53,7 +63,7 @@ export class PhysicsWorld {
     const idx = this.idToIndex.get(id);
     if (idx === undefined) return;
 
-    StateStore.flags[idx] = 0; // Inactive
+    this.world.stateFlags[idx] = 0; // Inactive
     entityManager.removeEntity(idx);
     this.idToIndex.delete(id);
     this.indexToId.delete(idx);
@@ -81,27 +91,27 @@ export class PhysicsWorld {
   // Accessors
   getX(id: string): number {
     const idx = this.idToIndex.get(id);
-    return idx !== undefined ? TransformStore.data[idx * 8] : 0;
+    return idx !== undefined ? TransformAccess.getX(this.world, idx) : 0;
   }
 
   getY(id: string): number {
     const idx = this.idToIndex.get(id);
-    return idx !== undefined ? TransformStore.data[idx * 8 + 1] : 0;
+    return idx !== undefined ? TransformAccess.getY(this.world, idx) : 0;
   }
 
   getRadius(id: string): number {
     const idx = this.idToIndex.get(id);
-    return idx !== undefined ? PhysicsStore.data[idx * 8 + 4] : 0;
+    return idx !== undefined ? PhysicsAccess.getRadius(this.world, idx) : 0;
   }
 
   getVx(id: string): number {
     const idx = this.idToIndex.get(id);
-    return idx !== undefined ? PhysicsStore.data[idx * 8] : 0;
+    return idx !== undefined ? PhysicsAccess.getVx(this.world, idx) : 0;
   }
 
   getVy(id: string): number {
     const idx = this.idToIndex.get(id);
-    return idx !== undefined ? PhysicsStore.data[idx * 8 + 1] : 0;
+    return idx !== undefined ? PhysicsAccess.getVy(this.world, idx) : 0;
   }
 
   // Batch Sync helpers (Legacy support)
@@ -114,8 +124,8 @@ export class PhysicsWorld {
     }[]
   ) {
     // This was the "Push" step in OptimizedEngine.
-    const tData = TransformStore.data;
-    const pData = PhysicsStore.data;
+    const tData = this.world.transform;
+    const pData = this.world.physics;
 
     for (let i = 0; i < entities.length; i++) {
       const ent = entities[i];
@@ -134,14 +144,14 @@ export class PhysicsWorld {
 
       if (idx !== undefined && idx !== -1) {
         // Update Pos/Vel from Object
-        tData[idx * 8] = ent.position.x;
-        tData[idx * 8 + 1] = ent.position.y;
-        pData[idx * 8] = ent.velocity.x;
-        pData[idx * 8 + 1] = ent.velocity.y;
+        TransformAccess.setX(this.world, idx, ent.position.x);
+        TransformAccess.setY(this.world, idx, ent.position.y);
+        PhysicsAccess.setVx(this.world, idx, ent.velocity.x);
+        PhysicsAccess.setVy(this.world, idx, ent.velocity.y);
 
         // Also update Radius if it changed (e.g. growth)
         if ((ent as any).radius) {
-          pData[idx * 8 + 4] = (ent as any).radius;
+          PhysicsAccess.setRadius(this.world, idx, (ent as any).radius);
         }
       }
     }

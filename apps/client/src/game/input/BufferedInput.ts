@@ -1,4 +1,6 @@
-import { InputStore } from '@cjr/engine';
+import { InputStore, InputAccess, WorldState, STRIDES } from '@cjr/engine';
+
+// ... (existing imports)
 
 // EIDOLON-V FIX: Input types and interfaces
 export type InputEventType =
@@ -181,11 +183,12 @@ export class BufferedInput {
     BufferedInput.instance = null;
   }
 
-  // EIDOLON-V FIX: Direct Sync to DOD Store
+  // EIDOLON-V FIX: Direct Sync to DOD Store (IoC)
   public syncToStore(
     entityIndex: number,
     playerPosition?: { x: number; y: number },
-    camera?: { x: number; y: number }
+    camera?: { x: number; y: number },
+    world: WorldState | null = null
   ): void {
     if (this.isDisposed) return;
 
@@ -204,15 +207,29 @@ export class BufferedInput {
       targetY = worldY;
     }
 
-    InputStore.setTarget(entityIndex, targetX, targetY);
+    if (world) {
+      // EIDOLON-V: Use WorldState accessors
+      InputAccess.setTargetX(world, entityIndex, targetX);
+      InputAccess.setTargetY(world, entityIndex, targetY);
 
-    // 2. Skill Action (Space or Mouse Down)
-    const isSkill = this.keys.has('Space') || this.isMouseDown;
-    InputStore.setAction(entityIndex, 0, isSkill); // Bit 0 = Primary/Skill
+      // 2. Skill Action (Space or Mouse Down)
+      const isSkill = this.keys.has('Space') || this.isMouseDown;
 
-    // 3. Eject Action (Q or E)
-    const isEject = this.keys.has('KeyQ') || this.keys.has('KeyE');
-    InputStore.setAction(entityIndex, 1, isEject); // Bit 1 = Secondary/Eject
+      // 3. Eject Action (Q or E)
+      const isEject = this.keys.has('KeyQ') || this.keys.has('KeyE');
+
+      // Direct bit manipulation using DataView (mimicking InputStore logic but with IoC)
+      const offset = entityIndex * STRIDES.INPUT * 4 + 8;
+      let actions = world.inputView.getUint32(offset, true);
+
+      if (isSkill) actions |= 1; else actions &= ~1;
+      if (isEject) actions |= 2; else actions &= ~2;
+
+      world.inputView.setUint32(offset, actions, true);
+
+    } else {
+      console.warn('[BufferedInput] syncToStore called without WorldState - input dropped');
+    }
   }
 
   // EIDOLON-V P3: Reset state without removing listeners

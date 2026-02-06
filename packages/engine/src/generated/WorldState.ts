@@ -26,10 +26,10 @@ export interface IWorldConfig {
 
 export class WorldState {
     public readonly maxEntities: number;
-    
+
     // Entity State Flags (ACTIVE, DEAD, etc.)
     public readonly stateFlags: Uint8Array;
-    
+
     // Component Buffers
     public readonly transform: Float32Array;
     public readonly transformBuffer: ArrayBufferLike;
@@ -59,16 +59,21 @@ export class WorldState {
     public readonly tattooBuffer: ArrayBufferLike;
     public readonly tattooView: DataView;
 
+    // EIDOLON-V: Sparse Set for O(1) Iteration
+    public readonly activeEntities: Uint16Array; // Dense [id1, id2, ...]
+    public readonly entityToIndex: Int16Array;   // Sparse [id] -> index
+    public activeCount: number = 0;
+
     constructor(config?: IWorldConfig) {
         this.maxEntities = config?.maxEntities ?? MAX_ENTITIES;
-        
+
         // Allocate State Flags (1 byte per entity)
         if (config?.buffers?.stateFlags) {
             this.stateFlags = new Uint8Array(config.buffers.stateFlags);
         } else {
             this.stateFlags = new Uint8Array(this.maxEntities);
         }
-        
+
         // Allocate Component Buffers
         if (config?.buffers?.transform) {
             this.transformBuffer = config.buffers.transform;
@@ -133,6 +138,10 @@ export class WorldState {
         }
         this.tattoo = new Float32Array(this.tattooBuffer);
         this.tattooView = new DataView(this.tattooBuffer);
+
+        // EIDOLON-V: Initialize Sparse Set
+        this.activeEntities = new Uint16Array(this.maxEntities);
+        this.entityToIndex = new Int16Array(this.maxEntities).fill(-1);
     }
 
     /**
@@ -149,6 +158,11 @@ export class WorldState {
         this.config.fill(0);
         this.projectile.fill(0);
         this.tattoo.fill(0);
+
+        // EIDOLON-V: Reset Sparse Set
+        this.activeCount = 0;
+        this.activeEntities.fill(0);
+        this.entityToIndex.fill(-1);
     }
 
     /**
@@ -182,5 +196,5 @@ export const defaultWorld = new WorldState();
 // EIDOLON-V P6: Runtime deprecation warning
 declare const __DEV__: boolean | undefined;
 if (typeof console !== 'undefined' && typeof __DEV__ !== 'undefined' && __DEV__) {
-  console.warn('[EIDOLON-V] defaultWorld singleton is deprecated. Use new WorldState() for instance-based architecture.');
+    console.warn('[EIDOLON-V] defaultWorld singleton is deprecated. Use new WorldState() for instance-based architecture.');
 }

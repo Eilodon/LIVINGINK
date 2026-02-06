@@ -3,7 +3,6 @@ import type { Client } from 'colyseus';
 import { GameRoom } from './GameRoom';
 import { GameRoomState } from '../schema/GameState';
 import { MAX_ENTITIES } from '@cjr/engine';
-import { StatsStore } from '@cjr/engine';
 
 vi.mock('../logging/Logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -147,8 +146,10 @@ describe('GameRoom', () => {
       const entityIdx = (room as any).entityIndices.get('d1');
       const initialX = room.state.players.get('d1')?.position.x;
 
-      // Simulate death (health <= 0)
-      StatsStore.setCurrentHealth(entityIdx, 0);
+      // Simulate death (health <= 0) using Accessor API with world
+      const world = (room as any).world;
+      const { StatsAccess } = require('@cjr/engine');
+      StatsAccess.setHp(world, entityIdx, 0);
 
       room.update(16.67);
 

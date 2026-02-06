@@ -15,6 +15,7 @@
 import type { LevelConfig } from '../config/levels';
 import { validateLevelBlueprint, type LevelBlueprint } from './LevelValidator';
 import { EntitySpawner, type SpawnContext } from './EntitySpawner';
+import { WorldState } from '../compat';
 
 /**
  * Entity template for dynamic spawning
@@ -126,12 +127,12 @@ export class BlueprintLoader {
      * @param context Spawn context (game time, callbacks, etc.)
      * @returns Array of spawned entity IDs
      */
-    spawnLevelEntities(level: LevelConfig, context: SpawnContext): number[] {
+    spawnLevelEntities(world: WorldState, level: LevelConfig, context: SpawnContext): number[] {
         const spawnedIds: number[] = [];
 
         // Spawn bots based on botCount
         for (let i = 0; i < level.botCount; i++) {
-            const botId = this.spawner.spawnBot({
+            const botId = this.spawner.spawnBot(world, {
                 ...context,
                 name: `Bot ${i + 1}`,
                 spawnDelay: i * 0.5, // Stagger spawns
@@ -141,7 +142,7 @@ export class BlueprintLoader {
 
         // Configure boss entities if enabled
         if (level.boss.boss1Enabled) {
-            const bossId = this.spawner.spawnBoss({
+            const bossId = this.spawner.spawnBoss(world, {
                 ...context,
                 health: level.boss.boss1Health,
                 spawnTime: level.boss.boss1Time,
@@ -150,7 +151,7 @@ export class BlueprintLoader {
         }
 
         if (level.boss.boss2Enabled) {
-            const bossId = this.spawner.spawnBoss({
+            const bossId = this.spawner.spawnBoss(world, {
                 ...context,
                 health: level.boss.boss2Health,
                 spawnTime: level.boss.boss2Time,
@@ -170,8 +171,8 @@ export class BlueprintLoader {
      * @param y Y position
      * @returns Entity ID
      */
-    spawnFromTemplate(template: EntityTemplate, x: number, y: number): number {
-        return this.spawner.spawnFromTemplate(template, x, y);
+    spawnFromTemplate(world: WorldState, template: EntityTemplate, x: number, y: number): number {
+        return this.spawner.spawnFromTemplate(world, template, x, y);
     }
 
     /**

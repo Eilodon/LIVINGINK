@@ -3,159 +3,152 @@
  *
  * EIDOLON-V P2: Eliminated dual-write anti-pattern.
  * DOD Stores are now the SINGLE SOURCE OF TRUTH.
- * Object properties are DEPRECATED - use getters that read from stores.
+ * 
+ * EIDOLON-V FIX: Now accepts WorldState as parameter instead of using defaultWorld.
  */
 
 import { Player, Bot } from '../../../types';
-// EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { ConfigStore, StatsStore, TransformStore, PhysicsStore, ConfigAccess, StatsAccess, defaultWorld } from '@cjr/engine';
+import {
+  WorldState,
+  TransformAccess,
+  PhysicsAccess,
+  StatsAccess,
+  ConfigAccess,
+} from '@cjr/engine';
 
-export const EntityStateBridge = {
-  // =============================================
-  // SETTERS: Write ONLY to DOD Stores
-  // =============================================
+/**
+ * Factory to create an EntityStateBridge bound to a specific WorldState.
+ * This eliminates the defaultWorld singleton dependency.
+ */
+export function createEntityStateBridge(world: WorldState) {
+  return {
+    // =============================================
+    // SETTERS: Write ONLY to DOD Stores
+    // =============================================
 
-  setSpeedMultiplier: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    ConfigStore.setSpeedMultiplier(entity.physicsIndex, value);
-  },
+    setSpeedMultiplier: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      ConfigAccess.setSpeedMult(world, entity.physicsIndex, value);
+    },
 
-  setMagnetRadius: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    ConfigStore.setMagnetRadius(entity.physicsIndex, value);
-  },
+    setMagnetRadius: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      ConfigAccess.setMagneticRadius(world, entity.physicsIndex, value);
+    },
 
-  setDamageMultiplier: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    // Direct Access fallback
-    if ((ConfigAccess as any).setDamageMult) {
-      (ConfigAccess as any).setDamageMult(defaultWorld, entity.physicsIndex, value);
-    }
-    // Also sync to StatsStore if needed (legacy duality)
-    if ((StatsAccess as any).setDamageMultiplier) {
-      (StatsAccess as any).setDamageMultiplier(defaultWorld, entity.physicsIndex, value);
-    }
-  },
+    setDamageMultiplier: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      StatsAccess.setDamageMultiplier(world, entity.physicsIndex, value);
+    },
 
-  setDefense: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    if ((StatsAccess as any).setDefense) {
-      (StatsAccess as any).setDefense(defaultWorld, entity.physicsIndex, value);
-    }
-  },
+    setDefense: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      StatsAccess.setDefense(world, entity.physicsIndex, value);
+    },
 
-  setCurrentHealth: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    StatsStore.setCurrentHealth(entity.physicsIndex, value);
-  },
+    setCurrentHealth: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      StatsAccess.setHp(world, entity.physicsIndex, value);
+    },
 
-  setMaxHealth: (entity: Player | Bot, value: number) => {
-    if (entity.physicsIndex === undefined) return;
-    StatsStore.setMaxHealth(entity.physicsIndex, value);
-  },
+    setMaxHealth: (entity: Player | Bot, value: number) => {
+      if (entity.physicsIndex === undefined) return;
+      StatsAccess.setMaxHp(world, entity.physicsIndex, value);
+    },
 
-  // =============================================
-  // GETTERS: Read from DOD Stores (NEW)
-  // =============================================
+    // =============================================
+    // GETTERS: Read from DOD Stores
+    // =============================================
 
-  getSpeedMultiplier: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 1;
-    // @ts-ignore - ConfigStore.getSpeedMult is missing in types but present in compat
-    return (ConfigStore as any).getSpeedMult ? (ConfigStore as any).getSpeedMult(entity.physicsIndex) : 1;
-  },
+    getSpeedMultiplier: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 1;
+      return ConfigAccess.getSpeedMult(world, entity.physicsIndex);
+    },
 
-  getMagnetRadius: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 0;
-    // @ts-ignore - ConfigStore.getMagneticRadius might be missing
-    return (ConfigStore as any).getMagneticRadius ? (ConfigStore as any).getMagneticRadius(entity.physicsIndex) : 0;
-  },
+    getMagnetRadius: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 0;
+      return ConfigAccess.getMagneticRadius(world, entity.physicsIndex);
+    },
 
-  getDamageMultiplier: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 1;
-    // @ts-ignore
-    return (ConfigStore as any).getDamageMult ? (ConfigStore as any).getDamageMult(entity.physicsIndex) : 1;
-  },
+    getDamageMultiplier: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 1;
+      return StatsAccess.getDamageMultiplier(world, entity.physicsIndex);
+    },
 
-  getDefense: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 0;
-    // @ts-ignore
-    return (StatsAccess as any).getDefense ? (StatsAccess as any).getDefense(defaultWorld, entity.physicsIndex) : 0;
-  },
+    getDefense: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 0;
+      return StatsAccess.getDefense(world, entity.physicsIndex);
+    },
 
-  getCurrentHealth: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 100;
-    return StatsStore.getCurrentHealth(entity.physicsIndex);
-  },
+    getCurrentHealth: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 100;
+      return StatsAccess.getHp(world, entity.physicsIndex);
+    },
 
-  getMaxHealth: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 100;
-    return StatsStore.getMaxHealth(entity.physicsIndex);
-  },
+    getMaxHealth: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 100;
+      return StatsAccess.getMaxHp(world, entity.physicsIndex);
+    },
 
-  // =============================================
-  // POSITION/VELOCITY GETTERS (From TransformStore/PhysicsStore)
-  // =============================================
+    // =============================================
+    // POSITION/VELOCITY GETTERS
+    // =============================================
 
-  getPosition: (entity: Player | Bot, out: { x: number; y: number }): void => {
-    if (entity.physicsIndex === undefined) {
-      out.x = 0;
-      out.y = 0;
-      return;
-    }
-    const idx = entity.physicsIndex * 8;
-    out.x = TransformStore.data[idx];
-    out.y = TransformStore.data[idx + 1];
-  },
-
-  getVelocity: (entity: Player | Bot, out: { x: number; y: number }): void => {
-    if (entity.physicsIndex === undefined) {
-      out.x = 0;
-      out.y = 0;
-      return;
-    }
-    const idx = entity.physicsIndex * 8;
-    out.x = PhysicsStore.data[idx];
-    out.y = PhysicsStore.data[idx + 1];
-  },
-
-  getRadius: (entity: Player | Bot): number => {
-    if (entity.physicsIndex === undefined) return 15;
-    const idx = entity.physicsIndex * 8;
-    return PhysicsStore.data[idx + 3]; // radius at offset 3
-  },
-
-  // =============================================
-  // BATCH SYNC: For UI/Legacy that still needs object properties
-  // Call this once per frame AFTER physics update
-  // =============================================
-
-  syncToObject: (entity: Player | Bot): void => {
-    if (entity.physicsIndex === undefined) return;
-    const idx = entity.physicsIndex * 8;
-
-    // Position
-    entity.position.x = TransformStore.data[idx];
-    entity.position.y = TransformStore.data[idx + 1];
-
-    // Velocity
-    entity.velocity.x = PhysicsStore.data[idx];
-    entity.velocity.y = PhysicsStore.data[idx + 1];
-
-    // Radius
-    entity.radius = PhysicsStore.data[idx + 3];
-
-    // Stats
-    entity.currentHealth = StatsStore.getCurrentHealth(entity.physicsIndex);
-
-    // Speed multiplier for UI display
-    if (entity.statusMultipliers) {
-      // Use Accessors or local getters
-      if ((ConfigAccess as any).getSpeedMult) {
-        entity.statusMultipliers.speed = (ConfigAccess as any).getSpeedMult(defaultWorld, entity.physicsIndex);
+    getPosition: (entity: Player | Bot, out: { x: number; y: number }): void => {
+      if (entity.physicsIndex === undefined) {
+        out.x = 0;
+        out.y = 0;
+        return;
       }
-      if ((StatsAccess as any).getDamageMultiplier) {
-        entity.statusMultipliers.damage = (StatsAccess as any).getDamageMultiplier(defaultWorld, entity.physicsIndex);
+      out.x = TransformAccess.getX(world, entity.physicsIndex);
+      out.y = TransformAccess.getY(world, entity.physicsIndex);
+    },
+
+    getVelocity: (entity: Player | Bot, out: { x: number; y: number }): void => {
+      if (entity.physicsIndex === undefined) {
+        out.x = 0;
+        out.y = 0;
+        return;
       }
-    }
-  },
-};
+      out.x = PhysicsAccess.getVx(world, entity.physicsIndex);
+      out.y = PhysicsAccess.getVy(world, entity.physicsIndex);
+    },
+
+    getRadius: (entity: Player | Bot): number => {
+      if (entity.physicsIndex === undefined) return 15;
+      return PhysicsAccess.getRadius(world, entity.physicsIndex);
+    },
+
+    // =============================================
+    // BATCH SYNC: For UI/Legacy that still needs object properties
+    // =============================================
+
+    syncToObject: (entity: Player | Bot): void => {
+      if (entity.physicsIndex === undefined) return;
+      const idx = entity.physicsIndex;
+
+      // Position
+      entity.position.x = TransformAccess.getX(world, idx);
+      entity.position.y = TransformAccess.getY(world, idx);
+
+      // Velocity
+      entity.velocity.x = PhysicsAccess.getVx(world, idx);
+      entity.velocity.y = PhysicsAccess.getVy(world, idx);
+
+      // Radius
+      entity.radius = PhysicsAccess.getRadius(world, idx);
+
+      // Stats
+      entity.currentHealth = StatsAccess.getHp(world, idx);
+
+      // Speed multiplier for UI display
+      if (entity.statusMultipliers) {
+        entity.statusMultipliers.speed = ConfigAccess.getSpeedMult(world, idx);
+        entity.statusMultipliers.damage = StatsAccess.getDamageMultiplier(world, idx);
+      }
+    },
+  };
+}
+
+// Type for the bridge object
+export type EntityStateBridgeType = ReturnType<typeof createEntityStateBridge>;

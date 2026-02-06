@@ -1,8 +1,9 @@
 import { Player, Bot, GameState, Vector2, Entity } from '../../types';
 import { ShapeId, TattooId } from './cjrTypes';
 import { StatusFlag } from '../engine/statusFlags';
-import { TransformStore, PhysicsStore, StatsStore } from '@cjr/engine';
-import { EntityStateBridge } from '../engine/dod/EntityStateBridge';
+import { TransformAccess, PhysicsAccess } from '@cjr/engine';
+import { getEntityStateBridge } from '../engine/context';
+import { getCurrentEngine } from '../engine/context';
 import { vfxSystem } from '../vfx/vfxSystem';
 
 export interface ShapeSkillDef {
@@ -12,20 +13,20 @@ export interface ShapeSkillDef {
   execute: (entity: Player | Bot, state: GameState) => void;
 }
 
-// EIDOLON-V: Helper to get DOD Position
+// EIDOLON-V: Helper to get DOD Position (uses injected world)
 const getPos = (e: Entity) => {
   if (e.physicsIndex !== undefined) {
-    const idx = e.physicsIndex * 8;
-    return { x: TransformStore.data[idx], y: TransformStore.data[idx + 1] };
+    const world = getCurrentEngine().world;
+    return { x: TransformAccess.getX(world, e.physicsIndex), y: TransformAccess.getY(world, e.physicsIndex) };
   }
   return e.position;
 };
 
-// EIDOLON-V: Helper to get DOD Velocity
+// EIDOLON-V: Helper to get DOD Velocity (uses injected world)
 const getVel = (e: Entity) => {
   if (e.physicsIndex !== undefined) {
-    const idx = e.physicsIndex * 8;
-    return { x: PhysicsStore.data[idx], y: PhysicsStore.data[idx + 1] };
+    const world = getCurrentEngine().world;
+    return { x: PhysicsAccess.getVx(world, e.physicsIndex), y: PhysicsAccess.getVy(world, e.physicsIndex) };
   }
   return e.velocity;
 };
@@ -50,11 +51,11 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
       }
 
       const dashPower = 800;
-      // EIDOLON-V: Write back to Physics Store directly
+      // EIDOLON-V: Write back to Physics Store directly (uses injected world)
       if (entity.physicsIndex !== undefined) {
-        const idx = entity.physicsIndex * 8;
-        PhysicsStore.data[idx] = dir.x * dashPower;
-        PhysicsStore.data[idx + 1] = dir.y * dashPower;
+        const world = getCurrentEngine().world;
+        PhysicsAccess.setVx(world, entity.physicsIndex, dir.x * dashPower);
+        PhysicsAccess.setVy(world, entity.physicsIndex, dir.y * dashPower);
       } else {
         // Fallback: Update entity object for legacy systems
         entity.velocity.x = dir.x * dashPower;
@@ -98,9 +99,11 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
           const dir = { x: dx / dist, y: dy / dist };
 
           if (other.physicsIndex !== undefined) {
-            const oIdx = other.physicsIndex * 8;
-            PhysicsStore.data[oIdx] += dir.x * knockbackPower;
-            PhysicsStore.data[oIdx + 1] += dir.y * knockbackPower;
+            const world = getCurrentEngine().world;
+            const curVx = PhysicsAccess.getVx(world, other.physicsIndex);
+            const curVy = PhysicsAccess.getVy(world, other.physicsIndex);
+            PhysicsAccess.setVx(world, other.physicsIndex, curVx + dir.x * knockbackPower);
+            PhysicsAccess.setVy(world, other.physicsIndex, curVy + dir.y * knockbackPower);
           } else {
             // Fallback for legacy systems
             other.velocity.x += dir.x * knockbackPower;
@@ -108,7 +111,7 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
           }
 
           if ('currentHealth' in other) {
-            EntityStateBridge.setCurrentHealth(other, other.currentHealth - 10);
+            getEntityStateBridge().setCurrentHealth(other, other.currentHealth - 10);
           }
         }
       }
@@ -127,7 +130,7 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
     description: 'Next attack deals 2.5x damage and ignores 50% defense',
     execute: (entity, state) => {
       const pos = getPos(entity);
-      EntityStateBridge.setDamageMultiplier(entity, 2.5);
+      getEntityStateBridge().setDamageMultiplier(entity, 2.5);
       entity.armorPen = Math.min(1.0, entity.armorPen + 0.5);
       entity.statusScalars.speedSurge = 3.0;
 
@@ -142,7 +145,7 @@ export const SHAPE_SKILLS: Record<ShapeId, ShapeSkillDef> = {
     description: 'Pull nearby pickups for 2s, +30% pickup value',
     execute: (entity, state) => {
       const pos = getPos(entity);
-      EntityStateBridge.setMagnetRadius(entity, 200);
+      getEntityStateBridge().setMagnetRadius(entity, 200);
       entity.statusTimers.magnet = 2.0;
       entity.statusMultipliers.pity = 2.0;
 

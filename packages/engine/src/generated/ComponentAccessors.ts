@@ -51,10 +51,28 @@ export class StateAccess {
     }
 
     static activate(world: WorldState, id: number): void {
+        if (world.entityToIndex[id] !== -1) return; // Already active
+
+        const index = world.activeCount;
+        world.activeEntities[index] = id;
+        world.entityToIndex[id] = index;
+        world.activeCount++;
+
         world.stateFlags[id] |= EntityFlags.ACTIVE;
     }
 
     static deactivate(world: WorldState, id: number): void {
+        const index = world.entityToIndex[id];
+        if (index === -1) return; // Not active
+
+        const lastIndex = --world.activeCount;
+        const lastId = world.activeEntities[lastIndex];
+
+        // Swap with last element
+        world.activeEntities[index] = lastId;
+        world.entityToIndex[lastId] = index;
+
+        world.entityToIndex[id] = -1;
         world.stateFlags[id] &= ~EntityFlags.ACTIVE;
     }
 
@@ -70,7 +88,7 @@ export class StateAccess {
 export class TransformAccess {
     static readonly STRIDE = 32;
     static readonly COMPONENT_ID = 1;
-    
+
     // Field Offsets (bytes)
     static readonly X = 0;
     static readonly Y = 4;
@@ -95,7 +113,7 @@ export class TransformAccess {
         view.setFloat32(ptr + 20, prevY, true);
         view.setFloat32(ptr + 24, prevRotation, true);
     }
-    
+
     // Individual Getters
     static getX(world: WorldState, id: number): number {
         return world.transformView.getFloat32(id * 32 + 0, true);
@@ -162,7 +180,7 @@ export class TransformAccess {
 export class PhysicsAccess {
     static readonly STRIDE = 32;
     static readonly COMPONENT_ID = 2;
-    
+
     // Field Offsets (bytes)
     static readonly VX = 0;
     static readonly VY = 4;
@@ -187,7 +205,7 @@ export class PhysicsAccess {
         view.setFloat32(ptr + 20, restitution, true);
         view.setFloat32(ptr + 24, friction, true);
     }
-    
+
     // Individual Getters
     static getVx(world: WorldState, id: number): number {
         return world.physicsView.getFloat32(id * 32 + 0, true);
@@ -254,7 +272,7 @@ export class PhysicsAccess {
 export class PigmentAccess {
     static readonly STRIDE = 32;
     static readonly COMPONENT_ID = 3;
-    
+
     // Field Offsets (bytes)
     static readonly R = 0;
     static readonly G = 4;
@@ -280,7 +298,7 @@ export class PigmentAccess {
         view.setFloat32(ptr + 24, matchPercent, true);
         view.setFloat32(ptr + 28, colorInt, true);
     }
-    
+
     // Individual Getters
     static getR(world: WorldState, id: number): number {
         return world.pigmentView.getFloat32(id * 32 + 0, true);
@@ -355,7 +373,7 @@ export class PigmentAccess {
 export class StatsAccess {
     static readonly STRIDE = 32;
     static readonly COMPONENT_ID = 4;
-    
+
     // Field Offsets (bytes)
     static readonly HP = 0;
     static readonly MAXHP = 4;
@@ -379,7 +397,7 @@ export class StatsAccess {
         view.setFloat32(ptr + 16, defense, true);
         view.setFloat32(ptr + 20, damageMultiplier, true);
     }
-    
+
     // Individual Getters
     static getHp(world: WorldState, id: number): number {
         return world.statsView.getFloat32(id * 32 + 0, true);
@@ -438,7 +456,7 @@ export class StatsAccess {
 export class InputAccess {
     static readonly STRIDE = 16;
     static readonly COMPONENT_ID = 5;
-    
+
     // Field Offsets (bytes)
     static readonly TARGETX = 0;
     static readonly TARGETY = 4;
@@ -455,7 +473,7 @@ export class InputAccess {
         view.setFloat32(ptr + 4, targetY, true);
         view.setUint32(ptr + 8, actions, true);
     }
-    
+
     // Individual Getters
     static getTargetX(world: WorldState, id: number): number {
         return world.inputView.getFloat32(id * 16 + 0, true);
@@ -490,7 +508,7 @@ export class InputAccess {
 export class SkillAccess {
     static readonly STRIDE = 16;
     static readonly COMPONENT_ID = 6;
-    
+
     // Field Offsets (bytes)
     static readonly COOLDOWN = 0;
     static readonly MAXCOOLDOWN = 4;
@@ -508,7 +526,7 @@ export class SkillAccess {
         view.setFloat32(ptr + 8, activeTimer, true);
         view.setFloat32(ptr + 12, shapeId, true);
     }
-    
+
     // Individual Getters
     static getCooldown(world: WorldState, id: number): number {
         return world.skillView.getFloat32(id * 16 + 0, true);
@@ -551,7 +569,7 @@ export class SkillAccess {
 export class ConfigAccess {
     static readonly STRIDE = 32;
     static readonly COMPONENT_ID = 7;
-    
+
     // Field Offsets (bytes)
     static readonly MAGNETICRADIUS = 0;
     static readonly DAMAGEMULT = 4;
@@ -574,7 +592,7 @@ export class ConfigAccess {
         view.setFloat32(ptr + 12, pickupRange, true);
         view.setFloat32(ptr + 16, visionRange, true);
     }
-    
+
     // Individual Getters
     static getMagneticRadius(world: WorldState, id: number): number {
         return world.configView.getFloat32(id * 32 + 0, true);
@@ -625,7 +643,7 @@ export class ConfigAccess {
 export class ProjectileAccess {
     static readonly STRIDE = 16;
     static readonly COMPONENT_ID = 8;
-    
+
     // Field Offsets (bytes)
     static readonly OWNERID = 0;
     static readonly DAMAGE = 4;
@@ -643,7 +661,7 @@ export class ProjectileAccess {
         view.setFloat32(ptr + 8, duration, true);
         view.setFloat32(ptr + 12, typeId, true);
     }
-    
+
     // Individual Getters
     static getOwnerId(world: WorldState, id: number): number {
         return world.projectileView.getFloat32(id * 16 + 0, true);
@@ -686,7 +704,7 @@ export class ProjectileAccess {
 export class TattooAccess {
     static readonly STRIDE = 16;
     static readonly COMPONENT_ID = 9;
-    
+
     // Field Offsets (bytes)
     static readonly TIMER1 = 0;
     static readonly TIMER2 = 4;
@@ -703,7 +721,7 @@ export class TattooAccess {
         view.setFloat32(ptr + 4, timer2, true);
         view.setFloat32(ptr + 8, procChance, true);
     }
-    
+
     // Individual Getters
     static getTimer1(world: WorldState, id: number): number {
         return world.tattooView.getFloat32(id * 16 + 0, true);

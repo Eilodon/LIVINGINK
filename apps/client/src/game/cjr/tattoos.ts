@@ -7,7 +7,7 @@ import { PRNG } from '../math/FastMath';
 import { createFloatingText } from '../engine/effects';
 import { createParticle, createFood } from '../engine/factories';
 import { StatusFlag, TattooFlag } from '../engine/statusFlags';
-import { EntityStateBridge } from '../engine/dod/EntityStateBridge';
+import { getEntityStateBridge } from '../engine/context';
 
 export interface TattooDefinition {
   id: TattooId;
@@ -102,8 +102,9 @@ const TATTOOS: TattooDefinition[] = [
     },
     onUpdate: (player: Player, dt: number, state: GameState) => {
       if (player.matchPercent >= 0.85) {
-        const curr = EntityStateBridge.getSpeedMultiplier(player);
-        EntityStateBridge.setSpeedMultiplier(player, Math.max(curr, 1.2));
+        const bridge = getEntityStateBridge();
+        const curr = bridge.getSpeedMultiplier(player);
+        bridge.setSpeedMultiplier(player, Math.max(curr, 1.2));
       }
     },
   },
@@ -183,8 +184,9 @@ const TATTOOS: TattooDefinition[] = [
     description: 'Passive 15% speed boost. Dash is cheaper.',
     apply: (player: Player) => {
       player.statusScalars.speedSurge = 1;
-      const curr = EntityStateBridge.getSpeedMultiplier(player);
-      EntityStateBridge.setSpeedMultiplier(player, Math.max(curr, 1.15));
+      const bridge = getEntityStateBridge();
+      const curr = bridge.getSpeedMultiplier(player);
+      bridge.setSpeedMultiplier(player, Math.max(curr, 1.15));
       player.skillCooldownMultiplier = 1.5; // Faster recharge
     },
   },
@@ -195,8 +197,9 @@ const TATTOOS: TattooDefinition[] = [
     description: 'Start with 3s invulnerability. Gain 50% defense.',
     apply: (player: Player) => {
       player.statusTimers.invulnerable = 3.0; // Start invuln
-      const def = EntityStateBridge.getDefense(player);
-      EntityStateBridge.setDefense(player, def * 1.5);
+      const bridge = getEntityStateBridge();
+      const def = bridge.getDefense(player);
+      bridge.setDefense(player, def * 1.5);
     },
   },
   {
@@ -217,7 +220,7 @@ const TATTOOS: TattooDefinition[] = [
     tier: MutationTier.Rare,
     description: 'Significantly increased pickup radius.',
     apply: (player: Player) => {
-      EntityStateBridge.setMagnetRadius(player, 150);
+      getEntityStateBridge().setMagnetRadius(player, 150);
       player.statusTimers.magnet = 9999;
     },
   },

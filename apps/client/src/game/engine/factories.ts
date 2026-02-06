@@ -34,6 +34,7 @@ import {
   ProjectileStore,
   EntityFlags,
   CJRFoodFlags,
+  defaultWorld,
 } from '@cjr/engine';
 
 // Helper: Random Pigment
@@ -71,14 +72,14 @@ export const createPlayer = (
 
   // 2. Initialize DOD State (Single Source of Truth)
   // 2.1 Transform & Physics
-  TransformStore.set(entId, position.x, position.y, 0);
-  PhysicsStore.set(entId, 0, 0, 10, PLAYER_START_RADIUS); // Mass 10
+  TransformStore.set(defaultWorld, entId, position.x, position.y, 0);
+  PhysicsStore.set(defaultWorld, entId, 0, 0, 10, PLAYER_START_RADIUS); // Mass 10
 
   // 2.2 Stats
-  StatsStore.set(entId, 100, 100, 0, 0, 1, 1); // Health=100, Def=1, Dmg=1
+  StatsStore.set(defaultWorld, entId, 100, 100, 0, 0, 1, 1); // Health=100, Def=1, Dmg=1
 
   // 2.3 State Flags
-  StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.PLAYER);
+  StateStore.setFlag(defaultWorld, entId, EntityFlags.ACTIVE | EntityFlags.PLAYER);
 
   // 2.4 Skill & Tattoo
   const ShapeMap: Record<string, number> = { circle: 1, square: 2, triangle: 3, hex: 4 };
@@ -92,6 +93,7 @@ export const createPlayer = (
   // 2.5 Config (Hot Logic Data)
   // [magneticRadius, damageMult, speedMult, pickupRange, visionRange]
   ConfigStore.set(
+    defaultWorld,
     entId,
     0, // magneticRadius
     1, // damageMultiplier
@@ -102,7 +104,7 @@ export const createPlayer = (
 
   // 2.6 Input (DOD)
   // Initialize target to current position (so they don't sprint to 0,0)
-  InputStore.setTarget(entId, position.x, position.y);
+  InputStore.setTarget(defaultWorld, entId, position.x, position.y);
 
   // 3. Create View Proxy (JS Object)
   // This object is now a "View Shell" for React/Rendering compatibility.
@@ -231,10 +233,10 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
   engine.physicsWorld.indexToId.set(entId, id);
 
   // 2. Initialize DOD State (Single Source of Truth)
-  TransformStore.set(entId, position.x, position.y, 0);
-  PhysicsStore.set(entId, 0, 0, 10, PLAYER_START_RADIUS); // Mass 10
-  StatsStore.set(entId, 100, 100, 0, 0, 1, 1);
-  StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.BOT);
+  TransformStore.set(defaultWorld, entId, position.x, position.y, 0);
+  PhysicsStore.set(defaultWorld, entId, 0, 0, 10, PLAYER_START_RADIUS); // Mass 10
+  StatsStore.set(defaultWorld, entId, 100, 100, 0, 0, 1, 1);
+  StateStore.setFlag(defaultWorld, entId, EntityFlags.ACTIVE | EntityFlags.BOT);
 
   // 2.4 Skill & Tattoo
   const sIdx = entId * SkillStore.STRIDE;
@@ -245,6 +247,7 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
 
   // 2.5 Config (Hot Logic Data)
   ConfigStore.set(
+    defaultWorld,
     entId,
     0, // magneticRadius
     1, // damageMultiplier
@@ -254,7 +257,7 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
   );
 
   // 2.6 Input (DOD)
-  InputStore.setTarget(entId, position.x, position.y);
+  InputStore.setTarget(defaultWorld, entId, position.x, position.y);
 
   // 3. Create View Proxy (JS Object)
   const bot: Bot = {
@@ -363,12 +366,10 @@ export const createBoss = (spawnTime: number = 0): Bot | null => {
   boss.personality = 'bully';
 
   if (boss.physicsIndex !== undefined) {
-    // Update Physics Store radius/mass
-    const pIdx = boss.physicsIndex * 8;
-    PhysicsStore.data[pIdx + 3] = 500; // Mass
-    PhysicsStore.data[pIdx + 4] = 80; // Radius
+    // Update Physics Store radius/mass - use WorldState accessors
+    PhysicsStore.setRadius(defaultWorld, boss.physicsIndex, 80);
     // Update Stats Store
-    StatsStore.set(boss.physicsIndex, 2000, 2000, boss.score, boss.matchPercent, 2, 1.5); // Boss Def=2, Dmg=1.5
+    StatsStore.set(defaultWorld, boss.physicsIndex, 2000, 2000, boss.score, boss.matchPercent, 2, 1.5); // Boss Def=2, Dmg=1.5
   }
 
   return boss;
@@ -440,8 +441,8 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food | nu
   }
 
   // Initialize DOD State
-  TransformStore.set(entId, startPos.x, startPos.y, 0);
-  PhysicsStore.set(entId, 0, 0, 1, FOOD_RADIUS); // Mass 1
+  TransformStore.set(defaultWorld, entId, startPos.x, startPos.y, 0);
+  PhysicsStore.set(defaultWorld, entId, 0, 0, 1, FOOD_RADIUS); // Mass 1
   // Determine Type Flag
   let typeFlag = EntityFlags.FOOD;
   if (food.kind === 'catalyst') typeFlag |= CJRFoodFlags.FOOD_CATALYST;
@@ -450,12 +451,13 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food | nu
   else if (food.kind === 'solvent') typeFlag |= CJRFoodFlags.FOOD_SOLVENT;
   else if (food.kind === 'neutral') typeFlag |= CJRFoodFlags.FOOD_NEUTRAL;
 
-  StateStore.setFlag(entId, EntityFlags.ACTIVE | typeFlag);
-  StatsStore.set(entId, 1, 1, 1, 0, 0, 0); // HP 1, MaxHP 1, Score 1...
+  StateStore.setFlag(defaultWorld, entId, EntityFlags.ACTIVE | typeFlag);
+  StatsStore.set(defaultWorld, entId, 1, 1, 1, 0, 0, 0); // HP 1, MaxHP 1, Score 1...
 
   // EIDOLON-V: ConfigStore Init for Food
   // [magneticRadius, damageMult, speedMult, pickupRange, visionRange]
   ConfigStore.set(
+    defaultWorld,
     entId,
     0, // magneticRadius
     0, // damageMultiplier
@@ -530,13 +532,14 @@ export const createProjectile = (
   projectile.velocity = { x: vx, y: vy };
 
   // DOD Stores
-  TransformStore.set(entId, position.x, position.y, 0);
-  PhysicsStore.set(entId, vx, vy, 0.5, 8, 0.5, 1.0);
-  StateStore.setFlag(entId, EntityFlags.ACTIVE | EntityFlags.PROJECTILE);
-  StatsStore.set(entId, 1, 1, 0, 0, 0, 1);
+  TransformStore.set(defaultWorld, entId, position.x, position.y, 0);
+  PhysicsStore.set(defaultWorld, entId, vx, vy, 0.5, 8, 0.5, 1.0);
+  StateStore.setFlag(defaultWorld, entId, EntityFlags.ACTIVE | EntityFlags.PROJECTILE);
+  StatsStore.set(defaultWorld, entId, 1, 1, 0, 0, 0, 1);
 
   // EIDOLON-V: ConfigStore Init for Projectile
   ConfigStore.set(
+    defaultWorld,
     entId,
     0, // magneticRadius
     1, // damageMultiplier
@@ -552,7 +555,7 @@ export const createProjectile = (
   // If -1, we might fail self-collision checks if logic relies on int comparison only.
   // But usually projectiles are created by Valid Entities.
 
-  ProjectileStore.set(entId, oIdx, damage, duration, 0);
+  ProjectileStore.set(defaultWorld, entId, oIdx, damage, duration, 0);
 
   // EIDOLON-V FIX: Zero-Copy Live View (SSOT)
   bindToLiveView(projectile, entId);
@@ -562,30 +565,53 @@ export const createProjectile = (
 
 // EIDOLON-V FIX: Zero-Copy Helper
 // Binds object properties directly to DOD Stores via Getters/Setters
+// FIXED: Cache proxy objects to avoid temp allocation on every access
 const bindToLiveView = (entity: any, entId: number) => {
   const pBase = entId * TransformStore.STRIDE;
   const vBase = entId * PhysicsStore.STRIDE;
 
+  // EIDOLON-V: Pre-create proxy objects ONCE (cached)
+  const posProxy = Object.create(null);
+  const velProxy = Object.create(null);
+
+  Object.defineProperties(posProxy, {
+    x: {
+      get() { return TransformStore.data[pBase]; },
+      set(v: number) { TransformStore.data[pBase] = v; },
+      enumerable: true
+    },
+    y: {
+      get() { return TransformStore.data[pBase + 1]; },
+      set(v: number) { TransformStore.data[pBase + 1] = v; },
+      enumerable: true
+    }
+  });
+
+  Object.defineProperties(velProxy, {
+    x: {
+      get() { return PhysicsStore.data[vBase]; },
+      set(v: number) { PhysicsStore.data[vBase] = v; },
+      enumerable: true
+    },
+    y: {
+      get() { return PhysicsStore.data[vBase + 1]; },
+      set(v: number) { PhysicsStore.data[vBase + 1] = v; },
+      enumerable: true
+    }
+  });
+
+  // Attach cached proxies to entity
   Object.defineProperties(entity, {
     position: {
-      get: () => ({
-        get x() { return TransformStore.data[pBase]; },
-        get y() { return TransformStore.data[pBase + 1]; },
-        set x(v) { TransformStore.data[pBase] = v; },
-        set y(v) { TransformStore.data[pBase + 1] = v; }
-      }),
+      get: () => posProxy,  // Returns CACHED object, not new object
       configurable: true,
       enumerable: true
     },
     velocity: {
-      get: () => ({
-        get x() { return PhysicsStore.data[vBase]; },
-        get y() { return PhysicsStore.data[vBase + 1]; },
-        set x(v) { PhysicsStore.data[vBase] = v; },
-        set y(v) { PhysicsStore.data[vBase + 1] = v; }
-      }),
+      get: () => velProxy,  // Returns CACHED object, not new object
       configurable: true,
       enumerable: true
     }
   });
 };
+

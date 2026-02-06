@@ -8,7 +8,7 @@
  * All transforms flow: Network -> Buffer -> Engine Tick -> DOD Stores
  */
 
-import { TransformStore, PhysicsStore } from '@cjr/engine';
+import { WorldState, StateAccess } from '@cjr/engine';
 
 interface PendingTransform {
   x: number;
@@ -56,11 +56,16 @@ export class NetworkTransformBuffer {
    * Flush all pending updates to DOD stores.
    * MUST be called once per physics tick, BEFORE physics simulation.
    */
-  flush(): void {
+  flush(world: WorldState): void {
     if (this.pending.size === 0) return;
 
-    const tData = TransformStore.data;
-    const pData = PhysicsStore.data;
+    // Use TypedArray set for performance? Or individual updates?
+    // Individual set is safer with accessors, but direct float32 access is faster for bulk.
+    // Given we have WorldState, we can get the float32 array.
+
+    // Direct access for performance (aligned with how Store data getter worked)
+    const tData = world.transform;
+    const pData = world.physics;
 
     this.pending.forEach((data, idx) => {
       const tIdx = idx * 8;
@@ -70,6 +75,9 @@ export class NetworkTransformBuffer {
       tData[tIdx + 1] = data.y;
       pData[pIdx] = data.vx;
       pData[pIdx + 1] = data.vy;
+
+      // EIDOLON-V: Ensure entity is active in Sparse Set
+      StateAccess.activate(world, idx);
     });
 
     this.pending.clear();

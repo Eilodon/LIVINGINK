@@ -24,7 +24,10 @@ export interface IParticlePool {
   release(particle: Particle): void;
 }
 
+import { WorldState } from '@cjr/engine';
+
 export interface IGameEngine {
+  readonly world: WorldState;
   readonly spatialGrid: ISpatialGrid;
   readonly particlePool: IParticlePool;
   readonly physicsWorld: PhysicsWorld;

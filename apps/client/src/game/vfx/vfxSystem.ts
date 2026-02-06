@@ -104,6 +104,11 @@ export class VFXSystem {
     }
     return this.screenShake.getCurrentOffset();
   }
+
+  getShakeIntensity(): number {
+    if (this._reducedMotion) return 0;
+    return this.screenShake.getCurrentIntensity();
+  }
 }
 
 class ScreenShakeController {
@@ -139,6 +144,12 @@ class ScreenShakeController {
 
   getCurrentOffset(): Vector2 {
     return this.currentOffset;
+  }
+
+  getCurrentIntensity(): number {
+    if (this.currentTime >= this.duration) return 0;
+    const progress = this.currentTime / this.duration;
+    return this.intensity * (1 - progress);
   }
 }
 

@@ -316,17 +316,6 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
 
         // E. Render Units (Player + Bots)
         const units = [state.player, ...state.bots];
-        // EIDOLON-V DEBUG: Log unit rendering info (REMOVE AFTER DEBUG)
-        if (state.gameTime < 1) {
-          console.log('[DEBUG] Rendering units:', {
-            playerExists: !!state.player,
-            playerDead: state.player?.isDead,
-            playerPos: state.player?.position,
-            playerPhysicsIdx: state.player?.physicsIndex,
-            botsCount: state.bots?.length,
-            botsDeadCount: state.bots?.filter(b => b.isDead).length,
-          });
-        }
         for (const u of units) {
           if (!u || u.isDead) continue;
 
@@ -379,11 +368,6 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
           if (coreRadius > 2) {
             gfx.circle(0, 0, coreRadius);
             gfx.fill({ color: 0xffffff, alpha: 0.4 });
-          }
-
-          // EIDOLON-V DEBUG (REMOVE AFTER DEBUG)
-          if (state.gameTime < 1 && u === state.player) {
-            console.log('[DEBUG] Player render (Graphics):', { ux, uy, ur, color: color.toString(16) });
           }
         }
 
