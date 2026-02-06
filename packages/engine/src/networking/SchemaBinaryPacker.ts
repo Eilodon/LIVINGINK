@@ -182,9 +182,16 @@ export class SchemaBinaryPacker {
             // EIDOLON-V OPTIMIZATION: Use pre-encoded ID instead of TextEncoder in hot loop
             const idBytes = PRE_ENCODED_IDS[compName];
             if (!idBytes) continue; // Safety check
-            
+
             view.setUint8(offset, idBytes.length); offset += 1;
-            new Uint8Array(entry.buffer).set(idBytes, offset); offset += idBytes.length;
+
+            // EIDOLON-V OPTIMIZATION: Manual unroll for zero allocation
+            // Replaces: new Uint8Array(entry.buffer).set(idBytes, offset);
+            const len = idBytes.length;
+            for (let k = 0; k < len; k++) {
+                view.setUint8(offset + k, idBytes[k]);
+            }
+            offset += len;
 
             const countOffset = offset;
             view.setUint16(offset, 0, true); offset += 2;
