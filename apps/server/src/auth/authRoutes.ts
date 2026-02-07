@@ -55,7 +55,7 @@ router.post('/login', authRateLimiter.middleware(), async (req, res) => {
 });
 
 // EIDOLON-V PHASE1: Guest login endpoint (for quick testing)
-router.post('/guest', (req, res) => {
+router.post('/guest', authRateLimiter.middleware(), (req, res) => {
   try {
     const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
     logger.security('Guest login', { clientIp });

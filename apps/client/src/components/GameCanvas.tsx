@@ -246,8 +246,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!ctx) return;
 
     let animationId: number;
+    let lastFrameTime = 0;
 
-    const render = () => {
+    const render = (now: number = performance.now()) => {
+      const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.25) : 1 / 60;
+      lastFrameTime = now;
       const state = gameStateRef.current;
 
       // 1. Clear Screen
@@ -389,7 +392,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({
       // Consumes EventRingBuffer and renders particle effects
       if (!reducedMotion) {
         const juice = JuiceSystem.getInstance();
-        juice.update(1 / 60); // Assume 60fps for dt
+        juice.update(dt);
 
         // Apply screen shake offset
         if (juice.shakeOffset.x !== 0 || juice.shakeOffset.y !== 0) {

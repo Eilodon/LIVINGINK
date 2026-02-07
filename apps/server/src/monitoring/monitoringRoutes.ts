@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import { authMiddleware } from '../auth/AuthService';
 import { monitoringService } from './MonitoringService';
 
 const router = express.Router();
@@ -25,7 +26,7 @@ router.get('/metrics', (req, res) => {
 // EIDOLON-V PHASE1: Get recent metrics
 router.get('/metrics/history', (req, res) => {
   try {
-    const count = parseInt(req.query.count as string) || 10;
+    const count = Math.min(Math.max(parseInt(req.query.count as string) || 10, 1), 1000);
     const metrics = monitoringService.getRecentMetrics(count);
     res.json({
       success: true,
@@ -98,8 +99,8 @@ router.get('/health', (req, res) => {
   }
 });
 
-// EIDOLON-V PHASE1: Record a security event (for testing)
-router.post('/security-event', (req, res) => {
+// EIDOLON-V PHASE1: Record a security event (authenticated only)
+router.post('/security-event', authMiddleware, (req, res) => {
   try {
     const { type, details } = req.body;
 

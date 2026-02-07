@@ -76,6 +76,9 @@ export class SessionStore {
     } else {
       const key = this.config.keyPrefix + token;
       await this.redis.set(key, fullSession, this.config.sessionTTL);
+
+      // Maintain user:sessions reverse index for "logout all devices"
+      await this.addToUserIndex(session.userId, token);
     }
 
     logger.debug('Session created', { userId: session.userId, isGuest: session.isGuest });
@@ -131,9 +134,11 @@ export class SessionStore {
     }
 
     const key = this.config.keyPrefix + token;
-    const exists = await this.redis.exists(key);
-    if (exists) {
+    const session = await this.redis.get<Session>(key);
+    if (session) {
       await this.redis.del(key);
+      // Remove from user:sessions reverse index
+      await this.removeFromUserIndex(session.userId, token);
       logger.debug('Session deleted', { token: token.substring(0, 8) + '...' });
       return true;
     }
@@ -152,8 +157,6 @@ export class SessionStore {
    * Get all sessions for a user (useful for "logout all devices")
    */
   async getUserSessions(userId: string): Promise<string[]> {
-    // Note: This is expensive in Redis. Consider maintaining a separate index
-    // For now, only works with memory fallback
     if (this.useMemoryFallback) {
       const tokens: string[] = [];
       for (const [token, session] of memoryStore.entries()) {
@@ -164,8 +167,59 @@ export class SessionStore {
       return tokens;
     }
 
-    logger.warn('getUserSessions not optimized for Redis - consider adding user:sessions index');
-    return [];
+    if (!this.redis) return [];
+
+    // Read user:sessions index and filter out expired tokens
+    const indexKey = `user_sessions:${userId}`;
+    const tokens = await this.redis.get<string[]>(indexKey);
+    if (!tokens || tokens.length === 0) return [];
+
+    // Validate that tokens still exist (cleanup stale references)
+    const validTokens: string[] = [];
+    for (const token of tokens) {
+      const key = this.config.keyPrefix + token;
+      if (await this.redis.exists(key)) {
+        validTokens.push(token);
+      }
+    }
+
+    // Update index if stale tokens were removed
+    if (validTokens.length !== tokens.length) {
+      if (validTokens.length > 0) {
+        await this.redis.set(indexKey, validTokens, this.config.sessionTTL);
+      } else {
+        await this.redis.del(indexKey);
+      }
+    }
+
+    return validTokens;
+  }
+
+  /**
+   * Add token to user:sessions reverse index
+   */
+  private async addToUserIndex(userId: string, token: string): Promise<void> {
+    if (!this.redis) return;
+    const indexKey = `user_sessions:${userId}`;
+    const tokens = await this.redis.get<string[]>(indexKey) || [];
+    tokens.push(token);
+    await this.redis.set(indexKey, tokens, this.config.sessionTTL);
+  }
+
+  /**
+   * Remove token from user:sessions reverse index
+   */
+  private async removeFromUserIndex(userId: string, token: string): Promise<void> {
+    if (!this.redis) return;
+    const indexKey = `user_sessions:${userId}`;
+    const tokens = await this.redis.get<string[]>(indexKey);
+    if (!tokens) return;
+    const filtered = tokens.filter(t => t !== token);
+    if (filtered.length > 0) {
+      await this.redis.set(indexKey, filtered, this.config.sessionTTL);
+    } else {
+      await this.redis.del(indexKey);
+    }
   }
 
   /**
