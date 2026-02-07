@@ -103,31 +103,31 @@ export class MobilePerformanceTester {
     {
       name: 'Canvas Fill Rate',
       description: 'Tests basic canvas rendering performance',
-      test: () => this.testCanvasFillRate(),
+      test: () => MobilePerformanceTester.testCanvasFillRate(),
       weight: 0.2,
     },
     {
       name: 'Particle System',
       description: 'Tests particle rendering performance',
-      test: () => this.testParticleSystem(),
+      test: () => MobilePerformanceTester.testParticleSystem(),
       weight: 0.3,
     },
     {
       name: 'Shader Performance',
       description: 'Tests WebGL shader performance',
-      test: () => this.testShaderPerformance(),
+      test: () => MobilePerformanceTester.testShaderPerformance(),
       weight: 0.3,
     },
     {
       name: 'Memory Allocation',
       description: 'Tests memory allocation and garbage collection',
-      test: () => this.testMemoryAllocation(),
+      test: () => MobilePerformanceTester.testMemoryAllocation(),
       weight: 0.1,
     },
     {
       name: 'Battery Impact',
       description: 'Tests battery consumption impact',
-      test: () => this.testBatteryImpact() as Promise<number>,
+      test: () => MobilePerformanceTester.testBatteryImpact() as Promise<number>,
       weight: 0.1,
     },
   ];
