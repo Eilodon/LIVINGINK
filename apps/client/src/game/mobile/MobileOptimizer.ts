@@ -3,7 +3,7 @@
  * Touch controls, haptic feedback, gesture recognition
  */
 // ...
-import { clientLogger } from '../../core/logging/ClientLogger';
+import { clientLogger } from '@/core/logging/ClientLogger';
 export interface TouchGesture {
   type: 'tap' | 'doubleTap' | 'swipe' | 'pinch' | 'longPress';
   startPoint: { x: number; y: number };

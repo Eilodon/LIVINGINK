@@ -7,7 +7,7 @@
  * EIDOLON-V FIX: Now accepts WorldState as parameter instead of using defaultWorld.
  */
 
-import { Player, Bot } from '../../../types';
+import { Player, Bot } from '@/types';
 import {
   WorldState,
   TransformAccess,

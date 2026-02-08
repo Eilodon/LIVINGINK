@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { LEVELS } from '../../game/cjr/levels';
+import { LEVELS } from '@/game/cjr/levels';
 
 type Props = {
   currentLevel: number;

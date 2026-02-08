@@ -1,5 +1,5 @@
-import { Bot, Player, GameState, Food, Entity } from '../../types';
-import { RING_RADII } from '../../constants';
+import { Bot, Player, GameState, Food, Entity } from '@/types';
+import { RING_RADII } from '@/constants';
 import { getCurrentSpatialGrid, getWorld } from '../engine/context';
 import { TransformAccess, PhysicsAccess } from '@cjr/engine';
 import { PRNG } from '../math/FastMath';

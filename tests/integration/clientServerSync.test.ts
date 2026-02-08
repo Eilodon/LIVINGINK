@@ -2,27 +2,24 @@
  * Integration Tests: Client-Server Sync
  * Tests authoritative server physics sync with client prediction
  * 
- * EIDOLON-V REFACTOR: Updated to use new SchemaBinaryPacker API
+ * EIDOLON-V: Migrated to Access APIs (removed compat layer dependency)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   PhysicsSystem,
   MovementSystem,
-  TransformStore,
-  PhysicsStore,
-  InputStore,
-  StateStore,
-  ConfigStore,
-  StatsStore,
-  resetAllStores,
+  TransformAccess,
+  PhysicsAccess,
+  InputAccess,
+  StateAccess,
+  ConfigAccess,
   EntityFlags,
   MAX_ENTITIES,
   RING_RADII_SQ,
   THRESHOLDS,
   checkRingTransition,
   defaultWorld,
-  StateAccess,
 } from '@cjr/engine';
 // EIDOLON-V AUDIT FIX: Use new SchemaBinaryPacker API
 import { SchemaBinaryPacker } from '@cjr/engine/networking';
@@ -31,15 +28,15 @@ const w = defaultWorld;
 
 describe('Client-Server Sync', () => {
   beforeEach(() => {
-    resetAllStores();
+    w.reset();
   });
 
   describe('Entity State Sync', () => {
     it('should pack transform data from WorldState to binary buffer', () => {
       // Setup: Create entity at position (100, 200)
       const entityId = 0;
-      TransformStore.set(w, entityId, 100, 200, 0, 1);
-      PhysicsStore.set(w, entityId, 50, 0, 100, 28);
+      TransformAccess.set(w, entityId, 100, 200, 0, 1, 100, 200, 0);
+      PhysicsAccess.set(w, entityId, 50, 0, 0, 100, 28, 0.5, 0.9);
       StateAccess.activate(w, entityId);
 
       // Pack transform using new API
@@ -58,8 +55,8 @@ describe('Client-Server Sync', () => {
 
       // Create multiple entities
       for (let i = 0; i < entityCount; i++) {
-        TransformStore.set(w, i, i * 100, i * 50, 0, 1);
-        PhysicsStore.set(w, i, i * 10, i * 5, 100, 28);
+        TransformAccess.set(w, i, i * 100, i * 50, 0, 1, i * 100, i * 50, 0);
+        PhysicsAccess.set(w, i, i * 10, i * 5, 0, 100, 28, 0.5, 0.9);
         StateAccess.activate(w, i);
       }
 
@@ -78,10 +75,11 @@ describe('Client-Server Sync', () => {
       const startX = 0, startY = 0;
 
       // Setup entity
-      TransformStore.set(w, entityId, startX, startY, 0, 1);
-      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
-      InputStore.setTarget(w, entityId, 500, 0); // Target at (500, 0)
-      ConfigStore.setMaxSpeed(w, entityId, 150);
+      TransformAccess.set(w, entityId, startX, startY, 0, 1, startX, startY, 0);
+      PhysicsAccess.set(w, entityId, 0, 0, 0, 100, 28, 0.5, 0.9);
+      InputAccess.setTargetX(w, entityId, 500);
+      InputAccess.setTargetY(w, entityId, 0);
+      ConfigAccess.setMaxSpeed(w, entityId, 150);
       StateAccess.activate(w, entityId);
 
       // Run physics for 60 frames (1 second at 60fps)
@@ -91,7 +89,7 @@ describe('Client-Server Sync', () => {
       }
 
       // Entity should have moved towards target
-      const finalX = TransformStore.getX(w, entityId);
+      const finalX = TransformAccess.getX(w, entityId);
       expect(finalX).toBeGreaterThan(startX);
       expect(finalX).toBeLessThan(500); // Shouldn't overshoot in 1 second
     });
@@ -100,17 +98,18 @@ describe('Client-Server Sync', () => {
       const entityId = 0;
       const maxSpeed = 100;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
-      InputStore.setTarget(w, entityId, 1000, 0);
-      ConfigStore.setMaxSpeed(w, entityId, maxSpeed);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 0, 0, 0, 100, 28, 0.5, 0.9);
+      InputAccess.setTargetX(w, entityId, 1000);
+      InputAccess.setTargetY(w, entityId, 0);
+      ConfigAccess.setMaxSpeed(w, entityId, maxSpeed);
       StateAccess.activate(w, entityId);
 
       // Apply movement
       MovementSystem.update(w, entityId, 1 / 60);
 
-      const vx = PhysicsStore.getVelocityX(w, entityId);
-      const vy = PhysicsStore.getVelocityY(w, entityId);
+      const vx = PhysicsAccess.getVx(w, entityId);
+      const vy = PhysicsAccess.getVy(w, entityId);
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       expect(speed).toBeLessThanOrEqual(maxSpeed * 1.01); // Allow small tolerance
@@ -123,7 +122,7 @@ describe('Client-Server Sync', () => {
 
       // Setup entity at ring 1 (outer)
       const ring1X = 1200; // Between R2 (1000) and R1 (1600)
-      TransformStore.set(w, entityId, ring1X, 0, 0, 1);
+      TransformAccess.set(w, entityId, ring1X, 0, 0, 1, ring1X, 0, 0);
 
       const entity = {
         physicsIndex: entityId,
@@ -139,7 +138,8 @@ describe('Client-Server Sync', () => {
 
       // Move entity to ring 2 position
       entity.position.x = 800; // Inside R2
-      TransformStore.setPosition(w, entityId, 800, 0);
+      TransformAccess.setX(w, entityId, 800);
+      TransformAccess.setY(w, entityId, 0);
 
       const result = checkRingTransition(entity);
 
@@ -150,7 +150,7 @@ describe('Client-Server Sync', () => {
     it('should block transition without sufficient match percent', () => {
       const entityId = 0;
 
-      TransformStore.set(w, entityId, 800, 0, 0, 1);
+      TransformAccess.set(w, entityId, 800, 0, 0, 1, 800, 0, 0);
 
       const entity = {
         physicsIndex: entityId,
@@ -177,13 +177,13 @@ describe('Client-Server Sync', () => {
       const maxAllowedSpeed = 150;
       const tolerance = 1.15;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
       // Set velocity above limit (simulating client hack)
-      PhysicsStore.set(w, entityId, 200, 0, 100, 28);
+      PhysicsAccess.set(w, entityId, 200, 0, 0, 100, 28, 0.5, 0.9);
       StateAccess.activate(w, entityId);
 
-      const vx = PhysicsStore.getVelocityX(w, entityId);
-      const vy = PhysicsStore.getVelocityY(w, entityId);
+      const vx = PhysicsAccess.getVx(w, entityId);
+      const vy = PhysicsAccess.getVy(w, entityId);
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       // Server validation check
@@ -193,12 +193,13 @@ describe('Client-Server Sync', () => {
       // Apply clamp
       if (isViolating) {
         const scale = (maxAllowedSpeed * tolerance) / speed;
-        PhysicsStore.setVelocity(w, entityId, vx * scale, vy * scale);
+        PhysicsAccess.setVx(w, entityId, vx * scale);
+        PhysicsAccess.setVy(w, entityId, vy * scale);
       }
 
       const newSpeed = Math.sqrt(
-        PhysicsStore.getVelocityX(w, entityId) ** 2 +
-        PhysicsStore.getVelocityY(w, entityId) ** 2
+        PhysicsAccess.getVx(w, entityId) ** 2 +
+        PhysicsAccess.getVy(w, entityId) ** 2
       );
       expect(newSpeed).toBeLessThanOrEqual(maxAllowedSpeed * tolerance * 1.01);
     });
@@ -207,13 +208,13 @@ describe('Client-Server Sync', () => {
 
 describe('Network Protocol', () => {
   beforeEach(() => {
-    resetAllStores();
+    w.reset();
   });
 
   it('should pack binary buffer with correct header format', () => {
     // Setup entity
     const entityId = 0;
-    TransformStore.set(w, entityId, 100, 200, 0, 1);
+    TransformAccess.set(w, entityId, 100, 200, 0, 1, 100, 200, 0);
     StateAccess.activate(w, entityId);
 
     const timestamp = 1234.5;
@@ -240,7 +241,7 @@ describe('Network Protocol', () => {
     const testX = 123.456;
     const testY = 789.012;
 
-    TransformStore.set(w, entityId, testX, testY, 0, 1);
+    TransformAccess.set(w, entityId, testX, testY, 0, 1, testX, testY, 0);
     StateAccess.activate(w, entityId);
 
     const buffer = SchemaBinaryPacker.packTransformSnapshot(w, 0);

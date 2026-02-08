@@ -7,10 +7,10 @@ import {
   WORLD_WIDTH,
   ACCELERATION_BASE,
   FRICTION_BASE,
-} from '../../constants';
+} from '@/constants';
 // EIDOLON-V FIX: Import MAX_SPEED_BASE from engine SSOT
 import { MAX_SPEED_BASE } from '@cjr/engine';
-import { Entity, Food, Particle, Player, Bot, Projectile, SizeTier, Vector2 } from '../../types';
+import { Entity, Food, Particle, Player, Bot, Projectile, SizeTier, Vector2 } from '@/types';
 import { getCurrentEngine, getWorld } from './context';
 import { randomRange, randomPos, randomPosInCenter, randomPosInRing, PRNG } from '../math/FastMath';
 import { PigmentVec3, ShapeId, PickupKind, TattooId } from '../cjr/cjrTypes';
@@ -20,13 +20,13 @@ import {
   createDefaultStatusTimers,
   createDefaultStatusMultipliers,
   createDefaultStatusScalars,
-} from '../../types/status';
+} from '@/types/status';
 import { StatusFlag } from './statusFlags';
 import { entityManager } from './dod/EntityManager';
 import {
   TransformAccess,    // PHASE 3: Migrated from TransformStore
   PhysicsAccess,      // PHASE 3: Migrated from PhysicsStore
-  StateStore,
+  StateAccess,        // PHASE 4: Migrated from StateStore
   StatsAccess,
   SkillStore,
   SkillAccess,
@@ -84,7 +84,7 @@ export const createPlayer = (
   StatsAccess.set(getWorld(), entId, 100, 100, 0, 0, 1, 1); // Health=100, Def=1, Dmg=1
 
   // 2.3 State Flags
-  StateStore.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.PLAYER);
+  StateAccess.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.PLAYER);
 
   // 2.4 Skill & Tattoo - EIDOLON-V P2 FIX: Use SkillAccess.set
   const ShapeMap: Record<string, number> = { circle: 1, square: 2, triangle: 3, hex: 4 };
@@ -241,7 +241,7 @@ export const createBot = (id: string, spawnTime: number = 0): Bot | null => {
   TransformAccess.set(getWorld(), entId, position.x, position.y, 0, 1, position.x, position.y, 0);
   PhysicsAccess.set(getWorld(), entId, 0, 0, 0, 10, PLAYER_START_RADIUS, 0.5, 0.9);
   StatsAccess.set(getWorld(), entId, 100, 100, 0, 0, 1, 1);
-  StateStore.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.BOT);
+  StateAccess.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.BOT);
 
   // 2.4 Skill & Tattoo - EIDOLON-V P2 FIX: Use SkillAccess.set
   SkillAccess.set(getWorld(), entId, 0, 8, 0, 1); // cooldown=0, maxCooldown=8, activeTimer=0, shape=circle
@@ -458,7 +458,7 @@ export const createFood = (pos?: Vector2, isEjected: boolean = false): Food | nu
   else if (food.kind === 'solvent') typeFlag |= CJRFoodFlags.FOOD_SOLVENT;
   else if (food.kind === 'neutral') typeFlag |= CJRFoodFlags.FOOD_NEUTRAL;
 
-  StateStore.setFlag(getWorld(), entId, EntityFlags.ACTIVE | typeFlag);
+  StateAccess.setFlag(getWorld(), entId, EntityFlags.ACTIVE | typeFlag);
   StatsAccess.set(getWorld(), entId, 1, 1, 1, 0, 0, 0); // HP 1, MaxHP 1, Score 1...
 
   // EIDOLON-V: ConfigStore Init for Food
@@ -555,7 +555,7 @@ export const createProjectile = (
   // DOD Stores
   TransformAccess.set(getWorld(), entId, position.x, position.y, 0, 1, position.x, position.y, 0);
   PhysicsAccess.set(getWorld(), entId, vx, vy, 0, 0.5, 8, 0.5, 1.0);
-  StateStore.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.PROJECTILE);
+  StateAccess.setFlag(getWorld(), entId, EntityFlags.ACTIVE | EntityFlags.PROJECTILE);
   StatsAccess.set(getWorld(), entId, 1, 1, 0, 0, 0, 1);
 
   // EIDOLON-V: ConfigStore Init for Projectile

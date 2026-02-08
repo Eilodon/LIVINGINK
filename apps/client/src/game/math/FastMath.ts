@@ -45,17 +45,23 @@ export {
 } from '@cjr/engine';
 
 // ============================================
-// LEGACY BRIDGE (Client-specific, uses constants)
+// LEGACY ALIASES (Backward compatibility exports)
 // ============================================
-import { CENTER_RADIUS, MAP_RADIUS, RING_RADII } from '../../constants';
-import { PRNG as EnginePRNG, type Vector2 as Vec2 } from '@cjr/engine';
+import {
+  CollisionSystem as _CollisionSystem,
+  SpatialOptimizer as _SpatialOptimizer,
+  MathPerformanceMonitor as _MathPerformanceMonitor,
+} from '@cjr/engine';
 
-/** @deprecated Use FastMath.distanceSquared for logic, or Math.sqrt only for final visual/UI. */
-export const distSq = (v1: Vec2, v2: Vec2): number => {
-  const dx = v2.x - v1.x;
-  const dy = v2.y - v1.y;
-  return dx * dx + dy * dy;
-};
+export const collisionSystem = _CollisionSystem;
+export const spatialOptimizer = _SpatialOptimizer;
+export const mathPerformanceMonitor = _MathPerformanceMonitor;
+
+// ============================================
+// CLIENT-SPECIFIC POSITION HELPERS
+// ============================================
+import { CENTER_RADIUS, MAP_RADIUS, RING_RADII } from '@cjr/shared';
+import { PRNG as EnginePRNG, type Vector2 as Vec2 } from '@cjr/engine';
 
 /** Random position within map bounds (uses seeded PRNG) */
 export const randomPos = (): Vec2 => {
@@ -99,15 +105,3 @@ export const randomPosInCenter = (): Vec2 => {
     y: Math.sin(angle) * r,
   };
 };
-
-// Legacy aliases for backward compatibility
-import {
-  CollisionSystem as _CollisionSystem,
-  SpatialOptimizer as _SpatialOptimizer,
-  MathPerformanceMonitor as _MathPerformanceMonitor,
-} from '@cjr/engine';
-
-export const collisionSystem = _CollisionSystem;
-export const spatialOptimizer = _SpatialOptimizer;
-export const mathPerformanceMonitor = _MathPerformanceMonitor;
-

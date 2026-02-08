@@ -1,7 +1,7 @@
 // EIDOLON-V FORGE: SOTA 2026 Object Pooling System
 // Eliminates GC allocations completely - Zero allocations during gameplay
 
-import { Food, Projectile, Particle } from '../../types';
+import { Food, Projectile, Particle } from '@/types';
 
 export interface PoolableObject {
   reset(): void;
@@ -113,7 +113,7 @@ export class Vector2Pool {
 }
 
 import { entityManager } from '../engine/dod/EntityManager';
-import { StateStore, EntityLookup, EntityFlags } from '@cjr/engine';
+import { StateAccess, EntityLookup, EntityFlags } from '@cjr/engine';  // PHASE 4: Migrated from StateStore
 import { getWorld } from '../engine/context';
 
 export class EntityPoolManager {
@@ -209,7 +209,7 @@ export class PooledEntityFactory {
           // EIDOLON-V FIX: Release DOD Index
           if (this.physicsIndex !== undefined) {
             const w = getWorld();
-            StateStore.clearFlag(w, this.physicsIndex, EntityFlags.ACTIVE);
+            StateAccess.clearFlag(w, this.physicsIndex, EntityFlags.ACTIVE);
             EntityLookup[this.physicsIndex] = null;
             entityManager.removeEntity(this.physicsIndex);
             this.physicsIndex = undefined;
@@ -260,7 +260,7 @@ export class PooledEntityFactory {
           // EIDOLON-V FIX: Release DOD Index
           if (this.physicsIndex !== undefined) {
             const w = getWorld();
-            StateStore.clearFlag(w, this.physicsIndex, EntityFlags.ACTIVE);
+            StateAccess.clearFlag(w, this.physicsIndex, EntityFlags.ACTIVE);
             EntityLookup[this.physicsIndex] = null;
             entityManager.removeEntity(this.physicsIndex);
             this.physicsIndex = undefined;

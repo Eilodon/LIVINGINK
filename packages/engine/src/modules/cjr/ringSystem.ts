@@ -4,7 +4,7 @@
  * Handles ring commit and elastic rejection mechanics
  */
 
-import { TransformStore, PhysicsStore } from '../../compat';
+// NOTE: Code uses direct buffer access (world.transform, world.physics), not Store methods
 import { WorldState, defaultWorld } from '../../generated/WorldState';
 import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants';
 import { fastMath } from '../../math/FastMath';

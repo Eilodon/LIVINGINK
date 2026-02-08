@@ -57,9 +57,8 @@ export class VFXRingBuffer {
   }
 
   /**
-   * @deprecated DO NOT USE. This is a Ring Buffer (FIFO).
-   * LIFO popping contradicts the visual event queue nature.
-   * Use getEvents() or getEventsInto() instead.
+   * Pop the last event from buffer (LIFO - for consumeVFXEvents compatibility).
+   * For sequential FIFO processing, use getEvents() or getEventsInto() instead.
    */
   pop(): VFXEvent | null {
     if (this.head === 0) return null;

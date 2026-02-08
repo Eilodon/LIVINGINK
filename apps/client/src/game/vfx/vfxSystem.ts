@@ -1,4 +1,4 @@
-import { GameState, Player, Vector2 } from '../../types';
+import { GameState, Player, Vector2 } from '@/types';
 import { RingId } from '../cjr/cjrTypes';
 import { audioEngine } from '../audio/AudioEngine';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../engine/VFXRingBuffer';

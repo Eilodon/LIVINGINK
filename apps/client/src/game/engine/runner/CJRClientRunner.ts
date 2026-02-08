@@ -12,7 +12,7 @@
  * - Render: Sync from DOD stores
  */
 
-import type { GameState } from '../../../types';
+import type { GameState } from '@/types';
 import { ClientRunner, type IClientSimulationConfig } from '@cjr/engine/client';
 
 // Core Systems
@@ -20,7 +20,7 @@ import { AISystem, getAISystem } from '../dod/systems/AISystem';
 import { getCurrentSpatialGrid } from '../context';
 
 // Input & Network Wiring
-import { BufferedInput } from '../../input/BufferedInput';
+import { BufferedInput } from '@/game/input/BufferedInput';
 import {
   TransformAccess,
   PhysicsAccess,
@@ -28,8 +28,8 @@ import {
   PhysicsSystem,
   MovementSystem
 } from '@cjr/engine';
-import { networkTransformBuffer } from '../../../network/NetworkTransformBuffer';
-import { networkClient } from '../../../network/NetworkClient';
+import { networkTransformBuffer } from '@/network/NetworkTransformBuffer';
+import { networkClient } from '@/network/NetworkClient';
 
 /**
  * CJR Client Simulation Configuration
@@ -411,35 +411,6 @@ export class CJRClientRunner extends ClientRunner {
       gameTime: this.getGameTime(),
       memoryUsage: 0,
     };
-  }
-
-  // =============================================================================
-  // Compatibility Helpers (deprecated, kept for API compatibility)
-  // =============================================================================
-
-  /**
-   * Check if running in legacy mode
-   * @deprecated Always returns false in kernel mode
-   */
-  isLegacyMode(): boolean {
-    return false;
-  }
-
-  /**
-   * Toggle legacy mode
-   * @deprecated No-op in kernel mode
-   */
-  setLegacyMode(__enabled: boolean): void {
-    console.warn('[CJRClientRunner] Legacy mode no longer supported, using kernel mode');
-  }
-
-  /**
-   * Get legacy engine reference
-   * @deprecated Returns null in kernel mode
-   */
-  getLegacyEngine(): null {
-    console.warn('[CJRClientRunner] Legacy engine removed, using kernel mode');
-    return null;
   }
 
   // =============================================================================

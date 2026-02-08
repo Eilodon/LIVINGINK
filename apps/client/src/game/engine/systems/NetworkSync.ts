@@ -6,9 +6,9 @@
  * =============================================================================
  */
 
-import { NetworkClient, NetworkStatus, networkClient as sharedNetworkClient } from '../../../network/NetworkClient';
-import { GameState } from '../../../types';
-import { clientLogger } from '../../../core/logging/ClientLogger';
+import { NetworkClient, NetworkStatus, networkClient as sharedNetworkClient } from '@/network/NetworkClient';
+import { GameState } from '@/types';
+import { clientLogger } from '@/core/logging/ClientLogger';
 import { getCurrentEngine } from '../context';
 
 export interface NetworkSyncConfig {

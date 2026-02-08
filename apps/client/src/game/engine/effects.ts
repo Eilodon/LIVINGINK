@@ -1,5 +1,5 @@
 // services/engine/effects.ts
-import { GameState, Vector2, Player, Bot } from '../../types';
+import { GameState, Vector2, Player, Bot } from '@/types';
 import { vfxBuffer, VFX_TYPES, packRGB } from './VFXRingBuffer';
 
 export const createExplosion = (

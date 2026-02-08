@@ -5,7 +5,8 @@
 
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
 import { distanceSquared } from '../../math/FastMath';
-import { PhysicsStore, WorldState } from '../../compat';
+import { PhysicsAccess } from '../../generated/ComponentAccessors';
+import { WorldState } from '../../generated/WorldState';
 
 /**
  * Minimal entity interfaces
@@ -69,7 +70,8 @@ export const updateBossLogic = (
 
             // EIDOLON-V P1: Sync to DOD if boss has physicsIndex
             if (boss.physicsIndex !== undefined) {
-                PhysicsStore.setVelocity(world, boss.physicsIndex, vx, vy);
+                PhysicsAccess.setVx(world, boss.physicsIndex, vx);
+                PhysicsAccess.setVy(world, boss.physicsIndex, vy);
             }
             boss.velocity.x = vx;
             boss.velocity.y = vy;
@@ -85,7 +87,8 @@ export const updateBossLogic = (
             const dashVy = boss.velocity.y * 3;
 
             if (boss.physicsIndex !== undefined) {
-                PhysicsStore.setVelocity(world, boss.physicsIndex, dashVx, dashVy);
+                PhysicsAccess.setVx(world, boss.physicsIndex, dashVx);
+                PhysicsAccess.setVy(world, boss.physicsIndex, dashVy);
             }
             boss.velocity.x = dashVx;
             boss.velocity.y = dashVy;

@@ -1,6 +1,6 @@
-import { BufferedInput } from '../../input/BufferedInput';
-import { NetworkClient } from '../../../network/NetworkClient';
-import { GameState } from '../../../types';
+import { BufferedInput } from '@/game/input/BufferedInput';
+import { NetworkClient } from '@/network/NetworkClient';
+import { GameState } from '@/types';
 import { InputStore, TransformAccess } from '@cjr/engine';
 import { getWorld } from '../context';
 

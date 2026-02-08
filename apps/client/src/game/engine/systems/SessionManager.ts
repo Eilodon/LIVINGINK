@@ -1,13 +1,12 @@
 import { GameSessionConfig, GameEvent } from '../GameStateManager';
-import { GameState, Player } from '../../../types';
-import { NetworkClient } from '../../../network/NetworkClient';
+import { GameState, Player } from '@/types';
+import { NetworkClient } from '@/network/NetworkClient';
 import { createInitialState } from '../index';
-import { clientLogger } from '../../../core/logging/ClientLogger';
-import { resetAllStores } from '@cjr/engine';
-import { pooledEntityFactory } from '../../pooling/ObjectPool';
-import { BufferedInput } from '../../input/BufferedInput';
+import { clientLogger } from '@/core/logging/ClientLogger';
+import { pooledEntityFactory } from '@/game/pooling/ObjectPool';
+import { BufferedInput } from '@/game/input/BufferedInput';
 import { PhysicsWorld } from '../PhysicsWorld';
-import { getCurrentEngine } from '../context';
+import { getCurrentEngine, getWorld } from '../context';
 
 export class SessionManager {
     private currentConfig: GameSessionConfig | null = null;
@@ -77,7 +76,11 @@ export class SessionManager {
         this.networkClient.disconnect();
 
         // Reset DOD stores and pools to prevent memory leaks
-        resetAllStores();
+        try {
+            getWorld().reset();
+        } catch {
+            // getWorld() may throw if engine not bound - that's fine during cleanup
+        }
         pooledEntityFactory.clear();
 
         // Clear spatial grid if applicable

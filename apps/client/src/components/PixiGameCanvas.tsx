@@ -11,7 +11,7 @@ import {
 } from 'pixi.js';
 import { GameState } from '../types';
 import { JELLY_VERTEX, JELLY_FRAGMENT, JellyShaderResources } from '../game/cjr/shaders';
-import { MAP_RADIUS, COLOR_PALETTE_HEX, RING_RADII } from '../constants';
+import { MAP_RADIUS, COLOR_PALETTE_HEX, RING_RADII, COLOR_INT } from '../constants';
 import { getPhysicsWorld, getWorld } from '../game/engine/context';
 import { TransformAccess, PhysicsAccess, EntityFlags, STRIDES } from '@cjr/engine';
 import { visualStore } from '../game/engine/systems/VisualSystem';
@@ -197,20 +197,20 @@ const PixiGameCanvas: React.FC<PixiGameCanvasProps> = ({ gameStateRef, alphaRef 
       // EIDOLON-V: Draw Ring Zones (R1 outer to R3 inner)
       // Ring 1 (Outer Safe Zone) - Gray
       border.arc(0, 0, RING_RADII.R1, 0, Math.PI * 2);
-      border.stroke({ width: 3, color: 0x475569, alpha: 0.6 });
+      border.stroke({ width: 3, color: COLOR_INT.rings.r1, alpha: 0.6 });
 
       // Ring 2 (Mid Zone) - Blue
       border.arc(0, 0, RING_RADII.R2, 0, Math.PI * 2);
-      border.stroke({ width: 4, color: 0x3b82f6, alpha: 0.7 });
+      border.stroke({ width: 4, color: COLOR_INT.rings.r2, alpha: 0.7 });
 
       // Ring 3 (Danger Zone) - Red
       border.arc(0, 0, RING_RADII.R3, 0, Math.PI * 2);
-      border.stroke({ width: 5, color: 0xef4444, alpha: 0.8 });
+      border.stroke({ width: 5, color: COLOR_INT.rings.r3, alpha: 0.8 });
 
       // Center Zone
       border.arc(0, 0, RING_RADII.CENTER, 0, Math.PI * 2);
-      border.fill({ color: 0xfbbf24, alpha: 0.15 });
-      border.stroke({ width: 2, color: 0xfbbf24, alpha: 0.6 });
+      border.fill({ color: COLOR_INT.center, alpha: 0.15 });
+      border.stroke({ width: 2, color: COLOR_INT.center, alpha: 0.6 });
 
       // Outer Map Border
       border.arc(0, 0, MAP_RADIUS, 0, Math.PI * 2);

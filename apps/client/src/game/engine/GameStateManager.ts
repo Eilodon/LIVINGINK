@@ -1,12 +1,12 @@
 // EIDOLON-V FIX: Unified Game State Manager
 // Refactored: Split GOD Object into dedicated systems (Input, Audio, Session)
 
-import { GameState, Player, Bot, Food } from '../../types';
+import { GameState, Player, Bot, Food } from '@/types';
 import { createInitialState } from './index';
 import { FixedGameLoop } from './GameLoop';
 import { cjrClientRunner } from './runner/CJRClientRunner';
 import { mathPerformanceMonitor } from '../math/FastMath';
-import { performanceMonitor } from '../../core/performance/PerformanceMonitor';
+import { performanceMonitor } from '@/core/performance/PerformanceMonitor';
 
 import { BufferedInput } from '../input/BufferedInput';
 import { GameConfig } from '@cjr/engine';
@@ -14,11 +14,11 @@ import {
   NetworkClient,
   networkClient as defaultNetworkClient,
   NetworkStatus,
-} from '../../network/NetworkClient';
+} from '@/network/NetworkClient';
 import { AudioEngine, audioEngine as defaultAudioEngine } from '../audio/AudioEngine';
 import { vfxIntegrationManager } from '../vfx/vfxIntegration';
 import { ShapeId } from '../cjr/cjrTypes';
-import { clientLogger } from '../../core/logging/ClientLogger';
+import { clientLogger } from '@/core/logging/ClientLogger';
 
 // Systems
 import { inputSystem, InputSystem } from './systems/InputSystem';

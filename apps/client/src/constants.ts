@@ -91,65 +91,6 @@ export const COMMIT_BUFFS = {
   },
 };
 
-/**
- * @deprecated Prefer usage of COLOR_DATA (Float32Array) for rendering loops.
- * This is a legacy string-based color palette. Use COLOR_DATA for GPU-optimized rendering.
- */
-export const COLOR_PALETTE_HEX = {
-  background: '#111111',
-  rings: {
-    r1: '#475569',
-    r2: '#3b82f6',
-    r3: '#ef4444',
-  },
-};
-
-export const WAVE_CONFIG = {
-  INTERVAL: {
-    1: 8000,
-    2: 10000,
-    3: 14000,
-  },
-  // Flattened aliases for waveSpawner.ts
-  INTERVAL_R1: 8000,
-  INTERVAL_R2: 10000,
-  INTERVAL_R3: 14000,
-
-  SPAWN_WEIGHTS: {
-    pigment: 0.6,
-    neutral: 0.25,
-    special: 0.15,
-  },
-  SPAWN_COUNTS: {
-    R1: 5,
-    R2: 4,
-    R3: 3,
-  },
-};
-
-export const BOSS_CONFIGS = {
-  BOSS_1_TRIGGER: 'RING_2_ACTIVE',
-  BOSS_2_TRIGGER: 'RING_3_ACTIVE',
-};
-
-// --- EIDOLON-V: GPU-READY COLOR DATA ---
-// Pre-normalized vectors for Shader/Math usage.
-// 0 alloc at runtime.
-
-const hexToVec3 = (hex: string): Float32Array => {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return new Float32Array([r, g, b]);
-};
-
-export const COLOR_DATA = {
-  // #475569
-  R1: hexToVec3(COLOR_PALETTE_HEX.rings.r1),
-  // #3b82f6
-  R2: hexToVec3(COLOR_PALETTE_HEX.rings.r2),
-  // #ef4444
-  R3: hexToVec3(COLOR_PALETTE_HEX.rings.r3),
-  // #111111
-  BG: hexToVec3(COLOR_PALETTE_HEX.background),
-};
+// --- EIDOLON-V: Unified Color System ---
+// Re-export from @cjr/shared (Single Source of Truth)
+export { COLOR_PALETTE_HEX, COLOR_DATA, COLOR_INT, COLOR_HEX, COLOR_VEC3 } from '@cjr/shared';

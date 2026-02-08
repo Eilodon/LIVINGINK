@@ -2,7 +2,7 @@
 // Flat Array Linked List Architecture - Zero GC Pressure
 
 import { fastMath } from '../math/FastMath';
-import { Entity } from '../../types';
+import { Entity } from '@/types';
 import { TransformAccess, PhysicsAccess, EntityLookup, STRIDES } from '@cjr/engine';
 import { getWorld } from '../engine/context';
 

@@ -1,4 +1,4 @@
-import { Player, GameState, Food, Entity } from '../../types';
+import { Player, GameState, Food, Entity } from '@/types';
 import { TattooId } from './cjrTypes';
 import { createFood, createParticle } from '../engine/factories';
 import { createFloatingText } from '../engine/effects';

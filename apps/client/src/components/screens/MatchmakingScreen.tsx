@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from 'react';
-import type { ShapeId } from '../../game/cjr/cjrTypes';
-import type { MatchmakingStatus } from '../../core/meta/matchmaking';
-import { useZeroRenderTimer } from '../../hooks/useZeroRenderTimer';
+import type { ShapeId } from '@/game/cjr/cjrTypes';
+import type { MatchmakingStatus } from '@/core/meta/matchmaking';
+import { useZeroRenderTimer } from '@/hooks/useZeroRenderTimer';
 
 type Props = {
   name: string;

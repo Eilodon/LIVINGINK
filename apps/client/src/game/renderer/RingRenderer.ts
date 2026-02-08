@@ -1,11 +1,11 @@
 // EIDOLON-V: Ring Renderer for Canvas2D
-import { RING_RADII, CENTER_RADIUS, MAP_RADIUS } from '../../constants';
-import { COLOR_PALETTE_HEX } from '../../constants';
+import { RING_RADII, CENTER_RADIUS, MAP_RADIUS } from '@/constants';
+import { COLOR_HEX } from '@cjr/shared';
 
 export class Canvas2DRingRenderer {
   private readonly colors = {
-    ...COLOR_PALETTE_HEX.rings,
-    center: '#fbbf24', // Gold/amber for center zone
+    ...COLOR_HEX.rings,
+    center: COLOR_HEX.center,
   };
 
   drawRings(ctx: CanvasRenderingContext2D, gameTime: number): void {

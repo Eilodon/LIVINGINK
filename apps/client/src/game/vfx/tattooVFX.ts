@@ -1,4 +1,4 @@
-import { GameState, Player } from '../../types';
+import { GameState, Player } from '@/types';
 import { TattooId } from '../cjr/cjrTypes';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../engine/VFXRingBuffer';
 import { vfxSystem } from './vfxSystem'; // EIDOLON-V: Static import

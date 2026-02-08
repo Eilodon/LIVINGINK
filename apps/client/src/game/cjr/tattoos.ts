@@ -1,4 +1,4 @@
-import { MutationTier, Player, Bot, Food, GameState } from '../../types';
+import { MutationTier, Player, Bot, Food, GameState } from '@/types';
 import { TattooId } from './cjrTypes';
 import { COLOR_BALANCE } from './balance';
 import { vfxIntegrationManager } from '../vfx/vfxIntegration';

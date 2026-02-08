@@ -2,18 +2,17 @@
  * VERIFY FIXES TEST
  * Tests specifically for the game mechanics fixes made
  *
- * EIDOLON-V CLEANUP: Fixed EntityFlags imports, added proper engine binding
+ * EIDOLON-V: Migrated to Access APIs (removed compat layer dependency)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   EntityFlags,
   MAX_ENTITIES,
-  resetAllStores,
-  TransformStore,
-  PhysicsStore,
-  StateStore,
-  InputStore,
+  TransformAccess,
+  PhysicsAccess,
+  StateAccess,
+  InputAccess,
   MovementSystem,
   PhysicsSystem,
   EntityLookup,
@@ -35,7 +34,7 @@ describe('EntityFlags Fix Verification', () => {
     // Bind a fresh engine before each test
     const engine = createGameEngine();
     bindEngine(engine);
-    resetAllStores();
+    getWorld().reset();
   });
 
   it('DEAD and BOSS should have different bit values', () => {
@@ -90,14 +89,14 @@ describe('EntityFlags Fix Verification', () => {
     const testId = 0;
     w.stateFlags[testId] = 0;
 
-    StateStore.setFlag(w, testId, EntityFlags.DEAD);
-    expect(StateStore.hasFlag(w, testId, EntityFlags.DEAD)).toBe(true);
-    expect(StateStore.hasFlag(w, testId, EntityFlags.BOSS)).toBe(false);
+    StateAccess.setFlag(w, testId, EntityFlags.DEAD);
+    expect(StateAccess.hasFlag(w, testId, EntityFlags.DEAD)).toBe(true);
+    expect(StateAccess.hasFlag(w, testId, EntityFlags.BOSS)).toBe(false);
 
     w.stateFlags[testId] = 0;
-    StateStore.setFlag(w, testId, EntityFlags.BOSS);
-    expect(StateStore.hasFlag(w, testId, EntityFlags.BOSS)).toBe(true);
-    expect(StateStore.hasFlag(w, testId, EntityFlags.DEAD)).toBe(false);
+    StateAccess.setFlag(w, testId, EntityFlags.BOSS);
+    expect(StateAccess.hasFlag(w, testId, EntityFlags.BOSS)).toBe(true);
+    expect(StateAccess.hasFlag(w, testId, EntityFlags.DEAD)).toBe(false);
   });
 });
 
@@ -105,19 +104,19 @@ describe('DOD Stores Reset Fix Verification', () => {
   beforeEach(() => {
     const engine = createGameEngine();
     bindEngine(engine);
-    resetAllStores();
+    getWorld().reset();
     entityManager.reset();
   });
 
-  it('resetAllStores should clear all data', () => {
+  it('world.reset() should clear all data', () => {
     const w = getWorld();
 
-    // Set some data first (using legacy 6-arg signatures)
-    TransformStore.set(w, 0, 100, 200, 0);
-    PhysicsStore.set(w, 0, 10, 20, 1, 30);
-    StateStore.setFlag(w, 0, EntityFlags.ACTIVE | EntityFlags.PLAYER);
+    // Set some data first (using new Access APIs)
+    TransformAccess.set(w, 0, 100, 200, 0, 1, 100, 200, 0);
+    PhysicsAccess.set(w, 0, 10, 20, 0, 1, 30, 0.5, 0.9);
+    StateAccess.setFlag(w, 0, EntityFlags.ACTIVE | EntityFlags.PLAYER);
 
-    // EIDOLON-V: Use w.reset() directly since resetAllStores() only resets defaultWorld
+    // Reset using instance method
     w.reset();
 
     expect(w.transform[0]).toBe(0);
@@ -151,8 +150,8 @@ describe('DOD Stores Reset Fix Verification', () => {
 
     const playerIdx = state.player.physicsIndex;
     if (playerIdx !== undefined) {
-      expect(StateStore.hasFlag(w, playerIdx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(w, playerIdx, EntityFlags.DEAD)).toBe(false);
+      expect(StateAccess.hasFlag(w, playerIdx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateAccess.hasFlag(w, playerIdx, EntityFlags.DEAD)).toBe(false);
     }
   });
 });
@@ -161,7 +160,7 @@ describe('Entity Loop Fix Verification', () => {
   beforeEach(() => {
     const engine = createGameEngine();
     bindEngine(engine);
-    resetAllStores();
+    getWorld().reset();
     entityManager.reset();
   });
 
@@ -178,9 +177,9 @@ describe('Entity Loop Fix Verification', () => {
     }
 
     const highIdx = ids[99];
-    StateStore.setFlag(w, highIdx, EntityFlags.ACTIVE);
-    TransformStore.set(w, highIdx, 100, 100, 0);
-    PhysicsStore.set(w, highIdx, 10, 10, 1, 20, 0.5, 0.9);
+    StateAccess.setFlag(w, highIdx, EntityFlags.ACTIVE);
+    TransformAccess.set(w, highIdx, 100, 100, 0, 1, 100, 100, 0);
+    PhysicsAccess.set(w, highIdx, 10, 10, 0, 1, 20, 0.5, 0.9);
 
     const initialX = w.transform[highIdx * 8];
 
@@ -195,7 +194,7 @@ describe('Entity Creation and Cleanup Verification', () => {
   beforeEach(() => {
     const engine = createGameEngine();
     bindEngine(engine);
-    resetAllStores();
+    getWorld().reset();
     entityManager.reset();
   });
 
@@ -208,9 +207,9 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(player.physicsIndex).toBeDefined();
 
       const idx = player.physicsIndex!;
-      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
       expect(EntityLookup[idx]).toBe(player);
     }
   });
@@ -224,9 +223,9 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(food.physicsIndex).toBeDefined();
 
       const idx = food.physicsIndex!;
-      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.FOOD)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.FOOD)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
       expect(EntityLookup[idx]).toBe(food);
     }
   });
@@ -240,10 +239,10 @@ describe('Entity Creation and Cleanup Verification', () => {
       expect(bot.physicsIndex).toBeDefined();
 
       const idx = bot.physicsIndex!;
-      expect(StateStore.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.BOT)).toBe(true);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(false);
-      expect(StateStore.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.ACTIVE)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.BOT)).toBe(true);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.PLAYER)).toBe(false);
+      expect(StateAccess.hasFlag(w, idx, EntityFlags.DEAD)).toBe(false);
     }
   });
 });
@@ -252,11 +251,11 @@ describe('Movement System Verification', () => {
   beforeEach(() => {
     const engine = createGameEngine();
     bindEngine(engine);
-    resetAllStores();
+    getWorld().reset();
     entityManager.reset();
   });
 
-  it('MovementSystem should read from InputStore and update velocity', () => {
+  it('MovementSystem should read from InputAccess and update velocity', () => {
     const w = getWorld();
     const player = createPlayer('TestPlayer');
     expect(player).not.toBeNull();
@@ -264,9 +263,10 @@ describe('Movement System Verification', () => {
     if (player && player.physicsIndex !== undefined) {
       const idx = player.physicsIndex;
 
-      TransformStore.set(w, idx, 0, 0, 0);
-      PhysicsStore.set(w, idx, 0, 0, 10, 28, 0.5, 0.9);
-      InputStore.setTarget(w, idx, 100, 100);
+      TransformAccess.set(w, idx, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, idx, 0, 0, 0, 10, 28, 0.5, 0.9);
+      InputAccess.setTargetX(w, idx, 100);
+      InputAccess.setTargetY(w, idx, 100);
 
       MovementSystem.update(w, idx, 1 / 60);
 

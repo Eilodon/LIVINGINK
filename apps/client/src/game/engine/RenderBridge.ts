@@ -83,65 +83,7 @@ export const getInterpolatedPositionsBatchByIndices = (
   return result;
 };
 
-// ============================================================================
-// LEGACY API (String-based with Map Lookup) - Preserved for compatibility
-// ============================================================================
 
-/**
- * Get interpolated positions for a batch of entities by STRING IDs
- * @deprecated Use getInterpolatedPositionsBatchByIndices for better performance
- */
-export const getInterpolatedPositionsBatch = (
-  entityIds: string[],
-  alpha: number,
-  output?: Float32Array
-): Float32Array => {
-  const world = getPhysicsWorld(); // Adapter
-  const count = entityIds.length;
-  // Output is packed tight [x, y, x, y...] so output stride is 2
-  const result = output || new Float32Array(count * 2);
-  const data = getWorld().transform;
-
-  for (let i = 0; i < count; i++) {
-    const idx = world.idToIndex.get(entityIds[i]);
-    if (idx === undefined) continue;
-
-    const baseIdx = idx * STRIDE;
-    const currX = data[baseIdx + X_OFFSET];
-    const currY = data[baseIdx + Y_OFFSET];
-    const prevX = data[baseIdx + PREV_X_OFFSET];
-    const prevY = data[baseIdx + PREV_Y_OFFSET];
-
-    const outIdx = i * 2;
-    result[outIdx] = prevX + (currX - prevX) * alpha;
-    result[outIdx + 1] = prevY + (currY - prevY) * alpha;
-  }
-
-  return result;
-};
-
-/**
- * Get interpolated position for a single entity by STRING ID
- * @deprecated Use getInterpolatedPositionByIndex for better performance
- */
-export function getInterpolatedPosition(entityId: string, alpha: number): RenderPoint | null;
-export function getInterpolatedPosition(
-  entityId: string,
-  alpha: number,
-  out: RenderPoint
-): RenderPoint | null;
-export function getInterpolatedPosition(
-  entityId: string,
-  alpha: number,
-  out?: RenderPoint
-): RenderPoint | null {
-  const world = getPhysicsWorld();
-  const idx = world.idToIndex.get(entityId);
-  if (idx === undefined) return null;
-
-  // Delegate to index-based implementation
-  return getInterpolatedPositionByIndex(idx, alpha, out);
-}
 
 /**
  * Consume all pending VFX events from the ring buffer

@@ -1,5 +1,5 @@
-import { AudioEngine } from '../../audio/AudioEngine';
-import { GameState } from '../../../types';
+import { AudioEngine } from '@/game/audio/AudioEngine';
+import { GameState } from '@/types';
 import { TransformAccess } from '@cjr/engine';
 import { getWorld } from '../context';
 

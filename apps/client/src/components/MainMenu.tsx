@@ -23,20 +23,20 @@ interface MainMenuProps {
 const MainMenu: React.FC<MainMenuProps> = ({
   level,
   unlockedLevel,
-  _usePixi,
+  _usePixi: usePixi = false,
   useMultiplayer,
   networkStatus,
-  _name,
-  _shape,
+  _name: name = '',
+  _shape: shape = 'circle',
   onTogglePixi,
   onOpenLevels,
   onOpenTutorial,
   onOpenSettings,
   onOpenMatchmaking,
   onOpenTournament,
-  _onStart,
-  _onNameChange,
-  _onShapeChange,
+  _onStart: onStart = () => { },
+  _onNameChange: onNameChange = () => { },
+  _onShapeChange: onShapeChange = () => { },
 }) => {
   const handleStart = () => {
     if (!name.trim()) return;

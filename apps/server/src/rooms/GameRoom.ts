@@ -27,11 +27,10 @@ import {
   SkillSystem,
   TransformAccess,  // PHASE 3: Migrated from TransformStore
   PhysicsAccess,    // PHASE 3: Migrated from PhysicsStore
-  StateStore,
+  StatsAccess,      // P1 FIX: Migrated from StatsStore
   InputStore,
-  StatsStore,
   ConfigStore,
-  StateAccess,
+  StateAccess,      // PHASE 4: Migrated from StateStore
   SkillAccess,
   checkRingTransition,
   calcMatchPercentFast,
@@ -50,6 +49,9 @@ import { InputValidator } from '../validation/InputValidator';
 
 // Server Engine Bridge
 import { ServerEngineBridge } from '../engine/ServerEngineBridge';
+
+// Centralized Configuration
+import { GAME_ROOM_CONFIG } from './GameRoomConfig';
 
 export class GameRoom extends Room<GameRoomState> {
   maxClients = 50;
@@ -217,9 +219,8 @@ export class GameRoom extends Room<GameRoomState> {
 
       // EIDOLON-V P7: Max payload size check (prevent DoS via large messages)
       const messageSize = JSON.stringify(message).length;
-      const MAX_MESSAGE_SIZE = 1024; // 1KB max
-      if (messageSize > MAX_MESSAGE_SIZE) {
-        logger.warn(`Message too large from ${client.sessionId}`, { size: messageSize, max: MAX_MESSAGE_SIZE });
+      if (messageSize > GAME_ROOM_CONFIG.MAX_MESSAGE_SIZE) {
+        logger.warn(`Message too large from ${client.sessionId}`, { size: messageSize, max: GAME_ROOM_CONFIG.MAX_MESSAGE_SIZE });
         return;
       }
 
@@ -338,7 +339,7 @@ export class GameRoom extends Room<GameRoomState> {
     PhysicsAccess.set(this.world, entityIndex, 0, 0, 0, mass, PLAYER_START_RADIUS, 0.5, 0.93);
 
     // Stats: [currentHealth, maxHealth, score, matchPercent, defense, damageMultiplier, _pad, _pad]
-    StatsStore.set(this.world, entityIndex, 100, 100, 0, player.matchPercent, 1, 1);
+    StatsAccess.set(this.world, entityIndex, 100, 100, 0, player.matchPercent, 1, 1);
 
     // Input: [targetX, targetY, isSkillActive, isEjectActive]
     InputStore.setTarget(this.world, entityIndex, x, y);
@@ -655,7 +656,7 @@ export class GameRoom extends Room<GameRoomState> {
     this.world.transform.fill(0, stride8, stride8 + 8);
     this.world.physics.fill(0, stride8, stride8 + 8);
     this.world.stats.fill(0, stride8, stride8 + 8);
-    StateStore.setFlag(this.world, idx, 0); // Correct way to clear flag
+    StateAccess.setFlag(this.world, idx, 0); // Clear all flags
     this.world.input.fill(0, idx * 4, idx * 4 + 4);
     this.world.config.fill(0, idx * 4, idx * 4 + 4);
     this.world.skill.fill(0, idx * 4, idx * 4 + 4);
@@ -709,7 +710,7 @@ export class GameRoom extends Room<GameRoomState> {
     // Initialize DOD stores
     TransformAccess.set(this.world, entityIndex, x, y, 0, 1.0, x, y, 0);
     PhysicsAccess.set(this.world, entityIndex, 0, 0, 0, 100, PLAYER_START_RADIUS, 0.5, 0.9);
-    StatsStore.set(this.world, entityIndex, 100, 100, 0, 0, 1, 1);
+    StatsAccess.set(this.world, entityIndex, 100, 100, 0, 0, 1, 1);
     ConfigStore.setMaxSpeed(this.world, entityIndex, GameRoom.MAX_SPEED_BASE * 0.8); // Bots slightly slower
     StateAccess.activate(this.world, entityIndex);
 
@@ -814,8 +815,8 @@ export class GameRoom extends Room<GameRoomState> {
       if (entityIndex === undefined) return;
 
       // Check death state from DOD
-      const currentHealth = StatsStore.getCurrentHealth(this.world, entityIndex);
-      const isActive = StateStore.isActive(this.world, entityIndex);
+      const currentHealth = StatsAccess.getHp(this.world, entityIndex);
+      const isActive = StateAccess.isActive(this.world, entityIndex);
 
       // Sync death state to Colyseus schema
       if (!isActive && !player.isDead) {
@@ -859,7 +860,7 @@ export class GameRoom extends Room<GameRoomState> {
         TransformAccess.setY(this.world, entityIndex, y);
         PhysicsAccess.setVx(this.world, entityIndex, 0);
         PhysicsAccess.setVy(this.world, entityIndex, 0);
-        StatsStore.setCurrentHealth(this.world, entityIndex, 100);
+        StatsAccess.setHp(this.world, entityIndex, 100);
       }
 
       logger.info('Player respawned', { sessionId, position: { x, y } });

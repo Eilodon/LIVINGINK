@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 // EIDOLON-V AUDIT FIX: Corrected import path (was ../game/networking/ which doesn't exist)
 import { NetworkClient } from '../NetworkClient';
-import type { GameState } from '../../types/state';
+import type { GameState } from '@/types/state';
 
 describe('NetworkClient - Ring Buffer Optimization', () => {
   let client: NetworkClient;

@@ -1,4 +1,4 @@
-import { GameState, Player } from '../../types';
+import { GameState, Player } from '@/types';
 import { StatusFlag } from '../engine/statusFlags';
 
 export const resetContributionLog = (runtime: any) => {

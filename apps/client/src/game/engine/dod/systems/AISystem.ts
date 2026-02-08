@@ -14,22 +14,24 @@
  * Phase 5: Fully DOD (remove Bot object references)
  */
 
-import type { GameState, Bot } from '../../../../types';
-import { fastMath, PRNG } from '../../../math/FastMath';
-import { MAP_RADIUS } from '../../../../constants';
+import type { GameState, Bot } from '@/types';
+import { fastMath, PRNG } from '@/game/math/FastMath';
+import { MAP_RADIUS } from '@/constants';
 import {
-  TransformStore,
-  PhysicsStore,
-  StateStore,
+  // EIDOLON-V: Migrated to Access pattern
+  TransformAccess,    // Migrated from TransformStore
+  PhysicsAccess,      // Migrated from PhysicsStore
+  StateAccess,        // Migrated from StateStore
   EntityLookup,
-  InputStore,
+  InputStore,         // No Access version yet
   EntityFlags,
   CJRFoodFlags,
   WorldState,
-  SkillSystem, // EIDOLON-V P1 FIX: Use canonical engine version (has Triangle/Hex)
+  STRIDES,            // For stride constants
+  SkillSystem,        // EIDOLON-V P1 FIX: Use canonical engine version (has Triangle/Hex)
 } from '@cjr/engine';
-import { updateBotPersonality } from '../../../cjr/botPersonalities';
-import type { SpatialGrid } from '../../context';
+import { updateBotPersonality } from '@/game/cjr/botPersonalities';
+import type { SpatialGrid } from '@/game/engine/context';
 
 /**
  * EIDOLON-V P2 FIX: O(1) Entity ID → Index Cache

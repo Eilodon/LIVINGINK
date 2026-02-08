@@ -1,6 +1,6 @@
 import { entityManager } from './dod/EntityManager';
 import { TransformAccess, PhysicsAccess, StateAccess, EntityFlags, WorldState } from '@cjr/engine';
-import { networkTransformBuffer } from '../../network/NetworkTransformBuffer';
+import { networkTransformBuffer } from '@/network/NetworkTransformBuffer';
 
 export class PhysicsWorld {
   // Adapter properties

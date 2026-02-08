@@ -9,12 +9,12 @@
 // RING SYSTEM
 // ============================================================
 
-/** Ring boundary radii */
+/** Ring boundary radii - SYNCED with @cjr/shared */
 export const RING_RADII = {
     R1: 1600,   // Outer ring
     R2: 1000,   // Middle ring
-    R3: 400,    // Inner ring
-    CENTER: 100, // Win zone
+    R3: 500,    // Inner ring (was 400, synced with shared)
+    CENTER: 150, // Win zone (was 100, synced with shared)
 } as const;
 
 /** Pre-computed squared radii for fast distance checks */

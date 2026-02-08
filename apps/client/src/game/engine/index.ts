@@ -5,8 +5,8 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   MUTATION_CHOICES,
-} from '../../constants';
-import { Bot, Entity, Food, GameState, Player } from '../../types';
+} from '@/constants';
+import { Bot, Entity, Food, GameState, Player } from '@/types';
 import { bindEngine, createGameEngine, getCurrentSpatialGrid } from './context';
 import { createBot, createFood, createPlayer } from './factories';
 
@@ -24,8 +24,7 @@ import { cjrClientRunner } from './runner/CJRClientRunner';
 import { gameStateManager } from './GameStateManager';
 import { createVFXEventPool } from './VFXRingBuffer';
 
-// EIDOLON-V FIX: Import DOD reset functions from @cjr/engine where safe
-import { resetAllStores } from '@cjr/engine';
+// EIDOLON-V: Entity manager reset for each new game
 import { entityManager } from './dod/EntityManager';
 
 // EIDOLON-V FIX: Export unified game state manager and new runner
@@ -36,9 +35,8 @@ export { gameStateManager, cjrClientRunner };
 // Use: cjrClientRunner.setGameState(state); cjrClientRunner.updateVisualsOnly(dt)
 
 export const createInitialState = (level: number = 1): GameState => {
-  // EIDOLON-V FIX: Reset DOD stores and entity manager FIRST
-  // This prevents stale data from previous game sessions causing bugs
-  resetAllStores();
+  // EIDOLON-V: Reset entity manager for clean ID allocation
+  // Note: We create a NEW WorldState in createGameEngine(), so no need to reset any global world
   entityManager.reset();
 
   const engine = createGameEngine();

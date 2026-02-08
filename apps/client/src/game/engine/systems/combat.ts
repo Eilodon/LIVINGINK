@@ -1,23 +1,23 @@
-import { FOOD_GROWTH_MULTIPLIER } from '../../../constants';
-import { GameState, Player, Bot, Entity, Projectile, Food } from '../../../types';
+import { FOOD_GROWTH_MULTIPLIER } from '@/constants';
+import { GameState, Player, Bot, Entity, Projectile, Food } from '@/types';
 import { createDeathExplosion, createFloatingText, createExplosion } from '../effects';
 import { createFood } from '../factories';
 import { applyGrowth, applyGrowthDOD } from './mechanics';
-import { TattooId } from '../../cjr/cjrTypes';
+import { TattooId } from '@/game/cjr/cjrTypes';
 import { StatusFlag, TattooFlag } from '../statusFlags';
 import {
   createDefaultStatusMultipliers,
   createDefaultStatusScalars,
   createDefaultStatusTimers,
-} from '../../../types/status';
-import { mixPigment, calcMatchPercentFast, pigmentToInt, getSnapAlpha } from '../../cjr/colorMath';
-import { triggerEmotion } from '../../cjr/emotions';
+} from '@/types/status';
+import { mixPigment, calcMatchPercentFast, pigmentToInt, getSnapAlpha } from '@/game/cjr/colorMath';
+import { triggerEmotion } from '@/game/cjr/emotions';
 import { vfxBuffer, VFX_TYPES, packHex, TEXT_IDS } from '../VFXRingBuffer';
 import {
   StatsAccess,
   TransformAccess,
   PhysicsAccess,
-  StateStore,
+  StateAccess,        // PHASE 4: Migrated from StateStore
   TattooStore,
   EntityLookup,
   PigmentStore,
@@ -25,7 +25,7 @@ import {
   STRIDES,
 } from '@cjr/engine';
 import { getWorld } from '../context';
-import { audioEngine } from '../../audio/AudioEngine';
+import { audioEngine } from '@/game/audio/AudioEngine';
 
 // EIDOLON-V: Instance-based WorldState via getWorld()
 
@@ -39,8 +39,8 @@ export const consumePickupDOD = (entityId: number, foodId: number, _state: GameS
   if ((fFlags & EntityFlags.ACTIVE) === 0 || fFlags & EntityFlags.DEAD) return;
 
   // Mark Food Dead
-  StateStore.clearFlag(w, foodId, EntityFlags.ACTIVE);
-  StateStore.setFlag(w, foodId, EntityFlags.DEAD);
+  StateAccess.clearFlag(w, foodId, EntityFlags.ACTIVE);
+  StateAccess.setFlag(w, foodId, EntityFlags.DEAD);
 
   // Read Stats via world.stats (stride=8: [curHP, maxHP, score, match, def, dmg, pad, pad])
   const eIdx = entityId * 8;
@@ -220,7 +220,7 @@ export const reduceHealthDOD = (
   // Death Check
   if (newHealth <= 0) {
     w.stats[vIdx] = 0;
-    StateStore.setFlag(w, victimId, EntityFlags.DEAD);
+    StateAccess.setFlag(w, victimId, EntityFlags.DEAD);
 
     // Death VFX
     vfxBuffer.push(

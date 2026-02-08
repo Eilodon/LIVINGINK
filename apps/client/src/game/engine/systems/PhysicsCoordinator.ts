@@ -9,12 +9,11 @@
 import {
   TransformAccess,
   PhysicsAccess,
-  StateStore,
   StatsAccess,
   MAX_ENTITIES,
   EntityFlags,
 } from '@cjr/engine';
-import { GameState } from '../../../types';
+import { GameState } from '@/types';
 import { getWorld } from '../context';
 
 import { cjrClientRunner } from '../runner/CJRClientRunner';

@@ -1,4 +1,4 @@
-import { GameState, Player } from '../../types';
+import { GameState, Player } from '@/types';
 import { RingId, TattooId } from '../cjr/cjrTypes';
 import { vfxSystem } from './vfxSystem';
 import { tattooVFXSystem } from './tattooVFX';

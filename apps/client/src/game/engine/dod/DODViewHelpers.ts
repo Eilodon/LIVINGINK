@@ -5,7 +5,7 @@
  */
 
 // EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { TransformAccess, PhysicsAccess, StateStore, STRIDES } from '@cjr/engine';
+import { TransformAccess, PhysicsAccess, STRIDES } from '@cjr/engine';
 import { getWorld } from '../context';
 import { EntityFlags } from '@cjr/engine';
 import { entityManager } from './EntityManager';
