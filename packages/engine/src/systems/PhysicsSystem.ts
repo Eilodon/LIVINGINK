@@ -27,7 +27,7 @@ export class PhysicsSystem {
      * Update physics for all active entities
      * Uses active list for zero-overhead skipping of empty slots
      */
-    static update(world: WorldState, dt: number): void {
+    static update(world: WorldState, dt: number, excludeId?: number, dirtyTracker?: { markDirty: (id: number, mask: number) => void }): void {
         const deltaTime = dt;
 
         // Time scaling
@@ -42,7 +42,9 @@ export class PhysicsSystem {
 
         for (let i = 0; i < count; i++) {
             const id = activeEntities[i];
-            PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale);
+            if (id === excludeId) continue;
+            if (id === excludeId) continue;
+            PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale, dirtyTracker);
         }
     }
 
@@ -53,7 +55,8 @@ export class PhysicsSystem {
         deltaTime: number,
         useFastFriction: boolean,
         defaultFrictionUnstable: number,
-        timeScale: number
+        timeScale: number,
+        dirtyTracker?: { markDirty: (id: number, mask: number) => void }
     ) {
         const frictionBase = PhysicsAccess.getFriction(world, id);
 
@@ -68,19 +71,23 @@ export class PhysicsSystem {
             }
         }
 
-        this.integrateEntity(world, id, deltaTime, effectiveFriction);
+        this.integrateEntity(world, id, deltaTime, effectiveFriction, dirtyTracker);
     }
 
     static integrateEntity(
         world: WorldState,
         id: number,
         dt: number,
-        friction: number
+        friction: number,
+        dirtyTracker?: { markDirty: (id: number, mask: number) => void }
     ): void {
 
         // 1. Get Velocity
         let vx = PhysicsAccess.getVx(world, id);
         let vy = PhysicsAccess.getVy(world, id);
+
+        // EIDOLON-V OPTIMIZATION: Skip static entities
+        if (Math.abs(vx) < 0.001 && Math.abs(vy) < 0.001) return;
 
         // 2. Apply Friction
         vx *= friction;
@@ -141,6 +148,11 @@ export class PhysicsSystem {
         TransformAccess.setY(world, id, newY);
         PhysicsAccess.setVx(world, id, vx);
         PhysicsAccess.setVy(world, id, vy);
+
+        // Mark Dirty (Mask 1 = TRANSFORM)
+        if (dirtyTracker) {
+            dirtyTracker.markDirty(id, 1);
+        }
     }
 }
 

@@ -54,37 +54,45 @@ export interface ISpawnResultDOD {
 }
 
 /**
+ * Callback for spawning food directly to state/store
+ * Eliminates GC pressure from creating intermediate objects
+ */
+export type SpawnCallback = (
+    x: number,
+    y: number,
+    kind: PickupKind,
+    pigment?: PigmentVec3
+) => void;
+
+/**
  * Update wave spawner logic
- * Returns new food items instead of mutating state directly
+ * Invokes onSpawn callback for new items instead of allocating arrays
  */
 export const updateWaveSpawner = (
     waveState: IWaveState['runtime']['wave'],
-    dt: number
-): ISpawnResult => {
-    const result: ISpawnResult = { foods: [] };
-
+    dt: number,
+    onSpawn: SpawnCallback
+): void => {
     // Ring 1 Wave
     waveState.ring1 -= dt * 1000;
     if (waveState.ring1 <= 0) {
-        result.foods.push(...spawnWave(1));
+        spawnWave(1, onSpawn);
         waveState.ring1 = WAVE_CONFIG.INTERVAL[1];
     }
 
     // Ring 2 Wave
     waveState.ring2 -= dt * 1000;
     if (waveState.ring2 <= 0) {
-        result.foods.push(...spawnWave(2));
+        spawnWave(2, onSpawn);
         waveState.ring2 = WAVE_CONFIG.INTERVAL[2];
     }
 
     // Ring 3 Wave
     waveState.ring3 -= dt * 1000;
     if (waveState.ring3 <= 0) {
-        result.foods.push(...spawnWave(3));
+        spawnWave(3, onSpawn);
         waveState.ring3 = WAVE_CONFIG.INTERVAL[3];
     }
-
-    return result;
 };
 
 export const resetWaveTimers = (
@@ -98,10 +106,10 @@ export const resetWaveTimers = (
 
 /**
  * Spawn a wave of food items for a specific ring
+ * Directly invokes callback to avoid allocation
  */
-const spawnWave = (ring: 1 | 2 | 3): IFood[] => {
+const spawnWave = (ring: 1 | 2 | 3, onSpawn: SpawnCallback): void => {
     const count = WAVE_CONFIG.SPAWN_COUNTS[`R${ring}` as keyof typeof WAVE_CONFIG.SPAWN_COUNTS];
-    const foods: IFood[] = [];
 
     // Radii
     const minR = ring === 3 ? 0 : ring === 2 ? RING_RADII.R3 : RING_RADII.R2;
@@ -131,10 +139,8 @@ const spawnWave = (ring: 1 | 2 | 3): IFood[] => {
             kind = Math.random() < 0.5 ? 'solvent' : 'shield';
         }
 
-        foods.push(createFood(x, y, kind, pigment));
+        onSpawn(x, y, kind, pigment);
     }
-
-    return foods;
 };
 
 /**
@@ -185,16 +191,14 @@ export const updateWaveSpawnerLegacy = (state: {
     food: IFood[];
     engine?: { spatialGrid?: { insert: (food: IFood) => void } };
 }, dt: number): void => {
-    const result = updateWaveSpawner(state.runtime.wave, dt);
-
-    // Add spawned foods to state
-    for (const food of result.foods) {
+    updateWaveSpawner(state.runtime.wave, dt, (x, y, kind, pigment) => {
+        const food = createFood(x, y, kind, pigment);
         state.food.push(food);
         // Insert into spatial grid if available
         if (state.engine?.spatialGrid) {
             state.engine.spatialGrid.insert(food);
         }
-    }
+    });
 };
 
 /**

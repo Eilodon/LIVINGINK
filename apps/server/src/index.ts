@@ -69,7 +69,13 @@ async function main() {
     await rateLimiter.init(cache);
     await authRateLimiter.init(cache);
     await AuthService.initSessionStore(cache);
-    logger.info('✅ Redis connected - using distributed rate limiting and sessions');
+
+    // EIDOLON-V PHASE1: Init Auth DB and Maintenance BEFORE network listening
+    // Prevents race condition where requests arrive before DB is ready
+    await initAuthService();
+    startAuthMaintenance();
+
+    logger.info('✅ Redis & Auth DB connected');
   } catch (error) {
     logger.warn(
       '⚠️ Redis unavailable - falling back to in-memory (NOT recommended for production)',
@@ -218,9 +224,7 @@ async function main() {
   // Start listening
   await gameServer.listen(PORT);
 
-  // Auth init/maintenance (explicit boot order; no module side-effects)
-  await initAuthService();
-  startAuthMaintenance();
+
 
   logger.info(`
   ╔═══════════════════════════════════════════════════╗

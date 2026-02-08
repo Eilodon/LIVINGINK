@@ -41,7 +41,7 @@ import {
   WorldState,
 } from '@cjr/engine';
 // Import EntityFlags from engine root (exported via compat/generated)
-import { EntityFlags } from '@cjr/engine';
+import { EntityFlags, DirtyTracker } from '@cjr/engine';
 import { MAX_ENTITIES } from '@cjr/engine';
 
 // Import security validation
@@ -71,6 +71,11 @@ export class GameRoom extends Room<GameRoomState> {
 
   // EIDOLON-V P6 FIX: Instance-based WorldState (No Global Singleton)
   private world!: WorldState;
+
+  // EIDOLON-V OPTIMIZATION: Dirty Tracker for Delta Compression
+  private dirtyTracker!: DirtyTracker;
+  private framesSinceSnapshot = 0;
+  private readonly SNAPSHOT_INTERVAL = 60; // Force full snapshot every 1s (60 ticks)
 
   // Security & Physics constants
   private static readonly SECURITY_MAX_DT_SEC = 0.2;
@@ -184,6 +189,7 @@ export class GameRoom extends Room<GameRoomState> {
     // (50 players + ~500 food + ~100 projectiles + buffer = ~1000)
     // This reduces memory from ~2.3MB to ~230KB per room (90% reduction)
     this.world = new WorldState({ maxEntities: 1000 });
+    this.dirtyTracker = new DirtyTracker(1000);
 
     // EIDOLON-V P4 FIX: Periodic Cleanup Interval
     this.clock.setInterval(() => {
@@ -347,6 +353,9 @@ export class GameRoom extends Room<GameRoomState> {
     // Add to engine bridge for high-level logic
     this.serverEngine.addPlayer(client.sessionId, player.name, player.shape);
 
+    // Mark as dirty so it gets sent immediately
+    this.dirtyTracker.markDirty(entityIndex, 255);
+
     logger.info('Player added to DOD engine', {
       sessionId: client.sessionId,
       entityIndex,
@@ -401,10 +410,15 @@ export class GameRoom extends Room<GameRoomState> {
     // PhysicsSystem integrates velocity to position + applies friction
 
     // EIDOLON-V P6 FIX: Pass instance world
+    // MovementSystem converts input targets to velocities
+    // PhysicsSystem integrates velocity to position + applies friction
+
+    // EIDOLON-V P6 FIX: Pass instance world
     MovementSystem.updateAll(this.world, dtSec);
 
     // EIDOLON-V P5 FIX: Pass active indices for O(N) iteration
-    PhysicsSystem.update(this.world, dtSec);
+    // EIDOLON-V OPTIMIZATION: Pass dirtyTracker to mark moving entities
+    PhysicsSystem.update(this.world, dtSec, undefined, this.dirtyTracker);
 
     SkillSystem.update(this.world, dtSec);
 
@@ -550,9 +564,25 @@ export class GameRoom extends Room<GameRoomState> {
   private broadcastBinaryTransforms() {
     // EIDOLON-V: Unified Snapshot using SchemaBinaryPacker (SSOT from WorldState)
     // Replaces manual loop over players/bots with zero-overhead iteration
-    const buffer = SchemaBinaryPacker.packTransformSnapshot(this.world, this.state.gameTime);
 
-    if (buffer.byteLength > 0) {
+    let buffer: ArrayBuffer | null = null;
+    this.framesSinceSnapshot++;
+
+    // Force full snapshot periodically to sync drift/new players
+    if (this.framesSinceSnapshot >= this.SNAPSHOT_INTERVAL) {
+      buffer = SchemaBinaryPacker.packTransformSnapshot(this.world, this.state.gameTime);
+      this.framesSinceSnapshot = 0;
+      // Reset dirty tracker for transforms since we sent everything
+      // Actually we don't clear dirty flags here because we rely on frame age in DirtyTracker
+    } else {
+      // Delta Compression: Only send changed entities
+      buffer = SchemaBinaryPacker.packTransformDeltas(this.world, this.state.gameTime, this.dirtyTracker);
+    }
+
+    // Tick dirty tracker to age out old entries
+    this.dirtyTracker.tick();
+
+    if (buffer && buffer.byteLength > 0) {
       // EIDOLON-V FIX: Unicast with Ack (Last Processed Input)
       // We must append the 'lastProcessedInput' seq for each client to the packet.
       // Format: [Ack (4 bytes)] + [Snapshot Buffer]
@@ -732,29 +762,30 @@ export class GameRoom extends Room<GameRoomState> {
 
   // EIDOLON-V FIX: Food spawning integration
   private updateFoodSpawning(dtSec: number): void {
-    // Call wave spawner to get new food items
-    const spawnResult = updateWaveSpawner(this.waveState, dtSec);
-
-    // Add spawned food to Colyseus state
-    for (const food of spawnResult.foods) {
+    // Call wave spawner with callback to create new food items
+    // This avoids creating intermediate arrays/objects (GC optimization)
+    updateWaveSpawner(this.waveState, dtSec, (x, y, kind, pigment) => {
       const foodState = new FoodState();
       foodState.id = `food_${this.nextFoodId++}`;
-      foodState.x = food.position.x;
-      foodState.y = food.position.y;
-      foodState.radius = food.radius;
-      foodState.value = food.value;
-      foodState.kind = food.kind;
+      foodState.x = x;
+      foodState.y = y;
+
+      // Radius and Value logic from waveSpawner's createFood
+      foodState.radius = kind === 'pigment' ? 12 : kind === 'neutral' ? 8 : 10;
+      foodState.value = kind === 'neutral' ? 5 : 2;
+
+      foodState.kind = kind;
       foodState.isDead = false;
 
       // Set pigment if available
-      if (food.pigment) {
-        foodState.pigment.r = food.pigment.r;
-        foodState.pigment.g = food.pigment.g;
-        foodState.pigment.b = food.pigment.b;
+      if (pigment) {
+        foodState.pigment.r = pigment.r;
+        foodState.pigment.g = pigment.g;
+        foodState.pigment.b = pigment.b;
       }
 
       this.state.food.set(foodState.id, foodState);
-    }
+    });
 
     // EIDOLON-V FIX: Optimized Food Culling (No GC thrashing)
     const MAX_FOOD = GameConfig.MEMORY.MAX_FOOD_COUNT;

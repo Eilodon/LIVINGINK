@@ -146,6 +146,57 @@ export class SchemaBinaryPacker {
     }
 
     /**
+     * Pack optimized Transform DELTAS (Smart Lane)
+     * Replaces full snapshot with only dirty entities
+     */
+    static packTransformDeltas(
+        world: WorldState,
+        timestamp: number,
+        dirtyTracker: DirtyTracker
+    ): ArrayBuffer | null {
+        const dirtyEntities = dirtyTracker.getDirtyEntities(1); // 1 = TRANSFORM mask
+        if (dirtyEntities.length === 0) return null;
+
+        const entry = this.acquire();
+        const { view } = entry;
+        let { offset } = entry;
+
+        // Header: Type(1) + Timestamp(4) + Count(2)
+        view.setUint8(offset, SchemaPacketType.TRANSFORM_UPDATE); offset += 1;
+        view.setFloat32(offset, timestamp, true); offset += 4;
+
+        const countOffset = offset;
+        view.setUint16(offset, 0, true); offset += 2;
+
+        let count = 0;
+        const tView = world.transformView;
+
+        for (const id of dirtyEntities) {
+            if (!world.isValidEntityId(id)) continue;
+
+            // Write ID (2)
+            view.setUint16(offset, id, true); offset += 2;
+
+            // Manual optimization: Only pack X/Y (Fast Lane)
+            // Stride is 32 bytes (8 floats). 
+            const ptr = id * 32;
+            const x = tView.getFloat32(ptr + 0, true);
+            const y = tView.getFloat32(ptr + 4, true);
+
+            view.setFloat32(offset, x, true); offset += 4;
+            view.setFloat32(offset, y, true); offset += 4;
+
+            count++;
+        }
+
+        view.setUint16(countOffset, count, true);
+
+        const result = entry.buffer.slice(0, offset);
+        this.release(entry);
+        return result;
+    }
+
+    /**
      * Pack Component Deltas (Smart Lane) using Generated Serializer
      */
     static packComponentDeltas(

@@ -28,7 +28,9 @@ export class MovementSystem {
      * @param dt Delta time
      * @param defaultMaxSpeed Optional default max speed
      */
-    static update(world: WorldState, id: number, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED) {
+    static update(world: WorldState, id: number, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED, excludeId?: number) {
+        if (id === excludeId) return;
+
         // 1. Read inputs using accessor
         const tx = InputAccess.getTargetX(world, id);
         const ty = InputAccess.getTargetY(world, id);
@@ -82,13 +84,13 @@ export class MovementSystem {
     /**
      * Update all active entities
      */
-    static updateAll(world: WorldState, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED) {
+    static updateAll(world: WorldState, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED, excludeId?: number) {
         const count = world.activeCount;
         const activeEntities = world.activeEntities;
 
         for (let i = 0; i < count; i++) {
             const id = activeEntities[i];
-            this.update(world, id, dt, defaultMaxSpeed);
+            this.update(world, id, dt, defaultMaxSpeed, excludeId);
         }
     }
 

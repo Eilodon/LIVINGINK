@@ -257,6 +257,16 @@ export class CJRClientRunner extends ClientRunner {
         if (msg.type === 'INIT_COMPLETE') {
           console.info('[CJRClientRunner] Worker Initialized. Switching to Split-Brain Mode.');
           this.useWorker = true;
+          this.useWorker = true;
+
+          // EIDOLON-V FIX: Ensure worker knows about local player if already set
+          if (this.localPlayerEntityIndex !== null) {
+            this.worker?.postMessage({
+              type: 'SET_LOCAL_PLAYER',
+              id: this.localPlayerEntityIndex
+            });
+          }
+
           this.worker?.postMessage({ type: 'START' });
         }
       };
@@ -443,6 +453,14 @@ export class CJRClientRunner extends ClientRunner {
   setLocalPlayerEntityIndex(index: number): void {
     this.localPlayerEntityIndex = index;
     console.info(`[CJRClientRunner] Local player entity index set to ${index}`);
+
+    // EIDOLON-V: Update Worker with Local Player ID to prevent Race Conditions
+    if (this.worker && this.useWorker) {
+      this.worker.postMessage({
+        type: 'SET_LOCAL_PLAYER',
+        id: index
+      });
+    }
   }
 
   /**

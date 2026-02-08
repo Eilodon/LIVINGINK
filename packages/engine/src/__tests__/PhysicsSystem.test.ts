@@ -93,4 +93,21 @@ describe('PhysicsSystem', () => {
             }
         });
     });
+
+    it('should respect excludeId', () => {
+        const entityId = 0;
+        const excludedId = 0;
+
+        // Setup entity
+        TransformAccess.set(defaultWorld, entityId, 100, 100, 0, 1, 0, 0, 0);
+        PhysicsAccess.set(defaultWorld, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
+        StateAccess.activate(defaultWorld, entityId);
+
+        // Run physics with excludeId
+        PhysicsSystem.update(defaultWorld, 1.0, excludedId);
+
+        // Position should NOT have changed because it was excluded
+        expect(TransformAccess.getX(defaultWorld, entityId)).toBe(100);
+        expect(TransformAccess.getY(defaultWorld, entityId)).toBe(100);
+    });
 });

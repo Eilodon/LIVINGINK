@@ -11,6 +11,7 @@ import {
 declare const self: Worker;
 
 let world: WorldState | null = null;
+let localPlayerId: number | null = null;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let _lastTime = 0;
 const targetTickRate = 60;
@@ -51,6 +52,11 @@ self.onmessage = (e: MessageEvent) => {
         }
     }
 
+    if (type === 'SET_LOCAL_PLAYER') {
+        localPlayerId = e.data.id;
+        console.info(`[PhysicsWorker] Local Player ID set to: ${localPlayerId}`);
+    }
+
     if (type === 'START') {
         if (!world) {
             console.error('[PhysicsWorker] Cannot start: World not initialized');
@@ -70,10 +76,10 @@ self.onmessage = (e: MessageEvent) => {
                 // Physics generally prefers Fixed DT for stability.
 
                 // 1. Movement System (Input -> Velocity)
-                MovementSystem.updateAll(world!, fixedDt);
+                MovementSystem.updateAll(world!, fixedDt, undefined, localPlayerId ?? undefined);
 
                 // 2. Physics System (Velocity -> Position)
-                PhysicsSystem.update(world!, fixedDt);
+                PhysicsSystem.update(world!, fixedDt, localPlayerId ?? undefined);
 
                 // 3. Skill System (Cooldowns, etc)
                 SkillSystem.update(world!, fixedDt);

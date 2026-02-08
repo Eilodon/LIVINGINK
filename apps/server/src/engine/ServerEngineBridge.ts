@@ -137,11 +137,15 @@ export class ServerEngineBridge {
     }
 
     /**
-     * Get spawn results from last wave spawner update
-     * Room can use this to create authoritative food entities
+     * Run wave spawner logic with callback
+     * Room uses this to create authoritative food entities
      */
-    getSpawnResults(waveState: IWaveState['runtime']['wave'], dt: number) {
-        return updateWaveSpawner(waveState, dt);
+    runWaveSpawner(
+        waveState: IWaveState['runtime']['wave'],
+        dt: number,
+        onSpawn: (x: number, y: number, kind: any, pigment?: any) => void
+    ) {
+        updateWaveSpawner(waveState, dt, onSpawn);
     }
 
     /**
