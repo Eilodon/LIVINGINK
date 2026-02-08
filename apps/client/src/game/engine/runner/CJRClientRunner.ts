@@ -26,7 +26,8 @@ import {
   PhysicsAccess,
   InputAccess,
   PhysicsSystem,
-  MovementSystem
+  MovementSystem,
+  WorldState
 } from '@cjr/engine';
 import { networkTransformBuffer } from '@/network/NetworkTransformBuffer';
 import { networkClient } from '@/network/NetworkClient';
@@ -54,7 +55,9 @@ export class CJRClientRunner extends ClientRunner {
   private pendingInputs: Array<{ seq: number; targetX: number; targetY: number; space: boolean; w: boolean; dt: number }> = [];
 
   private constructor(config: ICJRSimulationConfig) {
-    super(config);
+    // EIDOLON-V FIX: Create WorldState if not provided (Step 0 - Fix Breaking Change)
+    const worldConfig = config.world ? config : { ...config, world: new WorldState() };
+    super(worldConfig);
     // Legacy flag ignored - always use BaseSimulation
     this.aiSystem = getAISystem();
   }
@@ -64,7 +67,8 @@ export class CJRClientRunner extends ClientRunner {
    */
   public static getInstance(config?: ICJRSimulationConfig): CJRClientRunner {
     if (!CJRClientRunner.instance) {
-      CJRClientRunner.instance = new CJRClientRunner(config || { tickRate: 60 });
+      // EIDOLON-V: Default config with tickRate, world will be created in constructor
+      CJRClientRunner.instance = new CJRClientRunner(config ?? { tickRate: 60 });
     }
     return CJRClientRunner.instance;
   }
@@ -288,6 +292,16 @@ export class CJRClientRunner extends ClientRunner {
         projectile: world.projectileBuffer,
         tattoo: world.tattooBuffer
       };
+
+      // EIDOLON-V Step 1: Runtime SAB Detection Logging
+      const isSAB = buffers.transform instanceof SharedArrayBuffer;
+      if (isSAB) {
+        console.info('%c✅ [CJRClientRunner] Buffers are SharedArrayBuffer - Zero-Copy Mode ACTIVE', 'color: #00ff00; font-weight: bold');
+      } else {
+        console.warn('%c⚠️ [CJRClientRunner] Buffers are ArrayBuffer - Worker will receive COPIES (slower)', 'color: orange; font-weight: bold');
+        console.warn('[CJRClientRunner] To enable SharedArrayBuffer, ensure COOP/COEP headers are set.');
+        // Still proceed - Worker will work, just with copied data instead of shared
+      }
 
       this.worker.postMessage({
         type: 'INIT',

@@ -30,16 +30,10 @@ export class PhysicsCoordinator {
     cjrClientRunner.setGameState(state);
     cjrClientRunner.update(dt);
 
-    // Sync player position from DOD store to state object
-    // Note: This is only for UI/debugging - rendering uses DOD directly
-    if (state.player.physicsIndex !== undefined) {
-      const w = getWorld();
-      const idx = state.player.physicsIndex;
-      state.player.position.x = TransformAccess.getX(w, idx);
-      state.player.position.y = TransformAccess.getY(w, idx);
-      state.player.velocity.x = PhysicsAccess.getVx(w, idx);
-      state.player.velocity.y = PhysicsAccess.getVy(w, idx);
-    }
+    // EIDOLON-V Step 2: Removed redundant sync code
+    // bindToLiveView already creates proxies (position, velocity) that read directly from DOD.
+    // Writing state.player.position.x = TransformAccess.getX() was a circular no-op:
+    // (DOD -> read -> proxy.set -> DOD)
   }
 
   /**

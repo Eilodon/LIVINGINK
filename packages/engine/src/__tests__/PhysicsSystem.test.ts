@@ -1,12 +1,12 @@
 /**
  * @cjr/engine - Unit Tests: PhysicsSystem
  * 
- * EIDOLON-V: Updated to use generated WorldState and accessors
+ * EIDOLON-V: Updated to use instance-based WorldState (no defaultWorld singleton)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
-import { defaultWorld } from '../generated/WorldState';
+import { WorldState } from '../generated/WorldState';
 import {
     TransformAccess,
     PhysicsAccess,
@@ -15,8 +15,10 @@ import {
 } from '../generated/ComponentAccessors';
 
 describe('PhysicsSystem', () => {
+    let world: WorldState;
+
     beforeEach(() => {
-        defaultWorld.reset();
+        world = new WorldState();
     });
 
     describe('update', () => {
@@ -24,16 +26,16 @@ describe('PhysicsSystem', () => {
             const entityId = 0;
 
             // Setup entity using accessors (7 non-pad args for Transform, 7 non-pad args for Physics)
-            TransformAccess.set(defaultWorld, entityId, 100, 100, 0, 1, 0, 0, 0);
-            PhysicsAccess.set(defaultWorld, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
-            StateAccess.activate(defaultWorld, entityId);
+            TransformAccess.set(world, entityId, 100, 100, 0, 1, 0, 0, 0);
+            PhysicsAccess.set(world, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
+            StateAccess.activate(world, entityId);
 
             // Run physics for 1 second
-            PhysicsSystem.update(defaultWorld, 1.0);
+            PhysicsSystem.update(world, 1.0);
 
             // Check position changed
-            const newX = TransformAccess.getX(defaultWorld, entityId);
-            const newY = TransformAccess.getY(defaultWorld, entityId);
+            const newX = TransformAccess.getX(world, entityId);
+            const newY = TransformAccess.getY(world, entityId);
 
             // Position should have moved in direction of velocity
             expect(newX).toBeGreaterThan(100);
@@ -45,18 +47,18 @@ describe('PhysicsSystem', () => {
             const friction = 0.9;
 
             // Setup entity with velocity
-            TransformAccess.set(defaultWorld, entityId, 0, 0, 0, 1, 0, 0, 0);
-            PhysicsAccess.set(defaultWorld, entityId, 100, 100, 0, 1, 10, 0.5, friction);
-            StateAccess.activate(defaultWorld, entityId);
+            TransformAccess.set(world, entityId, 0, 0, 0, 1, 0, 0, 0);
+            PhysicsAccess.set(world, entityId, 100, 100, 0, 1, 10, 0.5, friction);
+            StateAccess.activate(world, entityId);
 
             // Get initial velocity
-            const initialVx = PhysicsAccess.getVx(defaultWorld, entityId);
+            const initialVx = PhysicsAccess.getVx(world, entityId);
 
             // Run physics
-            PhysicsSystem.update(defaultWorld, 1.0);
+            PhysicsSystem.update(world, 1.0);
 
             // Velocity should be reduced by friction
-            const newVx = PhysicsAccess.getVx(defaultWorld, entityId);
+            const newVx = PhysicsAccess.getVx(world, entityId);
             expect(newVx).toBeLessThan(initialVx);
         });
 
@@ -64,32 +66,32 @@ describe('PhysicsSystem', () => {
             const entityId = 0;
 
             // Setup entity but DON'T set ACTIVE flag
-            TransformAccess.set(defaultWorld, entityId, 100, 100, 0, 1, 0, 0, 0);
-            PhysicsAccess.set(defaultWorld, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
+            TransformAccess.set(world, entityId, 100, 100, 0, 1, 0, 0, 0);
+            PhysicsAccess.set(world, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
             // NOT calling StateAccess.activate()
 
             // Run physics
-            PhysicsSystem.update(defaultWorld, 1.0);
+            PhysicsSystem.update(world, 1.0);
 
             // Position should NOT have changed
-            expect(TransformAccess.getX(defaultWorld, entityId)).toBe(100);
-            expect(TransformAccess.getY(defaultWorld, entityId)).toBe(100);
+            expect(TransformAccess.getX(world, entityId)).toBe(100);
+            expect(TransformAccess.getY(world, entityId)).toBe(100);
         });
 
         it('should handle multiple entities', () => {
             // Setup 3 entities
             for (let i = 0; i < 3; i++) {
-                TransformAccess.set(defaultWorld, i, i * 100, i * 100, 0, 1, 0, 0, 0);
-                PhysicsAccess.set(defaultWorld, i, 10, 10, 0, 1, 10, 0.5, 0.9);
-                StateAccess.activate(defaultWorld, i);
+                TransformAccess.set(world, i, i * 100, i * 100, 0, 1, 0, 0, 0);
+                PhysicsAccess.set(world, i, 10, 10, 0, 1, 10, 0.5, 0.9);
+                StateAccess.activate(world, i);
             }
 
             // Run physics
-            PhysicsSystem.update(defaultWorld, 1.0);
+            PhysicsSystem.update(world, 1.0);
 
             // All entities should have moved
             for (let i = 0; i < 3; i++) {
-                expect(TransformAccess.getX(defaultWorld, i)).toBeGreaterThan(i * 100);
+                expect(TransformAccess.getX(world, i)).toBeGreaterThan(i * 100);
             }
         });
     });
@@ -99,15 +101,15 @@ describe('PhysicsSystem', () => {
         const excludedId = 0;
 
         // Setup entity
-        TransformAccess.set(defaultWorld, entityId, 100, 100, 0, 1, 0, 0, 0);
-        PhysicsAccess.set(defaultWorld, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
-        StateAccess.activate(defaultWorld, entityId);
+        TransformAccess.set(world, entityId, 100, 100, 0, 1, 0, 0, 0);
+        PhysicsAccess.set(world, entityId, 50, 30, 0, 1, 10, 0.5, 0.9);
+        StateAccess.activate(world, entityId);
 
         // Run physics with excludeId
-        PhysicsSystem.update(defaultWorld, 1.0, excludedId);
+        PhysicsSystem.update(world, 1.0, excludedId);
 
         // Position should NOT have changed because it was excluded
-        expect(TransformAccess.getX(defaultWorld, entityId)).toBe(100);
-        expect(TransformAccess.getY(defaultWorld, entityId)).toBe(100);
+        expect(TransformAccess.getX(world, entityId)).toBe(100);
+        expect(TransformAccess.getY(world, entityId)).toBe(100);
     });
 });

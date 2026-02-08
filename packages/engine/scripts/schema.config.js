@@ -112,10 +112,14 @@ const SCHEMA = {
     Tattoo: {
         id: 9,
         fields: {
+            flags: { type: 'u8', default: 0 },      // Tattoo-specific bitmask flags
+            _pad1: { type: 'u8', default: 0 },      // Padding for alignment
+            _pad2: { type: 'u8', default: 0 },      // Padding for alignment
+            _pad3: { type: 'u8', default: 0 },      // Padding for alignment (4-byte aligned now)
             timer1: { type: 'f32', default: 0 },
             timer2: { type: 'f32', default: 0 },
             procChance: { type: 'f32', default: 0 },
-            _pad: { type: 'f32', default: 0 },
+            _pad4: { type: 'f32', default: 0 },
         }
     },
 };

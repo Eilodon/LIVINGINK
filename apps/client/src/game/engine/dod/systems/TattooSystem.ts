@@ -1,5 +1,5 @@
 // EIDOLON-V FIX: Import from engine SSOT instead of local duplicates
-import { TattooStore, StatsAccess } from '@cjr/engine';
+import { TattooAccess, StatsAccess } from '@cjr/engine';
 import { getWorld } from '@/game/engine/context';
 import { MAX_ENTITIES, EntityFlags } from '@cjr/engine';
 import { TattooFlag } from '@/game/engine/statusFlags';
@@ -9,14 +9,12 @@ export class TattooSystem {
     const w = getWorld();
     const count = MAX_ENTITIES;
     const flags = w.stateFlags;
-    const tFlags = TattooStore.flags;
-    // EIDOLON-V FIX: Use instance-based world.tattoo instead of deprecated TattooStore.data
     const tData = w.tattoo;
 
     for (let id = 0; id < count; id++) {
       if ((flags[id] & EntityFlags.ACTIVE) === 0) continue;
 
-      const tf = tFlags[id];
+      const tf = TattooAccess.getFlags(w, id);
       if (tf === 0) continue;
 
       // 1. Passive Checks (e.g. Deposit Shield)
@@ -36,9 +34,10 @@ export class TattooSystem {
 
   // Event Hooks (called from Engine/Combat)
   static onHit(attackerId: number, victimId: number) {
+    const w = getWorld();
     // Direct Bitmask Check - FAST
-    const attFlags = TattooStore.flags[attackerId];
-    const vicFlags = TattooStore.flags[victimId];
+    const attFlags = TattooAccess.getFlags(w, attackerId);
+    const vicFlags = TattooAccess.getFlags(w, victimId);
 
     // Pigment Bomb
     if (vicFlags & TattooFlag.PIGMENT_BOMB_ACTIVE) {

@@ -1,17 +1,13 @@
 /**
  * @cjr/engine - Factories Module
- * Pure data creation - no visual dependencies
+ *
+ * EIDOLON-V: LogicFactories.ts was removed as it was not used by any consumer.
+ * Client has its own factories with DOD integration at:
+ * apps/client/src/game/engine/factories.ts
+ *
+ * If shared factory logic is needed in the future,
+ * add new files here with proper DOD WorldState integration.
  */
 
-export {
-    randomPigment,
-    randomPosInRing,
-    createPlayerData,
-    createBotData,
-    createFoodData,
-    createBossData,
-    type IPlayerData,
-    type IBotData,
-    type IFoodData,
-    type IBossData,
-} from './LogicFactories';
+// Empty export to make this a valid TypeScript module
+export { };

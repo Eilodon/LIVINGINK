@@ -1,9 +1,5 @@
 
 import {
-    TransformStore,
-    PhysicsStore,
-    StateStore,
-    StatsStore,
     EntityFlags,
     MAX_ENTITIES,
     EntityLookup,

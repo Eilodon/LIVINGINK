@@ -9,7 +9,6 @@ import {
     COMPONENT_IDS,
     NetworkSerializer,
     WorldState,
-    defaultWorld,
 } from '../generated';
 
 import { DirtyTracker } from './DirtyTracker';
@@ -40,6 +39,18 @@ interface IPacketBuffer {
     offset: number;
 }
 
+/**
+ * EIDOLON-V: Network serialization profiling metrics
+ * Used to monitor performance under load
+ */
+export interface PackerMetrics {
+    lastPackTimeMs: number;      // Time to pack last packet (ms)
+    lastBytesPacked: number;     // Size of last packet (bytes)
+    lastEntitiesPacked: number;  // Number of entities in last packet
+    totalPackCount: number;      // Total packets packed since reset
+    avgPackTimeMs: number;       // Moving average pack time
+}
+
 export class SchemaBinaryPacker {
     // Shared buffer pool
     private static POOL_SIZE = 10;
@@ -47,8 +58,50 @@ export class SchemaBinaryPacker {
     private static _pool: IPacketBuffer[] = [];
     private static _poolInitialized = false;
 
+    // EIDOLON-V: Profiling metrics
+    private static _metrics: PackerMetrics = {
+        lastPackTimeMs: 0,
+        lastBytesPacked: 0,
+        lastEntitiesPacked: 0,
+        totalPackCount: 0,
+        avgPackTimeMs: 0,
+    };
+
     constructor() {
         SchemaBinaryPacker.initPool();
+    }
+
+    /**
+     * Get current profiling metrics
+     */
+    static getMetrics(): Readonly<PackerMetrics> {
+        return this._metrics;
+    }
+
+    /**
+     * Reset profiling metrics
+     */
+    static resetMetrics(): void {
+        this._metrics = {
+            lastPackTimeMs: 0,
+            lastBytesPacked: 0,
+            lastEntitiesPacked: 0,
+            totalPackCount: 0,
+            avgPackTimeMs: 0,
+        };
+    }
+
+    /**
+     * Update metrics after pack operation
+     */
+    private static updateMetrics(timeMs: number, bytes: number, entities: number): void {
+        const m = this._metrics;
+        m.lastPackTimeMs = timeMs;
+        m.lastBytesPacked = bytes;
+        m.lastEntitiesPacked = entities;
+        m.totalPackCount++;
+        // Exponential moving average (alpha = 0.1)
+        m.avgPackTimeMs = m.avgPackTimeMs * 0.9 + timeMs * 0.1;
     }
 
     static initPool() {
@@ -99,6 +152,7 @@ export class SchemaBinaryPacker {
         world: WorldState,
         timestamp: number
     ): ArrayBuffer {
+        const startTime = performance.now();
         const entry = this.acquire();
         const { view } = entry;
         let { offset } = entry;
@@ -142,6 +196,10 @@ export class SchemaBinaryPacker {
         // Copy to result buffer
         const result = entry.buffer.slice(0, offset);
         this.release(entry);
+
+        // EIDOLON-V: Update profiling metrics
+        this.updateMetrics(performance.now() - startTime, result.byteLength, count);
+
         return result;
     }
 

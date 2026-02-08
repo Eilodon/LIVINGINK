@@ -5,7 +5,7 @@
  * EIDOLON-V: Refactored to use generated WorldState and accessors
  */
 
-import { WorldState, defaultWorld, MAX_ENTITIES } from '../generated/WorldState';
+import { WorldState, MAX_ENTITIES } from '../generated/WorldState';
 import { EntityFlags, StateAccess, SkillAccess, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
 import { eventBuffer, EngineEventType } from '../events/EventRingBuffer';
 
@@ -26,7 +26,7 @@ export class SkillSystem {
     static handleInput(
         id: number,
         input: { space: boolean; target: { x: number; y: number } },
-        world: WorldState = defaultWorld
+        world: WorldState  // EIDOLON-V: WorldState is now REQUIRED
     ) {
         // Validation via StateAccess
         if (!StateAccess.isActive(world, id)) return;
@@ -70,7 +70,7 @@ export class SkillSystem {
         id: number,
         shapeId: number,
         target: { x: number; y: number },
-        world: WorldState = defaultWorld
+        world: WorldState  // EIDOLON-V: WorldState is now REQUIRED
     ) {
         const x = TransformAccess.getX(world, id);
         const y = TransformAccess.getY(world, id);

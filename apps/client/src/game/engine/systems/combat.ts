@@ -18,9 +18,9 @@ import {
   TransformAccess,
   PhysicsAccess,
   StateAccess,        // PHASE 4: Migrated from StateStore
-  TattooStore,
+  TattooAccess,
   EntityLookup,
-  PigmentStore,
+  PigmentUtils,
   EntityFlags,
   STRIDES,
 } from '@cjr/engine';
@@ -59,7 +59,7 @@ export const consumePickupDOD = (entityId: number, foodId: number, _state: GameS
   audioEngine.playEat(entityId);
 
   // VFX - get color from PigmentStore instead of object
-  const entityColor = PigmentStore.getColorInt(w, entityId) || 0xffffff;
+  const entityColor = PigmentUtils.getColorInt(w, entityId) || 0xffffff;
   vfxBuffer.push(
     w.transform[entityId * 8],
     w.transform[entityId * 8 + 1],
@@ -82,10 +82,10 @@ export const consumePickupDOD = (entityId: number, foodId: number, _state: GameS
     const baseRatio = Math.min(0.2, 0.1 * (15 / Math.max(15, eRadius)));
 
     // Mix pigment directly in DOD store
-    PigmentStore.mix(w, entityId, foodR, foodG, foodB, baseRatio);
+    PigmentUtils.mix(w, entityId, foodR, foodG, foodB, baseRatio);
 
     // Sync match back to StatsStore for compatibility
-    w.stats[eIdx + 3] = PigmentStore.getMatch(w, entityId);
+    w.stats[eIdx + 3] = PigmentUtils.getMatch(w, entityId);
   }
 
   // Legacy fallback for complex food types (catalyst, shield, solvent)
@@ -138,7 +138,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
         // Sync to Store (SSOT)
         if (e.physicsIndex !== undefined) {
-          PigmentStore.set(w, e.physicsIndex, mixed.r, mixed.g, mixed.b);
+          PigmentUtils.set(w, e.physicsIndex, mixed.r, mixed.g, mixed.b);
         }
 
         e.color = pigmentToInt(e.pigment);
@@ -182,7 +182,7 @@ const handleLegacyFoodEffects = (e: Player | Bot, food: Food, state: GameState) 
 
       // Sync to Store (SSOT)
       if (e.physicsIndex !== undefined) {
-        PigmentStore.set(w, e.physicsIndex, mixedSolvent.r, mixedSolvent.g, mixedSolvent.b);
+        PigmentUtils.set(w, e.physicsIndex, mixedSolvent.r, mixedSolvent.g, mixedSolvent.b);
       }
 
       e.color = pigmentToInt(e.pigment);

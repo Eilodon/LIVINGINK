@@ -63,6 +63,7 @@ export {
     updateRingLogic,
     updateRingLogicLegacy,
     checkRingTransition,
+    checkRingTransitionDOD,  // EIDOLON-V Finding 6: DOD-native ring check
     type IRingEntity,
 } from './ringSystem';
 

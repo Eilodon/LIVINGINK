@@ -32,7 +32,7 @@ import {
   ConfigStore,
   StateAccess,      // PHASE 4: Migrated from StateStore
   SkillAccess,
-  checkRingTransition,
+  checkRingTransitionDOD,  // EIDOLON-V Finding 6: DOD-native ring check
   calcMatchPercentFast,
   updateWaveSpawner,
   WAVE_CONFIG,
@@ -40,7 +40,7 @@ import {
   WorldState,
 } from '@cjr/engine';
 // Import EntityFlags from engine root (exported via compat/generated)
-import { EntityFlags, DirtyTracker } from '@cjr/engine';
+import { EntityFlags, DirtyTracker, EntityManager, PRNG } from '@cjr/engine';
 import { MAX_ENTITIES } from '@cjr/engine';
 
 // Import security validation
@@ -67,9 +67,8 @@ export class GameRoom extends Room<GameRoomState> {
   // EIDOLON-V BOT DOD: Bot entity mapping (botId -> entityIndex)
   private botEntityIndices: Map<string, number> = new Map();
   private nextEntityIndex: number = 0;
-  // EIDOLON-V P0: Entity pool recycling with generation for safe ID reuse
-  private freeEntityIndices: number[] = [];
-  private entityGenerations: Uint16Array = new Uint16Array(MAX_ENTITIES);
+  // EIDOLON-V P0 FIX: Use shared EntityManager from engine (Finding 2)
+  private entityManager!: EntityManager;
 
   // EIDOLON-V P6 FIX: Instance-based WorldState (No Global Singleton)
   private world!: WorldState;
@@ -114,7 +113,7 @@ export class GameRoom extends Room<GameRoomState> {
   // EIDOLON-V AUDIT FIX: Use unsigned right shift (>>>) to prevent sign bit issues
   // when generation > 32767 (was using signed >> which preserves sign bit)
   private makeEntityHandle(index: number): number {
-    const gen = this.entityGenerations[index];
+    const gen = this.entityManager.getGeneration(index);
     return ((gen << 16) | index) >>> 0; // Force unsigned 32-bit
   }
 
@@ -125,7 +124,7 @@ export class GameRoom extends Room<GameRoomState> {
 
     if (index < 0 || index >= MAX_ENTITIES) return false;
 
-    const currentGen = this.entityGenerations[index];
+    const currentGen = this.entityManager.getGeneration(index);
     return currentGen === expectedGen;
   }
 
@@ -192,6 +191,10 @@ export class GameRoom extends Room<GameRoomState> {
     // This reduces memory from ~2.3MB to ~230KB per room (90% reduction)
     this.world = new WorldState({ maxEntities: 1000 });
     this.dirtyTracker = new DirtyTracker(1000);
+    // EIDOLON-V Finding 2: Use shared EntityManager instead of inline logic
+    this.entityManager = new EntityManager();
+    // EIDOLON-V AUDIT FIX: Seed PRNG for deterministic spawn (replay support)
+    PRNG.setSeed(Date.now());
 
     // EIDOLON-V P4 FIX: Periodic Cleanup Interval
     this.clock.setInterval(() => {
@@ -298,9 +301,9 @@ export class GameRoom extends Room<GameRoomState> {
     player.name = validOptions.name || `Jelly ${client.sessionId.slice(0, 4)}`;
     player.shape = validOptions.shape || 'circle';
 
-    // Random Position (outer ring)
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * (MAP_RADIUS * 0.8);
+    // Random Position (outer ring) - EIDOLON-V: Using seeded PRNG
+    const angle = PRNG.next() * Math.PI * 2;
+    const r = PRNG.next() * (MAP_RADIUS * 0.8);
     const x = Math.cos(angle) * r;
     const y = Math.sin(angle) * r;
     player.position.x = x;
@@ -312,15 +315,15 @@ export class GameRoom extends Room<GameRoomState> {
       player.pigment.g = Math.max(0, Math.min(1, options.pigment.g));
       player.pigment.b = Math.max(0, Math.min(1, options.pigment.b));
     } else {
-      player.pigment.r = Math.random();
-      player.pigment.g = Math.random();
-      player.pigment.b = Math.random();
+      player.pigment.r = PRNG.next();
+      player.pigment.g = PRNG.next();
+      player.pigment.b = PRNG.next();
     }
 
-    // Target Pigment (Quest color)
-    player.targetPigment.r = Math.random();
-    player.targetPigment.g = Math.random();
-    player.targetPigment.b = Math.random();
+    // Target Pigment (Quest color) - EIDOLON-V: Using seeded PRNG
+    player.targetPigment.r = PRNG.next();
+    player.targetPigment.g = PRNG.next();
+    player.targetPigment.b = PRNG.next();
 
     // Calculate initial match percent
     player.matchPercent = calcMatchPercentFast(
@@ -507,60 +510,42 @@ export class GameRoom extends Room<GameRoomState> {
 
   /**
    * Update ring transition logic for all players
+   * EIDOLON-V Finding 6: Uses DOD-native ring check to eliminate GC pressure
    */
   private updateRingLogicForAll() {
     this.state.players.forEach((player, sessionId) => {
       const entityIndex = this.entityIndices.get(sessionId);
       if (entityIndex === undefined || player.isDead) return;
 
-      // EIDOLON-V AUDIT FIX: Recalculate matchPercent every tick (was only set on join,
-      // causing ring transitions to use stale value and players stuck in Ring 1)
+      // EIDOLON-V AUDIT FIX: Recalculate matchPercent every tick
       player.matchPercent = calcMatchPercentFast(
         { r: player.pigment.r, g: player.pigment.g, b: player.pigment.b },
         { r: player.targetPigment.r, g: player.targetPigment.g, b: player.targetPigment.b }
       );
 
-      // Build ring entity interface
-      const ringEntity = {
-        physicsIndex: entityIndex,
-        position: {
-          x: TransformAccess.getX(this.world, entityIndex),
-          y: TransformAccess.getY(this.world, entityIndex),
-        },
-        velocity: {
-          x: PhysicsAccess.getVx(this.world, entityIndex),
-          y: PhysicsAccess.getVy(this.world, entityIndex),
-        },
-        ring: player.ring as 1 | 2 | 3,
-        matchPercent: player.matchPercent,
-        isDead: player.isDead,
-        statusScalars: {},
-        statusMultipliers: {},
-        statusTimers: {},
-      };
-
-      // Check ring transition
-      const result = checkRingTransition(ringEntity);
+      // EIDOLON-V Finding 6: DOD-native ring transition check
+      // Reads/writes directly to WorldState buffers - no intermediate object
+      const result = checkRingTransitionDOD(
+        this.world,
+        entityIndex,
+        player.ring as 1 | 2 | 3,
+        player.matchPercent,
+        this.lastUpdateDtSec
+      );
 
       if (result.transitioned && result.newRing) {
+        const fromRing = player.ring;
         player.ring = result.newRing;
         logger.info('Player committed to deeper ring', {
           sessionId,
-          fromRing: ringEntity.ring,
+          fromRing,
           toRing: result.newRing,
           matchPercent: player.matchPercent.toFixed(2),
         });
       }
-
-      // Sync position/velocity back from ring logic
-      if (ringEntity.physicsIndex !== undefined) {
-        TransformAccess.setX(this.world, entityIndex, ringEntity.position.x);
-        TransformAccess.setY(this.world, entityIndex, ringEntity.position.y);
-        PhysicsAccess.setVx(this.world, entityIndex, ringEntity.velocity.x);
-        PhysicsAccess.setVy(this.world, entityIndex, ringEntity.velocity.y);
-      }
     });
   }
+
 
   private broadcastBinaryTransforms() {
     // EIDOLON-V: Unified Snapshot using SchemaBinaryPacker (SSOT from WorldState)
@@ -625,34 +610,15 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
 
-  // EIDOLON-V P0: Allocate entity index with recycling
+  // EIDOLON-V P0 FIX (Finding 2): Delegate to EntityManager
   private allocateEntityIndex(): number {
-    // Prefer recycled indices
-    if (this.freeEntityIndices.length > 0) {
-      const idx = this.freeEntityIndices.pop();
-      if (idx === undefined) {
-        // This should never happen due to length check, but satisfies type safety
-        return -1;
-      }
-      this.entityGenerations[idx]++;  // Increment generation on reuse
-      return idx;
-    }
-
-    // Allocate new index if pool not exhausted
-    if (this.nextEntityIndex >= MAX_ENTITIES) {
-      return -1;  // Pool exhausted
-    }
-
-    const idx = this.nextEntityIndex++;
-    return idx;
+    return this.entityManager.createEntity();
   }
 
-  // EIDOLON-V P0: Release entity index for recycling with DOD store cleanup
+  // EIDOLON-V P0 FIX (Finding 2): Release entity index via EntityManager
   private releaseEntityIndex(idx: number): void {
     // Zero ALL DOD stores to prevent stale data reads
     const stride8 = idx * 8;
-    // Direct buffer access is faster, but we should use accessors or stores to be safe if possible
-    // But Stores don't have bulk clear. We'll rely on the typed arrays being available via this.world.
     this.world.transform.fill(0, stride8, stride8 + 8);
     this.world.physics.fill(0, stride8, stride8 + 8);
     this.world.stats.fill(0, stride8, stride8 + 8);
@@ -664,9 +630,8 @@ export class GameRoom extends Room<GameRoomState> {
     this.world.tattoo.fill(0, idx * 4, idx * 4 + 4);
     this.world.pigment.fill(0, stride8, stride8 + 8);
 
-    // Return to free list
-    this.freeEntityIndices.push(idx);
-
+    // EIDOLON-V Finding 2: Delegate to EntityManager
+    this.entityManager.removeEntity(idx);
 
     // EIDOLON-V P5 FIX: Remove from active list (swap-remove O(1))
     StateAccess.deactivate(this.world, idx);
@@ -724,12 +689,13 @@ export class GameRoom extends Room<GameRoomState> {
     bot.position.x = x;
     bot.position.y = y;
     bot.radius = PLAYER_START_RADIUS;
-    bot.pigment.r = Math.random();
-    bot.pigment.g = Math.random();
-    bot.pigment.b = Math.random();
-    bot.targetPigment.r = Math.random();
-    bot.targetPigment.g = Math.random();
-    bot.targetPigment.b = Math.random();
+    // EIDOLON-V: Using seeded PRNG for deterministic bot spawn
+    bot.pigment.r = PRNG.next();
+    bot.pigment.g = PRNG.next();
+    bot.pigment.b = PRNG.next();
+    bot.targetPigment.r = PRNG.next();
+    bot.targetPigment.g = PRNG.next();
+    bot.targetPigment.b = PRNG.next();
 
     this.state.bots.set(botId, bot);
 
@@ -843,8 +809,9 @@ export class GameRoom extends Room<GameRoomState> {
       // Guard: player may have disconnected during the delay
       if (!this.entityIndices.has(sessionId)) return;
 
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * (MAP_RADIUS * 0.8);
+      // EIDOLON-V: Using seeded PRNG for deterministic respawn
+      const angle = PRNG.next() * Math.PI * 2;
+      const r = PRNG.next() * (MAP_RADIUS * 0.8);
       const x = Math.cos(angle) * r;
       const y = Math.sin(angle) * r;
 

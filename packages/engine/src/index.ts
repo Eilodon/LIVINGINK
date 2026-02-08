@@ -61,6 +61,9 @@ export * from './config';
 // Factories Module
 export * from './factories';
 
+// Utils Module (Business Logic Utilities)
+export * from './utils';
+
 // Loader Module (Blueprint loading)
 export * from './loader';
 

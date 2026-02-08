@@ -9,3 +9,5 @@ export * from './ComponentRegistry';
 export * from './BaseSimulation';
 export * from './CoreRegistry';
 export * from './IEntityLookup';
+export * from './EntityManager';
+

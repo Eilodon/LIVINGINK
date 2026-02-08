@@ -1,27 +1,30 @@
 /**
  * Integration Tests: Physics Accuracy
  * Tests physics system correctness and determinism
+ * 
+ * EIDOLON-V: Migrated from legacy *Store wrappers to *Access pattern
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   PhysicsSystem,
   MovementSystem,
-  TransformStore,  // Legacy wrapper - proxies to TransformAccess
-  PhysicsStore,    // Legacy wrapper - proxies to PhysicsAccess
-  InputStore,
-  StateStore,
-  ConfigStore,
-  resetAllStores,
+  TransformAccess,
+  PhysicsAccess,
+  InputAccess,
+  StateAccess,
+  ConfigAccess,
   EntityFlags,
-  defaultWorld,
+  WorldState,
 } from '@cjr/engine';
 
-const w = defaultWorld;
+// EIDOLON-V FIX: Use instance-based WorldState instead of defaultWorld singleton
+let w: WorldState;
 
 describe('Physics Accuracy', () => {
   beforeEach(() => {
-    resetAllStores();
+    // Create fresh WorldState for each test (isolation)
+    w = new WorldState();
   });
 
   describe('Physics System', () => {
@@ -30,16 +33,16 @@ describe('Physics Accuracy', () => {
       const initialVx = 100;
       const friction = 0.92;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, initialVx, 0, 100, 28, 0.5, friction);
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, initialVx, 0, 0, 100, 28, 0.5, friction);
+      StateAccess.activate(w, entityId);
 
       // Run physics for 1 second at 60fps
       for (let i = 0; i < 60; i++) {
         PhysicsSystem.update(w, 1 / 60);
       }
 
-      const finalVx = PhysicsStore.getVelocityX(w, entityId);
+      const finalVx = PhysicsAccess.getVx(w, entityId);
       const expectedVx = initialVx * Math.pow(friction, 60);
 
       expect(finalVx).toBeCloseTo(expectedVx, 1);
@@ -50,15 +53,15 @@ describe('Physics Accuracy', () => {
       const entityId = 0;
       const vx = 60; // 60 units per second
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
       // Use friction=1.0 (no friction) for pure integration test
-      PhysicsStore.set(w, entityId, vx, 0, 100, 28, 0.5, 1.0);
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      PhysicsAccess.set(w, entityId, vx, 0, 0, 100, 28, 0.5, 1.0);
+      StateAccess.activate(w, entityId);
 
       // Run physics for exactly 1 second
       PhysicsSystem.update(w, 1);
 
-      const finalX = TransformStore.getX(w, entityId);
+      const finalX = TransformAccess.getX(w, entityId);
       // Position should be vx * dt * 10 (physics scale factor)
       // vx=60, dt=1, scale=10 => 600 units
       expect(finalX).toBeCloseTo(600, 1);
@@ -69,17 +72,17 @@ describe('Physics Accuracy', () => {
       const MAP_RADIUS = 2500;
 
       // Start near boundary, moving outward
-      TransformStore.set(w, entityId, MAP_RADIUS - 50, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 100, 0, 100, 100); // Large radius
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      TransformAccess.set(w, entityId, MAP_RADIUS - 50, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 100, 0, 0, 100, 100, 0.5, 0.9);
+      StateAccess.activate(w, entityId);
 
       // Run physics - should bounce at boundary
       for (let i = 0; i < 60; i++) {
         PhysicsSystem.update(w, 1 / 60);
       }
 
-      const finalX = TransformStore.getX(w, entityId);
-      const finalY = TransformStore.getY(w, entityId);
+      const finalX = TransformAccess.getX(w, entityId);
+      const finalY = TransformAccess.getY(w, entityId);
       const distFromCenter = Math.sqrt(finalX * finalX + finalY * finalY);
 
       // Should be clamped inside boundary
@@ -90,9 +93,9 @@ describe('Physics Accuracy', () => {
       const entityId = 0;
       const initialSpeed = 100;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, initialSpeed, 0, 100, 28, 1.0, 1.0); // No friction, perfect bounce
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, initialSpeed, 0, 0, 100, 28, 1.0, 1.0); // No friction, perfect bounce
+      StateAccess.activate(w, entityId);
 
       // Store initial kinetic energy
       const initialEnergy = 0.5 * 100 * initialSpeed * initialSpeed;
@@ -102,8 +105,8 @@ describe('Physics Accuracy', () => {
         PhysicsSystem.update(w, 1 / 60);
       }
 
-      const vx = PhysicsStore.getVelocityX(w, entityId);
-      const vy = PhysicsStore.getVelocityY(w, entityId);
+      const vx = PhysicsAccess.getVx(w, entityId);
+      const vy = PhysicsAccess.getVy(w, entityId);
       const finalSpeed = Math.sqrt(vx * vx + vy * vy);
       const finalEnergy = 0.5 * 100 * finalSpeed * finalSpeed;
 
@@ -120,11 +123,11 @@ describe('Physics Accuracy', () => {
       const startX = 0, startY = 0;
       const targetX = 300, targetY = 0;
 
-      TransformStore.set(w, entityId, startX, startY, 0, 1);
-      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
-      InputStore.setTarget(w, entityId, targetX, targetY);
-      ConfigStore.setMaxSpeed(w, entityId, 150);
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      TransformAccess.set(w, entityId, startX, startY, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 0, 0, 0, 100, 28, 0.5, 0.9);
+      InputAccess.set(w, entityId, targetX, targetY, 0);
+      ConfigAccess.set(w, entityId, 0, 1, 1, 0, 0, 150); // maxSpeed = 150
+      StateAccess.activate(w, entityId);
 
       const initialDist = Math.abs(targetX - startX);
 
@@ -134,7 +137,7 @@ describe('Physics Accuracy', () => {
         PhysicsSystem.update(w, 1 / 60);
       }
 
-      const currentX = TransformStore.getX(w, entityId);
+      const currentX = TransformAccess.getX(w, entityId);
       const currentDist = Math.abs(targetX - currentX);
 
       // Should have moved closer to target
@@ -145,17 +148,17 @@ describe('Physics Accuracy', () => {
     it('should stop at target (deadzone)', () => {
       const entityId = 0;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 0, 0, 0, 100, 28, 0.5, 0.9);
       // Target very close (within deadzone of 1 unit)
-      InputStore.setTarget(w, entityId, 0.5, 0.5);
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      InputAccess.set(w, entityId, 0.5, 0.5, 0);
+      StateAccess.activate(w, entityId);
 
-      const initialVx = PhysicsStore.getVelocityX(w, entityId);
+      const initialVx = PhysicsAccess.getVx(w, entityId);
 
       MovementSystem.update(w, entityId, 1 / 60);
 
-      const finalVx = PhysicsStore.getVelocityX(w, entityId);
+      const finalVx = PhysicsAccess.getVx(w, entityId);
 
       // Velocity should remain unchanged (deadzone)
       expect(finalVx).toBe(initialVx);
@@ -166,20 +169,19 @@ describe('Physics Accuracy', () => {
       const baseMaxSpeed = 150;
       const speedMultiplier = 1.5;
 
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 0, 0, 100, 28);
-      InputStore.setTarget(w, entityId, 1000, 0);
-      ConfigStore.setMaxSpeed(w, entityId, baseMaxSpeed);
-      ConfigStore.setSpeedMultiplier(w, entityId, speedMultiplier);
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 0, 0, 0, 100, 28, 0.5, 0.9);
+      InputAccess.set(w, entityId, 1000, 0, 0);
+      ConfigAccess.set(w, entityId, 0, 1, speedMultiplier, 0, 0, baseMaxSpeed);
+      StateAccess.activate(w, entityId);
 
       // Accelerate towards target
       for (let i = 0; i < 60; i++) {
         MovementSystem.update(w, entityId, 1 / 60);
       }
 
-      const vx = PhysicsStore.getVelocityX(w, entityId);
-      const vy = PhysicsStore.getVelocityY(w, entityId);
+      const vx = PhysicsAccess.getVx(w, entityId);
+      const vy = PhysicsAccess.getVy(w, entityId);
       const speed = Math.sqrt(vx * vx + vy * vy);
 
       // Speed should not exceed max * multiplier
@@ -193,14 +195,15 @@ describe('Physics Accuracy', () => {
       const results: { x: number; y: number; vx: number; vy: number }[] = [];
 
       for (let run = 0; run < 2; run++) {
-        resetAllStores();
+        // Create fresh WorldState for each run
+        w = new WorldState();
 
         const entityId = 0;
-        TransformStore.set(w, entityId, 100, 200, 0, 1);
-        PhysicsStore.set(w, entityId, 50, 30, 100, 28);
-        InputStore.setTarget(w, entityId, 500, 400);
-        ConfigStore.setMaxSpeed(w, entityId, 150);
-        StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+        TransformAccess.set(w, entityId, 100, 200, 0, 1, 0, 0, 0);
+        PhysicsAccess.set(w, entityId, 50, 30, 0, 100, 28, 0.5, 0.9);
+        InputAccess.set(w, entityId, 500, 400, 0);
+        ConfigAccess.set(w, entityId, 0, 1, 1, 0, 0, 150);
+        StateAccess.activate(w, entityId);
 
         // Run for 2 seconds
         for (let i = 0; i < 120; i++) {
@@ -209,10 +212,10 @@ describe('Physics Accuracy', () => {
         }
 
         results.push({
-          x: TransformStore.getX(w, entityId),
-          y: TransformStore.getY(w, entityId),
-          vx: PhysicsStore.getVelocityX(w, entityId),
-          vy: PhysicsStore.getVelocityY(w, entityId),
+          x: TransformAccess.getX(w, entityId),
+          y: TransformAccess.getY(w, entityId),
+          vx: PhysicsAccess.getVx(w, entityId),
+          vy: PhysicsAccess.getVy(w, entityId),
         });
       }
 
@@ -227,26 +230,26 @@ describe('Physics Accuracy', () => {
       const entityId = 0;
 
       // Run with fixed timestep (60fps), no friction
-      resetAllStores();
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 60, 0, 100, 28, 0.5, 1.0); // friction=1.0
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      w = new WorldState();
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 60, 0, 0, 100, 28, 0.5, 1.0); // friction=1.0
+      StateAccess.activate(w, entityId);
 
       for (let i = 0; i < 60; i++) {
         PhysicsSystem.update(w, 1 / 60);
       }
-      const fixedTimestepPos = TransformStore.getX(w, entityId);
+      const fixedTimestepPos = TransformAccess.getX(w, entityId);
 
       // Run with variable timestep (equivalent total time), no friction
-      resetAllStores();
-      TransformStore.set(w, entityId, 0, 0, 0, 1);
-      PhysicsStore.set(w, entityId, 60, 0, 100, 28, 0.5, 1.0); // friction=1.0
-      StateStore.setFlag(w, entityId, EntityFlags.ACTIVE);
+      w = new WorldState();
+      TransformAccess.set(w, entityId, 0, 0, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, entityId, 60, 0, 0, 100, 28, 0.5, 1.0); // friction=1.0
+      StateAccess.activate(w, entityId);
 
       // Two updates: 0.3s and 0.7s = 1s total
       PhysicsSystem.update(w, 0.3);
       PhysicsSystem.update(w, 0.7);
-      const variableTimestepPos = TransformStore.getX(w, entityId);
+      const variableTimestepPos = TransformAccess.getX(w, entityId);
 
       // Positions should be very similar (Euler integration is 1st order)
       const diff = Math.abs(fixedTimestepPos - variableTimestepPos);
@@ -260,11 +263,11 @@ describe('Physics Accuracy', () => {
 
       // Create multiple entities
       for (let i = 0; i < entityCount; i++) {
-        TransformStore.set(w, i, i * 100, 0, 0, 1);
-        PhysicsStore.set(w, i, 10 * (i + 1), 0, 100, 28);
-        InputStore.setTarget(w, i, 1000, i * 50);
-        ConfigStore.setMaxSpeed(w, i, 100 + i * 10);
-        StateStore.setFlag(w, i, EntityFlags.ACTIVE);
+        TransformAccess.set(w, i, i * 100, 0, 0, 1, 0, 0, 0);
+        PhysicsAccess.set(w, i, 10 * (i + 1), 0, 0, 100, 28, 0.5, 0.9);
+        InputAccess.set(w, i, 1000, i * 50, 0);
+        ConfigAccess.set(w, i, 0, 1, 1, 0, 0, 100 + i * 10);
+        StateAccess.activate(w, i);
       }
 
       // Run physics
@@ -277,7 +280,7 @@ describe('Physics Accuracy', () => {
 
       // Each entity should have moved
       for (let i = 0; i < entityCount; i++) {
-        const x = TransformStore.getX(w, i);
+        const x = TransformAccess.getX(w, i);
         expect(x).toBeGreaterThan(i * 100); // Moved from start position
       }
     });
@@ -289,13 +292,18 @@ describe('Performance', () => {
     const entityCount = 100;
     const targetFrameTime = 1000 / 60; // ~16.67ms per frame
 
-    // Setup entities
+    // Fresh WorldState for perf test
+    w = new WorldState();
+
+    // Setup entities (use PRNG.next() when available, for now use deterministic setup)
     for (let i = 0; i < entityCount; i++) {
-      TransformStore.set(w, i, Math.random() * 1000, Math.random() * 1000, 0, 1);
-      PhysicsStore.set(w, i, Math.random() * 50, Math.random() * 50, 100, 28);
-      InputStore.setTarget(w, i, Math.random() * 1000, Math.random() * 1000);
-      ConfigStore.setMaxSpeed(w, i, 150);
-      StateStore.setFlag(w, i, EntityFlags.ACTIVE);
+      const x = (i * 17) % 1000; // Pseudo-random but deterministic
+      const y = (i * 31) % 1000;
+      TransformAccess.set(w, i, x, y, 0, 1, 0, 0, 0);
+      PhysicsAccess.set(w, i, (i * 7) % 50, (i * 11) % 50, 0, 100, 28, 0.5, 0.9);
+      InputAccess.set(w, i, (i * 13) % 1000, (i * 19) % 1000, 0);
+      ConfigAccess.set(w, i, 0, 1, 1, 0, 0, 150);
+      StateAccess.activate(w, i);
     }
 
     // Measure time for 60 frames

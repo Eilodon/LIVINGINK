@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EntityManager, EntityHandle, entityManager } from '../EntityManager';
+import { EntityManager, getEntityManager, resetEntityManager } from '../EntityManager';
+import type { EntityHandle } from '../EntityManager';
 
 describe('EntityManager Generational Index', () => {
     let manager: EntityManager;
 
     beforeEach(() => {
-        // Reset singleton (for testing only)
-        (EntityManager as any).instance = null;
-        manager = EntityManager.getInstance();
+        // Reset singleton for clean test state
+        resetEntityManager();
+        manager = getEntityManager();
     });
 
     describe('createEntityHandle', () => {

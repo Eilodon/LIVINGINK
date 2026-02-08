@@ -42,9 +42,9 @@ export const applyGrowthDOD = (id: number, amount: number) => {
 
 export const updateTier = (entity: Player | Bot) => {
   const r = entity.radius;
-  if (r < 40) entity.tier = SizeTier.LARVA;
-  else if (r < 70) entity.tier = SizeTier.JUVENILE;
-  else if (r < 100) entity.tier = SizeTier.ADULT;
-  else if (r < 130) entity.tier = SizeTier.ELDER;
-  else entity.tier = SizeTier.ANCIENT_KING;
+  if (r < 40) entity.tier = SizeTier.Larva;
+  else if (r < 70) entity.tier = SizeTier.Juvenile;
+  else if (r < 100) entity.tier = SizeTier.Adult;
+  else if (r < 130) entity.tier = SizeTier.Elder;
+  else entity.tier = SizeTier.AncientKing;
 };

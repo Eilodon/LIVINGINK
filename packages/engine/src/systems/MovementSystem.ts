@@ -5,7 +5,7 @@
  * EIDOLON-V: Uses generated WorldState and Accessor classes from schema.
  */
 
-import { WorldState, defaultWorld, STRIDES, MAX_ENTITIES } from '../generated/WorldState';
+import { WorldState, STRIDES, MAX_ENTITIES } from '../generated/WorldState';
 import {
     EntityFlags,
     StateAccess,

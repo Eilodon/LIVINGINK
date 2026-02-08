@@ -6,7 +6,7 @@
  * Uses Generated Accessors for Type Safety.
  */
 
-import { WorldState, defaultWorld } from '../generated/WorldState';
+import { WorldState } from '../generated/WorldState';
 import { EntityFlags, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
 
 // EIDOLON-V P2 FIX: Document the intentional difference between physics and visual boundaries

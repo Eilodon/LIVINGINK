@@ -4,7 +4,7 @@
  */
 
 import { WAVE_CONFIG, RING_RADII } from './constants';
-import { randomRange } from '../../math/FastMath';
+import { randomRange, PRNG } from '../../math/FastMath';
 import type { PigmentVec3, PickupKind } from './types';
 
 export interface IFood {
@@ -116,27 +116,27 @@ const spawnWave = (ring: 1 | 2 | 3, onSpawn: SpawnCallback): void => {
     const maxR = ring === 3 ? RING_RADII.R3 : ring === 2 ? RING_RADII.R2 : RING_RADII.R1;
 
     for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = PRNG.next() * Math.PI * 2;
         const r = randomRange(minR + 50, maxR - 50);
 
         const x = Math.cos(angle) * r;
         const y = Math.sin(angle) * r;
 
-        // Choose Type
-        const roll = Math.random();
+        // Choose Type (EIDOLON-V: Use seeded PRNG for determinism)
+        const roll = PRNG.next();
         let kind: PickupKind = 'pigment';
         let pigment: PigmentVec3 | undefined = undefined;
 
         if (roll < 0.6) {
             kind = 'pigment';
-            const cRoll = Math.random();
+            const cRoll = PRNG.next();
             if (cRoll < 0.33) pigment = { r: 1, g: 0, b: 0 };
             else if (cRoll < 0.66) pigment = { r: 0, g: 1, b: 0 };
             else pigment = { r: 0, g: 0, b: 1 };
         } else if (roll < 0.85) {
             kind = 'neutral';
         } else {
-            kind = Math.random() < 0.5 ? 'solvent' : 'shield';
+            kind = PRNG.next() < 0.5 ? 'solvent' : 'shield';
         }
 
         onSpawn(x, y, kind, pigment);
@@ -153,7 +153,7 @@ const createFood = (
     pigment?: PigmentVec3
 ): IFood => {
     return {
-        id: `food_${Date.now()}_${Math.random()}`,
+        id: `food_${Date.now()}_${PRNG.next()}`,
         position: { x, y },
         velocity: { x: 0, y: 0 },
         radius: kind === 'pigment' ? 12 : kind === 'neutral' ? 8 : 10,

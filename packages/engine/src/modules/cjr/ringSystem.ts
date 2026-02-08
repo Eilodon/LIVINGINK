@@ -5,7 +5,7 @@
  */
 
 // NOTE: Code uses direct buffer access (world.transform, world.physics), not Store methods
-import { WorldState, defaultWorld } from '../../generated/WorldState';
+import { WorldState } from '../../generated/WorldState';
 import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants';
 import { fastMath } from '../../math/FastMath';
 import type { RingId } from './types';
@@ -91,7 +91,7 @@ export const updateRingLogic = (
     entity: IRingEntity,
     _dt: number,
     _levelConfig: unknown,
-    world: WorldState = defaultWorld
+    world: WorldState  // EIDOLON-V: WorldState is now REQUIRED
 ): { transitioned: boolean; newRing?: RingId } => {
     if (entity.isDead) return { transitioned: false };
 
@@ -110,7 +110,7 @@ export const updateRingLogic = (
  */
 export const checkRingTransition = (
     entity: IRingEntity,
-    world: WorldState = defaultWorld,
+    world: WorldState,  // EIDOLON-V: WorldState is now REQUIRED
     dt: number = 0.016  // EIDOLON-V P1 FIX: dt for frame-rate independent physics
 ): { transitioned: boolean; newRing?: RingId } => {
     const pos = { x: 0, y: 0 };
@@ -268,18 +268,142 @@ const isRingEntity = (entity: unknown): entity is IRingEntity => {
 
 /**
  * Legacy-compatible updateRingLogic
- * Matches client signature: (entity: Player | Bot, dt: number, levelConfig: any, state: GameState) => void
+ * EIDOLON-V: Now requires WorldState as 5th parameter
  */
 export const updateRingLogicLegacy = (
     entity: unknown,
     dt: number,
     _levelConfig: unknown,
-    _state: unknown
+    _state: unknown,
+    world?: WorldState
 ): void => {
+    // EIDOLON-V: WorldState is required
+    if (!world) {
+        console.warn('[ringSystem] updateRingLogicLegacy requires WorldState parameter');
+        return;
+    }
     // EIDOLON-V P3 FIX: Validate before casting
     if (!isRingEntity(entity)) {
         console.warn('[ringSystem] updateRingLogicLegacy called with invalid entity');
         return;
     }
-    updateRingLogic(entity, dt, _levelConfig);
+    updateRingLogic(entity, dt, _levelConfig, world);
 };
+
+/**
+ * EIDOLON-V Finding 6: DOD-native ring transition check
+ * 
+ * Reads/writes directly to WorldState buffers.
+ * No intermediate object allocation - eliminates GC pressure.
+ * 
+ * @param world WorldState instance
+ * @param entityId Entity index
+ * @param ring Current ring (1, 2, or 3)
+ * @param matchPercent Color match percentage (0-100)
+ * @param dt Delta time for physics calculations
+ * @returns Transition result with newRing if transitioned
+ */
+export const checkRingTransitionDOD = (
+    world: WorldState,
+    entityId: number,
+    ring: RingId,
+    matchPercent: number,
+    dt: number = 0.016
+): { transitioned: boolean; newRing?: RingId } => {
+    // Read position directly from transform buffer
+    const transformIdx = entityId * 8;
+    const x = world.transform[transformIdx];
+    const y = world.transform[transformIdx + 1];
+    const distSq = x * x + y * y;
+
+    // Physics buffer index for velocity writes
+    const physicsIdx = entityId * 8;
+
+    // Ring 1 -> Ring 2 transition
+    if (ring === 1) {
+        if (distSq < RING_RADII_SQ.R2) {
+            if (matchPercent >= THRESHOLDS.ENTER_RING2) {
+                return { transitioned: true, newRing: 2 };
+            } else {
+                // Apply elastic rejection directly to DOD
+                applyElasticRejectionDOD(world, physicsIdx, x, y, RING_RADII.R2, 50, dt);
+            }
+        }
+    }
+    // Ring 2 -> Ring 3 transition
+    else if (ring === 2) {
+        if (distSq < RING_RADII_SQ.R3) {
+            if (matchPercent >= THRESHOLDS.ENTER_RING3) {
+                return { transitioned: true, newRing: 3 };
+            } else {
+                applyElasticRejectionDOD(world, physicsIdx, x, y, RING_RADII.R3, 50, dt);
+            }
+        } else if (distSq > RING_RADII_SQ.R2) {
+            clampToRingOuterDOD(world, transformIdx, physicsIdx, x, y, RING_RADII.R2);
+        }
+    }
+    // Ring 3 - cannot leave
+    else if (ring === 3) {
+        if (distSq > RING_RADII_SQ.R3) {
+            clampToRingOuterDOD(world, transformIdx, physicsIdx, x, y, RING_RADII.R3);
+        }
+    }
+
+    return { transitioned: false };
+};
+
+// DOD-native elastic rejection - writes directly to physics buffer
+const applyElasticRejectionDOD = (
+    world: WorldState,
+    physicsIdx: number,
+    x: number,
+    y: number,
+    threshold: number,
+    force: number,
+    dt: number
+) => {
+    const distSq = x * x + y * y;
+    const dist = fastMath.fastSqrt(distSq);
+    if (dist < 0.001) return;
+
+    const overlap = threshold - dist;
+    if (overlap <= 0) return;
+
+    const nx = x / dist;
+    const ny = y / dist;
+    const pushForce = overlap * force * dt;
+
+    // Write directly to physics buffer (vx, vy)
+    world.physics[physicsIdx] += nx * pushForce;
+    world.physics[physicsIdx + 1] += ny * pushForce;
+};
+
+// DOD-native ring clamping - writes directly to transform/physics buffers
+const clampToRingOuterDOD = (
+    world: WorldState,
+    transformIdx: number,
+    physicsIdx: number,
+    x: number,
+    y: number,
+    radius: number
+) => {
+    const dist = fastMath.fastSqrt(x * x + y * y);
+    if (dist < 0.001) return;
+
+    const nx = x / dist;
+    const ny = y / dist;
+
+    // Clamp position to ring boundary
+    world.transform[transformIdx] = nx * radius;
+    world.transform[transformIdx + 1] = ny * radius;
+
+    // Nullify outward velocity component
+    const vx = world.physics[physicsIdx];
+    const vy = world.physics[physicsIdx + 1];
+    const dot = vx * nx + vy * ny;
+    if (dot > 0) {
+        world.physics[physicsIdx] = vx - dot * nx;
+        world.physics[physicsIdx + 1] = vy - dot * ny;
+    }
+};
+

@@ -53,7 +53,11 @@ export const PHYSICS = {
 export const EAT_THRESHOLD_RATIO = 0.9;
 export const DANGER_THRESHOLD_RATIO = 1.1;
 export const SPAWN_PROTECTION_TIME = 5;
-export const GAME_DURATION = 150;
+
+// EIDOLON-V P1 FIX: GAME_DURATION is game-specific, not engine-specific.
+// Re-export from @cjr/shared as the Single Source of Truth.
+// Was: 150 (conflict with shared's 480)
+export { GAME_DURATION } from '@cjr/shared';
 
 // ============================================================
 // BOT/FOOD DEFAULTS (Can be overridden by module config)

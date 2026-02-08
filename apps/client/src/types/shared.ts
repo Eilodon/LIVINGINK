@@ -18,18 +18,18 @@ export enum GamePhase {
 }
 
 export enum SizeTier {
-  LARVA = 'Ấu Trùng', // 0-20%
-  JUVENILE = 'Thiếu Niên', // 20-40%
-  ADULT = 'Thanh Niên', // 40-60%
-  ELDER = 'Trung Niên', // 60-80%
-  ANCIENT_KING = 'Cổ Vương', // 80-100%
+  Larva = 'Ấu Trùng', // 0-20%
+  Juvenile = 'Thiếu Niên', // 20-40%
+  Adult = 'Thanh Niên', // 40-60%
+  Elder = 'Trung Niên', // 60-80%
+  AncientKing = 'Cổ Vương', // 80-100%
 }
 
 export enum MutationTier {
-  COMMON = 'Common',
-  RARE = 'Rare',
-  EPIC = 'Epic',
-  LEGENDARY = 'Legendary',
+  Common = 'common',
+  Rare = 'rare',
+  Epic = 'epic',
+  Legendary = 'legendary',
 }
 
 export interface Vector2 {

@@ -1,6 +1,21 @@
 /**
  * @cjr/engine - Compatibility Layer
  *
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  DEPRECATION NOTICE - SCHEDULED FOR REMOVAL IN v2.0.0  ⚠️            ║
+ * ╠═══════════════════════════════════════════════════════════════════════════╣
+ * ║  The *Store wrapper classes below are DEPRECATED.                        ║
+ * ║  Use *Access classes directly from '@cjr/engine' instead:                ║
+ * ║                                                                           ║
+ * ║  ❌ TransformStore.set(...)  →  ✅ TransformAccess.set(...)              ║
+ * ║  ❌ PhysicsStore.set(...)    →  ✅ PhysicsAccess.set(...)                ║
+ * ║  ❌ StatsStore.get...(...)   →  ✅ StatsAccess.get...(...)               ║
+ * ║  ❌ defaultWorld             →  ✅ new WorldState() / getWorld()         ║
+ * ║                                                                           ║
+ * ║  Migration: Search for "*Store" and replace with "*Access"               ║
+ * ║  Timeline: v1.5.0 (warnings) → v2.0.0 (removal)                          ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ *
  * EIDOLON-V: Keeps the lights on for legacy code while we migrate to WorldState.
  * Proxies legacy static access (TransformStore.data, etc.) to generated WorldState.
  *
@@ -10,7 +25,6 @@
 
 import {
     WorldState,
-    defaultWorld,
     STRIDES,
     MAX_ENTITIES,
     type IWorldConfig,
@@ -36,7 +50,7 @@ import {
 
 export {
     WorldState,
-    defaultWorld,
+    // EIDOLON-V: defaultWorld REMOVED - use new WorldState() directly
     STRIDES,
     MAX_ENTITIES,
     type IWorldConfig,
@@ -387,9 +401,12 @@ export class TattooStore {
 
 /**
  * Reset all stores
- * @deprecated Use world.reset() directly for instance-based architecture
+ * @deprecated REMOVED - Use world.reset() directly on your WorldState instance
  */
 export function resetAllStores(): void {
-    warnOnce('resetAllStores() is deprecated. Use world.reset() directly for instance-based architecture.');
-    defaultWorld.reset();
+    throw new Error(
+        '[EIDOLON-V] resetAllStores() is REMOVED. ' +
+        'Use world.reset() directly on your WorldState instance.'
+    );
 }
+

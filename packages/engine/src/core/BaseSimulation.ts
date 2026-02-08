@@ -15,7 +15,7 @@
 import { PhysicsSystem, MovementSystem } from '../systems';
 import { SkillSystem } from '../systems/SkillSystem';
 import { eventBuffer } from '../events';
-import { WorldState, defaultWorld, MAX_ENTITIES } from '../generated/WorldState';
+import { WorldState, MAX_ENTITIES } from '../generated/WorldState';
 import { EntityFlags, StateAccess } from '../generated/ComponentAccessors';
 import { DirtyTracker, DirtyMask } from '../networking/DirtyTracker';
 
@@ -68,8 +68,11 @@ export abstract class BaseSimulation {
             ...config,
         };
 
-        // Use provided WorldState or fall back to defaultWorld
-        this.world = config.world ?? defaultWorld;
+        // EIDOLON-V: WorldState is REQUIRED - no singleton fallback
+        if (!config.world) {
+            throw new Error('[BaseSimulation] WorldState is required. Pass new WorldState() in config.');
+        }
+        this.world = config.world;
 
         this.context = {
             gameTime: 0,

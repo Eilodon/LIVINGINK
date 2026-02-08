@@ -6,6 +6,7 @@
 import { TattooId, MutationTier, TATTOO_NUMERIC_ID, type PigmentVec3 } from './types';
 import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
 import { mixPigment, calcMatchPercentFast, pigmentToInt } from './colorMath';
+import { PRNG } from '../../math/FastMath';
 
 /**
  * Minimal entity interface for tattoo operations
@@ -133,7 +134,7 @@ const TATTOOS: TattooDefinition[] = [
         onHit: (victim, attacker) => {
             if (victim.tattoos?.includes(TattooId.PigmentBomb)) {
                 const chance = victim.statusScalars.pigmentBombChance || 0.3;
-                if (Math.random() < chance && 'pigment' in attacker) {
+                if (PRNG.next() < chance && 'pigment' in attacker) {
                     attacker.pigment = mixPigment(attacker.pigment, victim.pigment, 0.15);
                     attacker.color = pigmentToInt(attacker.pigment);
                     attacker.matchPercent = calcMatchPercentFast(attacker.pigment, attacker.targetPigment);
@@ -369,7 +370,8 @@ export interface TattooChoice {
 }
 
 export const getTattooChoices = (count: number): TattooChoice[] => {
-    const shuffled = [...TATTOOS].sort(() => 0.5 - Math.random());
+    // EIDOLON-V: Use seeded PRNG for deterministic shuffling
+    const shuffled = [...TATTOOS].sort(() => 0.5 - PRNG.next());
     return shuffled.slice(0, count).map(m => ({
         id: m.id,
         name: m.name,

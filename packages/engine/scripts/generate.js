@@ -230,18 +230,27 @@ ${fields.map(f => `    static readonly ${f.name.toUpperCase()} = ${f.offset};`).
     static set(world: WorldState, id: number, ${fields.filter(f => !f.name.startsWith('_')).map(f => `${f.name}: number`).join(', ')}): void {
         const view = world.${lowerName}View;
         const ptr = id * ${stride};
-${fields.filter(f => !f.name.startsWith('_')).map(f => `        view.${f.typeInfo.set}(ptr + ${f.offset}, ${f.name}, true);`).join('\n')}
+${fields.filter(f => !f.name.startsWith('_')).map(f => {
+            const le = f.bytes === 1 ? '' : ', true';
+            return `        view.${f.typeInfo.set}(ptr + ${f.offset}, ${f.name}${le});`;
+        }).join('\n')}
     }
     
     // Individual Getters
-${fields.filter(f => !f.name.startsWith('_')).map(f => `    static get${capitalize(f.name)}(world: WorldState, id: number): number {
-        return world.${lowerName}View.${f.typeInfo.view}(id * ${stride} + ${f.offset}, true);
-    }`).join('\n\n')}
+${fields.filter(f => !f.name.startsWith('_')).map(f => {
+            const le = f.bytes === 1 ? '' : ', true';
+            return `    static get${capitalize(f.name)}(world: WorldState, id: number): number {
+        return world.${lowerName}View.${f.typeInfo.view}(id * ${stride} + ${f.offset}${le});
+    }`;
+        }).join('\n\n')}
 
     // Individual Setters
-${fields.filter(f => !f.name.startsWith('_')).map(f => `    static set${capitalize(f.name)}(world: WorldState, id: number, value: number): void {
-        world.${lowerName}View.${f.typeInfo.set}(id * ${stride} + ${f.offset}, value, true);
-    }`).join('\n\n')}
+${fields.filter(f => !f.name.startsWith('_')).map(f => {
+            const le = f.bytes === 1 ? '' : ', true';
+            return `    static set${capitalize(f.name)}(world: WorldState, id: number, value: number): void {
+        world.${lowerName}View.${f.typeInfo.set}(id * ${stride} + ${f.offset}, value${le});
+    }`;
+        }).join('\n\n')}
 }
 
 `;
@@ -255,7 +264,9 @@ ${fields.filter(f => !f.name.startsWith('_')).map(f => `    static set${capitali
         packerBody += `                const srcView = world.${lowerName}View;\n`;
         packerBody += `                const ptr = id * ${stride};\n`;
         for (const f of fields) {
-            packerBody += `                view.${f.typeInfo.set}(offset, srcView.${f.typeInfo.view}(ptr + ${f.offset}, true), true); offset += ${f.bytes};\n`;
+            const leGet = f.bytes === 1 ? '' : ', true';
+            const leSet = f.bytes === 1 ? '' : ', true';
+            packerBody += `                view.${f.typeInfo.set}(offset, srcView.${f.typeInfo.view}(ptr + ${f.offset}${leGet})${leSet}); offset += ${f.bytes};\n`;
         }
         packerBody += `                return offset;\n`;
         packerBody += `            }\n`;
@@ -267,7 +278,9 @@ ${fields.filter(f => !f.name.startsWith('_')).map(f => `    static set${capitali
         unpackerBody += `                const dstView = world.${lowerName}View;\n`;
         unpackerBody += `                const ptr = id * ${stride};\n`;
         for (const f of fields) {
-            unpackerBody += `                dstView.${f.typeInfo.set}(ptr + ${f.offset}, view.${f.typeInfo.view}(offset, true), true); offset += ${f.bytes};\n`;
+            const leGet = f.bytes === 1 ? '' : ', true';
+            const leSet = f.bytes === 1 ? '' : ', true';
+            unpackerBody += `                dstView.${f.typeInfo.set}(ptr + ${f.offset}, view.${f.typeInfo.view}(offset${leGet})${leSet}); offset += ${f.bytes};\n`;
         }
         unpackerBody += `                return offset;\n`;
         unpackerBody += `            }\n`;

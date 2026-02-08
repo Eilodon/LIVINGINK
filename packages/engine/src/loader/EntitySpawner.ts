@@ -5,16 +5,17 @@
  * Bridges high-level entity concepts to low-level DOD storage.
  */
 
-import { MAX_ENTITIES, EntityFlags, STRIDES } from '../compat';
+import { MAX_ENTITIES, STRIDES } from '../generated/WorldState';
 import {
-    TransformAccess,   // PHASE 3: Migrated from TransformStore
-    PhysicsAccess,     // PHASE 3: Migrated from PhysicsStore
-    StatsStore,
-    StateStore,
-    SkillStore,
-    InputStore,
-    WorldState,
-} from '../compat';
+    TransformAccess,
+    PhysicsAccess,
+    StatsAccess,
+    StateAccess,
+    SkillAccess,
+    InputAccess,
+    EntityFlags,
+} from '../generated/ComponentAccessors';
+import type { WorldState } from '../generated/WorldState';
 import { PLAYER_START_RADIUS } from '../config/constants';
 import type { EntityTemplate } from './BlueprintLoader';
 
@@ -92,8 +93,8 @@ export class EntitySpawner {
         }
 
         // Set flags
-        StateStore.setFlag(world, entityId, EntityFlags.ACTIVE);
-        StateStore.setFlag(world, entityId, EntityFlags.BOT);
+        StateAccess.setFlag(world, entityId, EntityFlags.ACTIVE);
+        StateAccess.setFlag(world, entityId, EntityFlags.BOT);
 
         // Initialize transform (random position in ring 1)
         const pos = this.randomPosInRing(1);
@@ -103,13 +104,14 @@ export class EntitySpawner {
         PhysicsAccess.set(world, entityId, 0, 0, 0, 10, PLAYER_START_RADIUS, 0.5, 0.9);
 
         // Initialize stats
-        StatsStore.set(world, entityId, 100, 100, 0, 0, 1, 1);
+        StatsAccess.set(world, entityId, 100, 100, 0, 0, 1, 1);
 
         // Initialize skill cooldown
-        SkillStore.setCooldown(world, entityId, 1.0);
+        SkillAccess.setCooldown(world, entityId, 1.0);
 
         // Initialize input
-        InputStore.setTarget(world, entityId, pos.x, pos.y);
+        InputAccess.setTargetX(world, entityId, pos.x);
+        InputAccess.setTargetY(world, entityId, pos.y);
 
         // Trigger callback
         options.onSpawn?.(entityId, 'bot');
@@ -131,9 +133,9 @@ export class EntitySpawner {
         }
 
         // Set flags
-        StateStore.setFlag(world, entityId, EntityFlags.ACTIVE);
-        StateStore.setFlag(world, entityId, EntityFlags.BOT);
-        StateStore.setFlag(world, entityId, EntityFlags.BOSS);
+        StateAccess.setFlag(world, entityId, EntityFlags.ACTIVE);
+        StateAccess.setFlag(world, entityId, EntityFlags.BOT);
+        StateAccess.setFlag(world, entityId, EntityFlags.BOSS);
 
         // Initialize transform (center position)
         TransformAccess.set(world, entityId, 0, 0, 0, 1.5, 0, 0, 0);
@@ -142,13 +144,14 @@ export class EntitySpawner {
         PhysicsAccess.set(world, entityId, 0, 0, 0, 50, 80, 0.5, 0.9);
 
         // Initialize stats with boss health
-        StatsStore.set(world, entityId, options.health, options.health, 0, 0, 1, 1);
+        StatsAccess.set(world, entityId, options.health, options.health, 0, 0, 1, 1);
 
         // Initialize skill cooldown
-        SkillStore.setCooldown(world, entityId, 2.0);
+        SkillAccess.setCooldown(world, entityId, 2.0);
 
         // Initialize input
-        InputStore.setTarget(world, entityId, 0, 0);
+        InputAccess.setTargetX(world, entityId, 0);
+        InputAccess.setTargetY(world, entityId, 0);
 
         // Trigger callback
         options.onSpawn?.(entityId, 'boss');
@@ -172,26 +175,26 @@ export class EntitySpawner {
         }
 
         // Set active flag
-        StateStore.setFlag(world, entityId, EntityFlags.ACTIVE);
+        StateAccess.setFlag(world, entityId, EntityFlags.ACTIVE);
 
         // Set additional flags from tags
         if (template.tags) {
             for (const tag of template.tags) {
                 switch (tag) {
                     case 'player':
-                        StateStore.setFlag(world, entityId, EntityFlags.PLAYER);
+                        StateAccess.setFlag(world, entityId, EntityFlags.PLAYER);
                         break;
                     case 'bot':
-                        StateStore.setFlag(world, entityId, EntityFlags.BOT);
+                        StateAccess.setFlag(world, entityId, EntityFlags.BOT);
                         break;
                     case 'boss':
-                        StateStore.setFlag(world, entityId, EntityFlags.BOSS);
+                        StateAccess.setFlag(world, entityId, EntityFlags.BOSS);
                         break;
                     case 'food':
-                        StateStore.setFlag(world, entityId, EntityFlags.FOOD);
+                        StateAccess.setFlag(world, entityId, EntityFlags.FOOD);
                         break;
                     case 'projectile':
-                        StateStore.setFlag(world, entityId, EntityFlags.PROJECTILE);
+                        StateAccess.setFlag(world, entityId, EntityFlags.PROJECTILE);
                         break;
                 }
             }
@@ -237,7 +240,7 @@ export class EntitySpawner {
             // Stats component
             if (template.components.Stats) {
                 const s = template.components.Stats;
-                StatsStore.set(
+                StatsAccess.set(
                     world,
                     entityId,
                     s.currentHealth || 100,
@@ -277,7 +280,7 @@ export class EntitySpawner {
         world.stats.fill(0, statsIdx, statsIdx + STRIDES.STATS);
 
         // Clear skill cooldown
-        SkillStore.setCooldown(world, entityId, 0);
+        SkillAccess.setCooldown(world, entityId, 0);
     }
 
     /**
