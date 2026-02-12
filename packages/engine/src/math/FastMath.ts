@@ -216,7 +216,7 @@ export const clampVector = (
 // COLLISION SYSTEM (Squared Distance Based)
 // ============================================
 
-export class CollisionSystem {
+export class CollisionMath {
     /** Circle-circle collision (squared distance) */
     static circleCollision(
         pos1: Vector2,
@@ -309,7 +309,7 @@ export class SpatialOptimizer {
         pos2: Vector2,
         radius2: number
     ): boolean {
-        return CollisionSystem.circleCollision(pos1, radius1, pos2, radius2);
+        return CollisionMath.circleCollision(pos1, radius1, pos2, radius2);
     }
 
     /** Fast point in circle test */
@@ -318,7 +318,7 @@ export class SpatialOptimizer {
         circlePos: Vector2,
         radius: number
     ): boolean {
-        return CollisionSystem.pointCircleCollision(point, circlePos, radius);
+        return CollisionMath.pointCircleCollision(point, circlePos, radius);
     }
 
     /** Fast distance comparison */

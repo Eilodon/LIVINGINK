@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: color-jelly-rush
-  labels:
-    app.kubernetes.io/name: color-jelly-rush
-    app.kubernetes.io/component: game-server

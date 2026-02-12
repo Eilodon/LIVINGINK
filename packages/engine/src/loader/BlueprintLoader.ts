@@ -15,7 +15,7 @@
 import type { LevelConfig } from '../config/levels';
 import { validateLevelBlueprint, type LevelBlueprint } from './LevelValidator';
 import { EntitySpawner, type SpawnContext } from './EntitySpawner';
-import { WorldState } from '../compat';
+import { WorldState } from '../generated/WorldState';
 
 /**
  * Entity template for dynamic spawning

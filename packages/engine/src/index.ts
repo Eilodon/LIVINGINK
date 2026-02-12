@@ -34,8 +34,8 @@ export * from './generated';
 
 // DOD Module (Data-Oriented Design) - Compatibility layer
 // Note: EntityFlags and other types are re-exported from generated
-// Import from './generated' for new code, './dod' for backward compatibility
-export * from './compat';
+// Import from './generated' for new code
+
 
 // Core (Registry, Memory Management)
 export * from './core';

@@ -30,7 +30,7 @@ export {
 
     // Classes
     FastMath,
-    CollisionSystem,
+    CollisionMath,
     SpatialOptimizer,
     PRNG,
     MathPerformanceMonitor,

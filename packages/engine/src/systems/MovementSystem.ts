@@ -31,6 +31,14 @@ export class MovementSystem {
     static update(world: WorldState, id: number, dt: number, defaultMaxSpeed: number = DEFAULT_MAX_SPEED, excludeId?: number) {
         if (id === excludeId) return;
 
+        // EIDOLON-V FIX: MovementSystem (Input -> Velocity) only applies to LOCAL entities!
+        // Remote entities move via Network Transform updates.
+        // Static entities (Food) don't move.
+        const flags = StateAccess.getFlags(world, id);
+        if ((flags & EntityFlags.LOCAL) === 0) {
+            return;
+        }
+
         // 1. Read inputs using accessor
         const tx = InputAccess.getTargetX(world, id);
         const ty = InputAccess.getTargetY(world, id);

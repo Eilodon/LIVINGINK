@@ -43,7 +43,6 @@ export class PhysicsSystem {
         for (let i = 0; i < count; i++) {
             const id = activeEntities[i];
             if (id === excludeId) continue;
-            if (id === excludeId) continue;
             PhysicsSystem.processEntity(world, id, deltaTime, useFastFriction, defaultFrictionUnstable, timeScale, dirtyTracker);
         }
     }

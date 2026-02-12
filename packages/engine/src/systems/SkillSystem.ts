@@ -115,36 +115,38 @@ export class SkillSystem {
             );
         }
 
-        // Triangle (Pierce)
+        // Triangle (Pierce) - Projectile
         else if (shapeId === ShapeEnum.TRIANGLE) {
-            // Direction to target
+            let angle = 0;
+            // Calculate angle from velocity if moving, else towards target?
+            // Actually target is mouse pos.
             const dx = target.x - x;
             const dy = target.y - y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            angle = Math.atan2(dy, dx);
 
-            if (dist > 1) {
-                const piercePower = 600;
-                PhysicsAccess.setVx(world, id, (dx / dist) * piercePower);
-                PhysicsAccess.setVy(world, id, (dy / dist) * piercePower);
-            }
+            // Pack data: We need Type ID.
+            // Let's say Type 1 = Pierce.
+            // We can pack angle? eventBuffer data is 32-bit float.
+            // We can't pack everything. The spawner in GameRoom will have to recalculate or we assume firing towards target.
+            // Actually, we pass Angle in Data? Float32 can store angle.
 
             eventBuffer.push(
-                EngineEventType.PARTICLE_BURST,
-                id,
+                EngineEventType.SPAWN_PROJECTILE,
+                id, // Source Entity ID (Owner)
                 x,
                 y,
-                0xff6600 // Color: Orange
+                angle // Data = Angle in radians
             );
         }
 
-        // Hex (Vortex)
+        // Hex (Vortex) - Area Effect / Projectile?
         else if (shapeId === ShapeEnum.HEX) {
             eventBuffer.push(
                 EngineEventType.SHOCKWAVE,
                 id,
                 x,
                 y,
-                200 // Larger radius for vortex
+                200 // Larger radius
             );
         }
     }

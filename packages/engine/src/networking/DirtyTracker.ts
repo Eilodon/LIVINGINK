@@ -5,7 +5,7 @@
  * Part of Smart Lane networking - only send what changed.
  */
 
-import { MAX_ENTITIES } from '../compat';
+import { MAX_ENTITIES } from '../generated/WorldState';
 
 /**
  * Dirty bit masks for component categories

@@ -21,6 +21,7 @@ export const enum EngineEventType {
     FLOATING_TEXT = 6,
     SHOCKWAVE = 7,
     EXPLODE = 8,
+    SPAWN_PROJECTILE = 9,
 }
 
 /**

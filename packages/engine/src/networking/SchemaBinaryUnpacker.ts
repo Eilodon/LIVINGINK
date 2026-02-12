@@ -82,6 +82,12 @@ export class SchemaBinaryUnpacker {
                 } else {
                     TransformAccess.setX(world, id, x);
                     TransformAccess.setY(world, id, y);
+                    // EIDOLON-V: Initialize prevX/Y to current for interpolation stability
+                    // If we don't do this, they might be 0, causing a huge smear on first frame
+                    if (TransformAccess.getPrevX(world, id) === 0 && TransformAccess.getPrevY(world, id) === 0) {
+                        TransformAccess.setPrevX(world, id, x);
+                        TransformAccess.setPrevY(world, id, y);
+                    }
                 }
             }
         }
@@ -184,5 +190,54 @@ export class SchemaBinaryUnpacker {
         }
 
         return timestamp;
+    }
+
+    /**
+     * Unpack Entity Spawn Events (Smart Lane)
+     */
+    static unpackSpawnEvents(
+        view: DataView,
+        offset: number
+    ): { id: number, x: number, y: number, r: number, g: number, b: number, type: number }[] {
+        const events: { id: number, x: number, y: number, r: number, g: number, b: number, type: number }[] = [];
+
+        if (view.byteLength < offset + 2) return events;
+        const count = view.getUint16(offset, true); offset += 2;
+
+        for (let i = 0; i < count; i++) {
+            if (view.byteLength < offset + 14) break;
+
+            const id = view.getUint16(offset, true); offset += 2;
+            const x = view.getFloat32(offset, true); offset += 4;
+            const y = view.getFloat32(offset, true); offset += 4;
+
+            const r = view.getUint8(offset++);
+            const g = view.getUint8(offset++);
+            const b = view.getUint8(offset++);
+            const type = view.getUint8(offset++);
+
+            events.push({ id, x, y, r, g, b, type });
+        }
+        return events;
+    }
+
+    /**
+     * Unpack Entity Despawn Events (Smart Lane)
+     */
+    static unpackDespawnEvents(
+        view: DataView,
+        offset: number
+    ): number[] {
+        const ids: number[] = [];
+
+        if (view.byteLength < offset + 2) return ids;
+        const count = view.getUint16(offset, true); offset += 2;
+
+        for (let i = 0; i < count; i++) {
+            if (view.byteLength < offset + 2) break;
+            const id = view.getUint16(offset, true); offset += 2;
+            ids.push(id);
+        }
+        return ids;
     }
 }

@@ -333,4 +333,87 @@ export class SchemaBinaryPacker {
         this.release(entry);
         return result;
     }
+    /**
+     * Pack Entity Spawn Events (Smart Lane)
+     * Used for creating lightweight entities (Food, Projectiles) on client
+     */
+    static packSpawnEvents(
+        world: WorldState,
+        entityIds: number[],
+        types: number[] // Optional: Type ID for each entity (e.g. 0=Neutral, 1=Pigment)
+    ): ArrayBuffer | null {
+        if (entityIds.length === 0) return null;
+
+        const entry = this.acquire();
+        const { view } = entry;
+        let { offset } = entry;
+
+        // Header: Type(1) + Count(2)
+        view.setUint8(offset, SchemaPacketType.ENTITY_SPAWN); offset += 1;
+        view.setUint16(offset, entityIds.length, true); offset += 2;
+
+        const tView = world.transformView;
+        const pView = world.pigmentView;
+
+        // EIDOLON-V: Pack essential data only (ID, X, Y, R, G, B, Type)
+        // Stride: 2(ID) + 4(X) + 4(Y) + 3(RGB) + 1(Type) = 14 bytes/entity
+        for (let i = 0; i < entityIds.length; i++) {
+            const id = entityIds[i];
+            const type = types[i] || 0;
+
+            view.setUint16(offset, id, true); offset += 2;
+
+            // Position
+            const ptr = id * 32;
+            const x = tView.getFloat32(ptr + 0, true);
+            const y = tView.getFloat32(ptr + 4, true);
+            view.setFloat32(offset, x, true); offset += 4;
+            view.setFloat32(offset, y, true); offset += 4;
+
+            // Pigment (RGB 0-255)
+            // Stride for pigment is 32 bytes (8 floats)
+            // But usually we store pigment as float 0-1.
+            // Let's pack as Uint8 for network efficiency.
+            const pPtr = id * 32;
+            const r = pView.getFloat32(pPtr + 0, true) * 255;
+            const g = pView.getFloat32(pPtr + 4, true) * 255;
+            const b = pView.getFloat32(pPtr + 8, true) * 255;
+
+            view.setUint8(offset, r); offset += 1;
+            view.setUint8(offset, g); offset += 1;
+            view.setUint8(offset, b); offset += 1;
+
+            // Type
+            view.setUint8(offset, type); offset += 1;
+        }
+
+        const result = entry.buffer.slice(0, offset);
+        this.release(entry);
+        return result;
+    }
+
+    /**
+     * Pack Entity Despawn Events (Smart Lane)
+     */
+    static packDespawnEvents(
+        entityIds: number[]
+    ): ArrayBuffer | null {
+        if (entityIds.length === 0) return null;
+
+        const entry = this.acquire();
+        const { view } = entry;
+        let { offset } = entry;
+
+        // Header: Type(1) + Count(2)
+        view.setUint8(offset, SchemaPacketType.ENTITY_DESTROY); offset += 1;
+        view.setUint16(offset, entityIds.length, true); offset += 2;
+
+        for (const id of entityIds) {
+            view.setUint16(offset, id, true); offset += 2;
+        }
+
+        const result = entry.buffer.slice(0, offset);
+        this.release(entry);
+        return result;
+    }
 }

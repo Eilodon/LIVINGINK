@@ -36,16 +36,27 @@ export class EntityManager {
 
     public count: number = 0;
 
-    constructor() {
+    private minId: number;
+    private maxId: number;
+
+    constructor(minId: number = 0, maxId: number = MAX_ENTITIES) {
+        this.minId = minId;
+        this.maxId = maxId;
         this.freeIndices = new Int32Array(MAX_ENTITIES);
         this.generations = new Uint16Array(MAX_ENTITIES); // Init to 0
         this.freeHead = 0;
 
-        // Reverse init so we pop 0 first: [MAX-1, ... 1, 0]
-        for (let i = 0; i < MAX_ENTITIES; i++) {
-            this.freeIndices[i] = MAX_ENTITIES - 1 - i;
-        }
-        this.freeHead = MAX_ENTITIES;
+        this.reset();
+    }
+
+    /**
+     * Set the allocation range for this manager
+     * Useful for partitioning IDs between Server (0-5000) and Client (5000-10000)
+     */
+    public setAllocationRange(min: number, max: number): void {
+        this.minId = min;
+        this.maxId = max;
+        this.reset();
     }
 
     /**
@@ -84,7 +95,10 @@ export class EntityManager {
      */
     public removeEntity(id: number): void {
         if (this.count <= 0) return;
-        if (id < 0 || id >= MAX_ENTITIES) return;
+        if (id < this.minId || id >= this.maxId) {
+            console.warn(`EntityManager: Attempted to free ID ${id} out of range [${this.minId}, ${this.maxId})`);
+            return;
+        }
 
         // Increment generation on removal (ABA protection)
         this.generations[id]++;
@@ -115,9 +129,13 @@ export class EntityManager {
      */
     public reset(): void {
         this.count = 0;
-        this.freeHead = MAX_ENTITIES;
-        for (let i = 0; i < MAX_ENTITIES; i++) {
-            this.freeIndices[i] = MAX_ENTITIES - 1 - i;
+        const range = this.maxId - this.minId;
+        this.freeHead = range;
+
+        // Fill free list with IDs in range [minId, maxId)
+        // Reverse order so we pop minId first
+        for (let i = 0; i < range; i++) {
+            this.freeIndices[i] = this.maxId - 1 - i;
         }
     }
 }

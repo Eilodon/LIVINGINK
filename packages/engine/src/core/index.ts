@@ -11,3 +11,4 @@ export * from './CoreRegistry';
 export * from './IEntityLookup';
 export * from './EntityManager';
 
+export * from './GlobalEntityLookup';
