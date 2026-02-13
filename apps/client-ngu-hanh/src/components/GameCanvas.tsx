@@ -27,8 +27,8 @@ export const GameCanvas = () => {
             appRef.current = app;
 
             // 2. Setup Fluid System (WebGPU)
-            const fluidSystem = new FluidSystem();
-            await fluidSystem.init(app);
+            const fluidSystem = new FluidSystem(app.stage, app.screen.width, app.screen.height);
+            await fluidSystem.init();
 
             // 3. Setup WASM Adapter
             const wasmAdapter = new WasmAdapter();

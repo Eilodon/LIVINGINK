@@ -5,7 +5,8 @@
     "main": "index.ts",
     "types": "index.ts",
     "dependencies": {
-        "@cjr/engine": "file:../../engine"
+        "@cjr/engine": "file:../../engine",
+        "@cjr/shared": "file:../../shared"
     },
     "devDependencies": {
         "vitest": "^1.0.0"

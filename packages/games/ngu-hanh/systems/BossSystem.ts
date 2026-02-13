@@ -132,4 +132,13 @@ export class BossSystem {
             maxHp: StatsAccess.getMaxHp(world, this.bossId)
         };
     }
+
+    getBossStatus(world: WorldState): { hp: number, maxHP: number, state: number } {
+        if (this.bossId === -1) return { hp: 0, maxHP: 100, state: 0 };
+        return {
+            hp: StatsAccess.getHp(world, this.bossId),
+            maxHP: StatsAccess.getMaxHp(world, this.bossId),
+            state: 0 // Mock state for now as we didn't fully implement State Component yet
+        };
+    }
 }

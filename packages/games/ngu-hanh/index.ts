@@ -54,6 +54,17 @@ export class NguHanhModule implements IGameModule {
                 this.bossSystem.onMatch(world, matches.size, 1);
             }
         }
+        // EIDOLON-V: UI Sync
+        if (this.context.onSyncUI) {
+            const bossStatus = this.bossSystem.getBossStatus(world);
+            this.context.onSyncUI({
+                boss: bossStatus,
+                level: {
+                    score: 0,
+                    movesLeft: this.gridSystem.movesLeft
+                }
+            });
+        }
     }
 
     onPlayerInput(world: WorldState, input: any): void {

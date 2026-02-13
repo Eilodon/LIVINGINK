@@ -12,7 +12,8 @@ import { EntityManager } from './EntityManager';
 export interface IGameContext {
     spawnVisual(entityId: number, color: number, shape: number): void;
     setVisualState(entityId: number, state: number): void;
-    onPreviewInteraction?: (data: any) => void;
+    onPreviewInteraction?(data: any): void; // Subconscious UI feedback
+    onSyncUI?(data: any): void; // UI State Sync
     entityManager: EntityManager;
 }
 
