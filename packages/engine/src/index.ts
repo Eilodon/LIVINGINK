@@ -58,6 +58,9 @@ export * from './networking';
 // Config Module
 export * from './config';
 
+// Client Module (Fluid, Rendering)
+export * from './client';
+
 // Factories Module
 export * from './factories';
 

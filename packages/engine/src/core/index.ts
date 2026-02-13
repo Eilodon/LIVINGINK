@@ -10,5 +10,7 @@ export * from './BaseSimulation';
 export * from './CoreRegistry';
 export * from './IEntityLookup';
 export * from './EntityManager';
+export * from './IGameModule';
 
 export * from './GlobalEntityLookup';
+export * from './WasmAdapter';

@@ -12,7 +12,7 @@ export * from './IComponent';
 export * from './ISystem';
 
 // Game Module (Plugin/Cartridge)
-export * from './IGameModule';
+// export * from './IGameModule';
 
 // Legacy Game State (IMPERATOR)
 export * from './IGameState';

@@ -11,6 +11,7 @@ import { EntityManager } from './EntityManager';
  */
 export interface IGameContext {
     spawnVisual(entityId: number, color: number, shape: number): void;
+    setVisualState(entityId: number, state: number): void;
     entityManager: EntityManager;
 }
 

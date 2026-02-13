@@ -1,0 +1,10 @@
+{
+    "name": "core-rust-wrapper",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "build": "wasm-pack build --target web --out-dir pkg",
+        "build:node": "wasm-pack build --target nodejs --out-dir pkg-node",
+        "test": "wasm-pack test --headless --firefox"
+    }
+}

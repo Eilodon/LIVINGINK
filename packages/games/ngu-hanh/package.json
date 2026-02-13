@@ -1,0 +1,10 @@
+{
+    "name": "@cjr/game-ngu-hanh",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "index.ts",
+    "types": "index.ts",
+    "dependencies": {
+        "@cjr/engine": "file:../../engine"
+    }
+}
