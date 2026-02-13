@@ -6,6 +6,7 @@ import { ElementType } from '../../../../packages/games/ngu-hanh/types';
 import { AssetManager } from '../game/systems/AssetManager';
 import { ParticleManager } from '../game/systems/ParticleManager';
 import { FluidRenderer } from '../../../../packages/engine/src/renderer/FluidRenderer';
+import { audioManager } from '../game/engine/AudioManager';
 
 export const GameCanvas = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -125,6 +126,10 @@ export const GameCanvas = () => {
             app.stage.eventMode = 'static';
             app.stage.hitArea = app.screen;
 
+            app.stage.on('pointerdown', async () => {
+                await audioManager.resume();
+            });
+
             app.stage.on('pointermove', (event) => {
                 const rect = canvasRef.current?.getBoundingClientRect();
                 if (!rect) return;
@@ -175,6 +180,8 @@ export const GameCanvas = () => {
 
     // Preview State
     const [previewState, setPreviewState] = useState<import('../../../../packages/games/ngu-hanh/types').InteractionPreview | null>(null);
+    const prevCellsRef = useRef<Uint8Array | null>(null);
+    const spriteScalesRef = useRef<Float32Array>(new Float32Array(64).fill(1));
 
     const updateLoop = (dt: number) => {
         const gridSystem = systemRef.current;
@@ -190,31 +197,14 @@ export const GameCanvas = () => {
 
         // Update Fluid
         if (fluidRendererRef.current) {
-            // Convert seconds to ms or just use dt? 
-            // FluidRenderer usually expects seconds or consistent time unit. 
-            // dt from Pixi ticker is in ticks? 
-            // app.ticker.deltaTime is scalar (1 = 1 frame at 60fps). 
-            // FluidRenderer.update(dt) -> time += dt.
-            // If shader expects seconds, we might need dt / 60.
-            // But let's pass dt for now.
-            fluidRendererRef.current.update(dt * 0.016, app.renderer); // Approx seconds, pass renderer
-
-            // Async feedback
-            gridSystem.updateFromFluid(fluidRendererRef.current).catch(e => {
-                // console.warn("Fluid Sync Error", e); // Suppress spam
-            });
+            fluidRendererRef.current.update(dt * 0.016, app.renderer);
+            gridSystem.updateFromFluid(fluidRendererRef.current).catch(e => { });
         }
 
-        // 2. Process Game Events (Matches, Cycle)
-        // 2. Process Game Events (Matches, Cycle)
-        // Use GridSystem helper to convert Rust events to Set of indices
+        // 2. Process Game Events
         const matches = gridSystem.findMatches(null);
-
         if (matches.size > 0) {
-            // Process Logic via TypeScript System (Hybrid approach)
             const cycleResult = gridSystem.resolveMatches(null, { removeEntity: () => { } }, matches, cycleSystem);
-
-            // Sync Cycle Status from TypeScript System
             setCycleStats({
                 target: cycleSystem.getCurrentTarget(),
                 multiplier: cycleSystem.getStats().multiplier,
@@ -222,52 +212,37 @@ export const GameCanvas = () => {
                 avatarState: cycleSystem.isAvatarStateActive()
             });
 
-            // Trigger Visual Effects based on result
             if (cycleResult.isAvatarState) {
-                // Flash effect or log
-                console.log("Avatar State Visual Triggered");
-                // TODO: Add screen shake or flash trigger here
                 traumaRef.current += 0.8;
             }
         }
 
-        // 3. Process Visual Events (Particles, Shake)
+        // 3. Process Visual Events
         const renderEvents = gridSystem.getFluidEvents();
         let addedTrauma = 0;
 
         if (renderEvents.length > 0) {
-            // ... (Existing Event Processing) ...
-            // Reusing existing logic but keeping it concise here
             for (let i = 0; i < renderEvents.length; i++) {
                 const data = renderEvents[i];
-                const type = (data >>> 24) & 0xFF;
+                const type = (data >>> 24) & 0xFF; // Type
                 const x = (data >>> 16) & 0xFF;
                 const y = (data >>> 8) & 0xFF;
                 const px = x * 50 + 25;
                 const py = y * 50 + 25;
 
-                // Particle spawning logic...
-                // (Copied from existing for safety, or we can trust the replaced block encompasses it)
-                // Wait, if I replace the whole loop, I need to include the body.
-                // The previous code had the Switch Case.
-                // I will include it.
-
                 switch (type) {
-                    case 21: particleManager.spawnSparks(px, py); addedTrauma += 0.3; break;
-                    case 22: particleManager.spawnLeaves(px, py); addedTrauma += 0.2; break;
-                    case 23: particleManager.spawnDroplets(px, py); addedTrauma += 0.3; break;
-                    case 24: particleManager.spawnEmbers(px, py); particleManager.spawnSparks(px, py); addedTrauma += 0.4; break;
-                    case 25: particleManager.spawnDust(px, py); addedTrauma += 0.2; break;
-                    case 31: particleManager.spawnDroplets(px, py); break;
-                    case 32: particleManager.spawnEmbers(px, py); break;
-                    case 33: particleManager.spawnLeaves(px, py); break;
+                    case 21: particleManager.spawnSparks(px, py); audioManager.playMetal(); addedTrauma += 0.3; break;
+                    case 22: particleManager.spawnLeaves(px, py); audioManager.playWood(); addedTrauma += 0.2; break;
+                    case 23: particleManager.spawnDroplets(px, py); audioManager.playWater(); addedTrauma += 0.3; break;
+                    case 24: particleManager.spawnEmbers(px, py); particleManager.spawnSparks(px, py); audioManager.playFire(); addedTrauma += 0.4; break;
+                    case 25: particleManager.spawnDust(px, py); audioManager.playEarth(); addedTrauma += 0.2; break;
                     default: break;
                 }
             }
             gridSystem.clearEvents();
         }
 
-        // Apply Trauma...
+        // Apply Trauma
         if (addedTrauma > 0) traumaRef.current = Math.min(1.0, traumaRef.current + addedTrauma);
         traumaRef.current = Math.max(0, traumaRef.current - 0.05 * dt);
         if (traumaRef.current > 0 && appRef.current) {
@@ -281,21 +256,15 @@ export const GameCanvas = () => {
         // 4. Render Grid State & Visual Feedback
         const cells = gridSystem.getCells();
         const sprites = spritesRef.current;
+        const scales = spriteScalesRef.current;
+        const prevCells = prevCellsRef.current;
 
-        // Reset tints first
-        for (let s of sprites) s.tint = 0xFFFFFF;
-
-        // Apply Preview Tints
-        if (previewState) {
-            previewState.affectedTiles.forEach(tile => {
-                const sIdx = tile.row * gridSystem.getWidth() + tile.col;
-                if (sIdx < sprites.length) {
-                    if (previewState.type === 'destruction') sprites[sIdx].tint = 0xFF6B6B; // Red
-                    else if (previewState.type === 'generation') sprites[sIdx].tint = 0x4ECDC4; // Cyan
-                }
-            });
+        // Resize scales buffer if needed
+        if (scales.length !== cells.length / 2) {
+            spriteScalesRef.current = new Float32Array(cells.length / 2).fill(1);
         }
 
+        // Logic Loop for Visuals
         for (let i = 0; i < sprites.length; i++) {
             const byteIdx = i * 2;
             if (byteIdx >= cells.length) break;
@@ -303,10 +272,34 @@ export const GameCanvas = () => {
             const element = cells[byteIdx];
             const sprite = sprites[i];
 
+            // Change Detection: Spawn Pop
+            if (prevCells) {
+                const prevElem = prevCells[byteIdx];
+                if (prevElem === 0 && element !== 0) {
+                    scales[i] = 0.0; // Reset scale for pop-in
+                }
+            }
+
+            // Interpolate Scale
+            // target is 1.0 normally, 1.1 if hovered/previewed
+            let targetScale = 1.0;
+            if (previewState) {
+                // If this tile is affected, pulse it
+                const isAffected = previewState.affectedTiles.some(t => (t.row * gridSystem.getWidth() + t.col) === i);
+                if (isAffected) targetScale = 1.15;
+            }
+
+            // Simple Lerp: current += (target - current) * 0.2
+            scales[i] += (targetScale - scales[i]) * 0.2 * dt;
+
+            // Render
             if (element === 0) {
                 sprite.visible = false;
             } else {
                 sprite.visible = true;
+                sprite.scale.set(scales[i]); // Apply Scale
+
+                // Texture update logic...
                 let key = 'element_metal';
                 switch (element) {
                     case 1: key = 'element_metal'; break;
@@ -320,6 +313,29 @@ export const GameCanvas = () => {
                 const tex = assetManager.getTexture(key);
                 if (sprite.texture !== tex) sprite.texture = tex;
             }
+
+            // Apply Tint from Preview
+            sprite.tint = 0xFFFFFF; // Reset
+        }
+
+        // Post-Loop: Tinting 
+        // (Moved out of main loop or integrated? Integrated is better but previewState loop is easier separate)
+        if (previewState) {
+            previewState.affectedTiles.forEach(tile => {
+                const sIdx = tile.row * gridSystem.getWidth() + tile.col;
+                if (sIdx < sprites.length) {
+                    const type = tile.type || previewState.type;
+                    if (type === 'destruction') sprites[sIdx].tint = 0xFF6B6B;
+                    else if (type === 'generation') sprites[sIdx].tint = 0x4ECDC4;
+                }
+            });
+        }
+
+        // Store copy of cells for next frame
+        if (!prevCellsRef.current || prevCellsRef.current.length !== cells.length) {
+            prevCellsRef.current = new Uint8Array(cells);
+        } else {
+            prevCellsRef.current.set(cells);
         }
     };
 

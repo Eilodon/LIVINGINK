@@ -186,14 +186,13 @@ impl Simulation {
     
     // PREVIEW API
     // Returns flat array: [index, type, index, type...]
-    pub fn get_swap_preview(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) -> Vec<u32> {
+    // Type: 1 = Destruction (Red), 2 = Generation (Blue)
+    pub fn preview_swap(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) -> Vec<u32> {
          let w = self.grid.get_width();
          let idx1 = y1 * w + x1;
          let idx2 = y2 * w + x2;
          self.grid.preview_swap(idx1, idx2)
     }
-
-    // Deprecated methods from old GridState
     pub fn get_fluid_events(&self) -> JsValue {
         JsValue::UNDEFINED
     }
@@ -202,7 +201,20 @@ impl Simulation {
         self.grid.clear_events();
     }
     
-    // Setters - removed as they are not in new GridState public API
-    pub fn set_cell(&mut self, _x: usize, _y: usize, _val: u8) {}
-    pub fn set_cell_flags(&mut self, _x: usize, _y: usize, _val: u8, _flags: u8) {}
+    // Setters
+    pub fn set_cell_element(&mut self, idx: usize, element: u8) {
+        self.grid.set_cell_element(idx, element);
+    }
+
+    pub fn set_cell_flag(&mut self, idx: usize, flag: u8) {
+        self.grid.set_cell_flag(idx, flag);
+    }
+    
+    pub fn unset_cell_flag(&mut self, idx: usize, flag: u8) {
+        self.grid.unset_cell_flag(idx, flag);
+    }
+
+    pub fn spawn_special(&mut self, count: usize, element: u8, flags: u8, exclude_element: u8) -> Vec<usize> {
+        self.grid.spawn_special(count, element, flags, exclude_element)
+    }
 }

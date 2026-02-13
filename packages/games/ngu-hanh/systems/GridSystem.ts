@@ -467,9 +467,7 @@ export class GridSystem {
 
     // --- SUBCONSCIOUS UI SYSTEM ---
 
-    // Note: This is a client-side heuristic for Visual Feedback (Hover).
-    // The authoritative logic remains in Rust (getSwapPreview).
-    // This method scans the board to highlight potential interactions based on Element Type.
+    // Note: This calls WASM to get accurate interaction previews for all 4 neighbors.
     previewInteraction(world: any, cycleSystem: any, row: number, col: number): import("../types.js").InteractionPreview {
         const idx = row * this.width + col;
         // Check bounds
@@ -477,76 +475,67 @@ export class GridSystem {
             return { type: 'none', affectedTiles: [], cycleProgress: cycleSystem?.getChainLength ? cycleSystem.getChainLength() : 0 };
         }
 
-        const cells = this.getCells();
-        const element = cells[idx * 2];
-
-        if (element === 0) {
-            return { type: 'none', affectedTiles: [], cycleProgress: cycleSystem?.getChainLength ? cycleSystem.getChainLength() : 0 };
+        if (!this.sim || !(this.sim as any).preview_swap) {
+            return { type: 'none', affectedTiles: [], cycleProgress: 0 };
         }
 
-        // Determine interaction type and affected tiles
-        const interaction = this.calculateInteraction(element);
-        const affectedTiles = this.findAffectedTiles(element, row, col, interaction.type);
+        const affectedMap = new Map<number, 'destruction' | 'generation'>();
 
-        return {
-            type: interaction.type as any,
-            affectedTiles: affectedTiles,
-            cycleProgress: cycleSystem?.getChainLength ? cycleSystem.getChainLength() : 0
-        };
-    }
+        // Check 4 cardinal neighbors (Up, Down, Left, Right)
+        const neighbors = [
+            { r: row - 1, c: col },
+            { r: row + 1, c: col },
+            { r: row, c: col - 1 },
+            { r: row, c: col + 1 }
+        ];
 
-    private calculateInteraction(attackerElement: number): { type: 'destruction' | 'generation' } {
-        // Based on Wu Xing: Fire melts Metal, Water quenches Fire, etc.
-        // Return type based on element interactions
-        switch (attackerElement) {
-            case 4: // Fire - destructive to Metal
-                return { type: 'destruction' };
-            case 3: // Water - destructive to Fire  
-                return { type: 'destruction' };
-            case 2: // Wood - destructive to Earth
-                return { type: 'destruction' };
-            case 1: // Metal - destructive to Wood
-                return { type: 'destruction' };
-            case 5: // Earth - destructive to Water
-                return { type: 'destruction' };
-            default:
-                return { type: 'generation' }; // Default to generation.
-        }
-    }
+        for (const n of neighbors) {
+            if (n.r >= 0 && n.r < this.height && n.c >= 0 && n.c < this.width) {
+                // Call WASM preview_swap
+                // WASM returns [idx, type, idx, type...] (u32 array)
+                const result = (this.sim as any).preview_swap(col, row, n.c, n.r) as Uint32Array;
 
-    private findAffectedTiles(attackerElement: number, row: number, col: number, type: string): { row: number, col: number }[] {
-        const affected: { row: number, col: number }[] = [];
-        const cells = this.getCells();
-
-        // Scan board for matching elements
-        for (let r = 0; r < this.height; r++) {
-            for (let c = 0; c < this.width; c++) {
-                const idx = r * this.width + c;
-                const element = cells[idx * 2];
-
-                if (this.isAffectedByInteraction(attackerElement, element, type)) {
-                    affected.push({ row: r, col: c });
+                // Parse result
+                for (let i = 0; i < result.length; i += 2) {
+                    const tIdx = result[i];
+                    const typeCode = result[i + 1];
+                    // typeCode: 1 = Destruction, 2 = Generation, 0/3 = Match
+                    if (typeCode === 1) {
+                        affectedMap.set(tIdx, 'destruction');
+                    } else if (typeCode === 2) {
+                        // Destruction takes priority in visualization usually, 
+                        // but if it's already destruction, keep destruction.
+                        if (affectedMap.get(tIdx) !== 'destruction') {
+                            affectedMap.set(tIdx, 'generation');
+                        }
+                    }
                 }
             }
         }
 
-        return affected;
-    }
+        const affectedTiles: { row: number, col: number, type?: 'destruction' | 'generation' }[] = [];
+        let hasDestruction = false;
+        let hasGeneration = false;
 
-    private isAffectedByInteraction(attacker: number, defender: number, type: string): boolean {
-        // Wu Xing interaction logic
-        if (type === 'destruction') {
-            return (attacker === 4 && defender === 1) || // Fire destroys Metal
-                (attacker === 3 && defender === 4) || // Water destroys Fire
-                (attacker === 2 && defender === 5) || // Wood destroys Earth
-                (attacker === 1 && defender === 2) || // Metal destroys Wood
-                (attacker === 5 && defender === 3);   // Earth destroys Water
-        } else {
-            // Generation interactions
-            return (attacker === 1 && defender === 3) || // Metal generates Water
-                (attacker === 2 && defender === 4) || // Wood generates Fire
-                (attacker === 3 && defender === 2);   // Water generates Wood
-        }
+        affectedMap.forEach((type, key) => {
+            if (type === 'destruction') hasDestruction = true;
+            if (type === 'generation') hasGeneration = true;
+            affectedTiles.push({
+                row: Math.floor(key / this.width),
+                col: key % this.width,
+                type: type
+            });
+        });
+
+        let overallType: 'destruction' | 'generation' | 'none' = 'none';
+        if (hasDestruction) overallType = 'destruction';
+        else if (hasGeneration) overallType = 'generation';
+
+        return {
+            type: overallType,
+            affectedTiles: affectedTiles,
+            cycleProgress: cycleSystem?.getChainLength ? cycleSystem.getChainLength() : 0
+        };
     }
 
     // --- VISUAL EVENTS ACCESS (FLUID SIMULATION EVENTS) ---

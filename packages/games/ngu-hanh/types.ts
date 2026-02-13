@@ -17,6 +17,6 @@ export enum TileMod {
 
 export interface InteractionPreview {
     type: 'destruction' | 'generation' | 'none';
-    affectedTiles: { row: number, col: number }[];
+    affectedTiles: { row: number, col: number, type?: 'destruction' | 'generation' }[];
     cycleProgress: number;
 }

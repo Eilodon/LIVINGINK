@@ -694,6 +694,51 @@ impl GridState {
     pub fn get_cycle_multiplier(&self) -> u32 {
         self.cycle.multiplier
     }
+
+    // --- PREVIEW IMPLEMENTATION ---
+    pub fn preview_swap(&mut self, idx1: usize, idx2: usize) -> Vec<u32> {
+        if idx1 >= self.cells.len() || idx2 >= self.cells.len() { return Vec::new(); }
+        // Basic validation same as try_swap
+        let c1 = self.cells[idx1];
+        let c2 = self.cells[idx2];
+        if c1.element == 10 || c2.element == 10 { return Vec::new(); }
+
+        // Swap
+        self.cells.swap(idx1, idx2);
+
+        // Check matches
+        let matches = self.find_all_matches();
+        let mut result = Vec::with_capacity(matches.len() * 5); // Heuristic
+
+        for m in matches {
+            let interaction = self.analyze_match_interaction(&m);
+            match interaction {
+                InteractionType::Destruction(affected) => {
+                    for idx in affected {
+                        result.push(idx as u32);
+                        result.push(1); // 1 = Destruction (Red)
+                    }
+                },
+                InteractionType::Generation(affected) => {
+                    for idx in affected {
+                        result.push(idx as u32);
+                        result.push(2); // 2 = Generation (Blue/Green)
+                    }
+                },
+                InteractionType::None => {
+                    for idx in m.cells {
+                        result.push(idx as u32);
+                        result.push(0); // 0 = Basic Match (White)
+                    }
+                }
+            }
+        }
+
+        // Revert Swap
+        self.cells.swap(idx1, idx2);
+
+        result
+    }
 }
 
 // --- PREVIEW SYSTEM ---
@@ -798,46 +843,7 @@ impl GridState {
          InteractionType::None
     }
 
-    pub fn preview_swap(&mut self, idx1: usize, idx2: usize) -> Vec<u32> {
-        // Return protocol: [CellIdx, Type, CellIdx, Type...]
-        // Type: 1 = Destruction (Red), 2 = Generation (Green)
-        
-        if idx1 >= self.cells.len() || idx2 >= self.cells.len() { return vec![]; }
-        if idx1 == idx2 { return vec![]; }
-        
-        let mut result = Vec::new();
-        
-        // 1. Temporarily Swap
-        self.cells.swap(idx1, idx2);
-        
-        // 2. Find matches
-        let matches = self.find_all_matches();
-        
-        // 3. Analyze
-        for m in matches {
-            let interaction = self.analyze_match_interaction(&m);
-            match interaction {
-                InteractionType::Destruction(idxs) => {
-                    for idx in idxs {
-                        result.push(idx as u32);
-                        result.push(1); // Destruction
-                    }
-                },
-                InteractionType::Generation(idxs) => {
-                    for idx in idxs {
-                        result.push(idx as u32);
-                        result.push(2); // Generation
-                    }
-                },
-                InteractionType::None => {}
-            }
-        }
-        
-        // 4. Swap Lock
-        self.cells.swap(idx1, idx2);
-        
-        result
-    }
+
 }
 
 // --- CYCLE SYSTEM LOGIC ---
