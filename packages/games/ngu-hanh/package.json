@@ -6,5 +6,8 @@
     "types": "index.ts",
     "dependencies": {
         "@cjr/engine": "file:../../engine"
+    },
+    "devDependencies": {
+        "vitest": "^1.0.0"
     }
 }

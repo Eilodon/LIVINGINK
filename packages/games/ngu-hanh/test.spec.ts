@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { NguHanhModule } from './index';
-import { WorldState } from '../../engine/src/generated/WorldState';
-import { EntityManager } from '../../engine/src/core/EntityManager';
+import { NguHanhModule } from './index.js';
+import { WorldState } from '../../engine/src/generated/WorldState.js';
+import { EntityManager } from '../../engine/src/core/EntityManager.js';
 
 describe('Ngũ Hành Module', () => {
     it('should initialize, run game loop, and handle input', async () => {
@@ -13,14 +13,16 @@ describe('Ngũ Hành Module', () => {
         // Mock Context
         const mockContext = {
             entityManager: entityManager,
-            spawnVisual: (entityId: number, color: number, shape: number) => { }
+            spawnVisual: (entityId: number, color: number, shape: number) => { },
+            setVisualState: (entityId: number, state: number) => { },
+            onPreviewInteraction: (data: any) => { }
         };
 
         const nguHanh = new NguHanhModule();
         await nguHanh.onMount(world, mockContext);
 
-        // Check if entities were created
-        expect(entityManager.count).toBe(64);
+        // Check if entities were spawned (8x8 grid = 64 tiles + 1 Boss = 65)
+        expect(entityManager.count).toBe(65);
 
         // Run loop multiple times
         console.log("Simulating Game Loop (Gravity)...");
@@ -28,8 +30,8 @@ describe('Ngũ Hành Module', () => {
             nguHanh.onUpdate(world, 0.016);
         }
 
-        // After stable state, count should still be 64
-        expect(entityManager.count).toBe(64);
+        // After stable state, count should still be 64 + 1 Boss = 65
+        expect(entityManager.count).toBe(65);
 
         console.log("Simulating Input (Select & Swap)...");
         // Click (0,0)

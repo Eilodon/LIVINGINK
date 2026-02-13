@@ -1,6 +1,7 @@
 import { WorldState, TransformAccess, StateAccess, EntityFlags, SkillAccess, EntityManager } from '@cjr/engine';
-import { ElementType, TileMod } from '../types';
-import { CycleSystem } from './CycleSystem';
+import { ElementType, TileMod } from '../types.js';
+import { CycleSystem } from './CycleSystem.js';
+import { PredictionSystem, PredictionResult } from './PredictionSystem.js';
 
 export class GridSystem {
     private width: number;
@@ -15,6 +16,8 @@ export class GridSystem {
     // Track Tile Modifications (Ash, Stone, etc.)
     // Key: Entity ID, Value: TileMod
     private tileMods: Map<number, TileMod> = new Map();
+
+    private predictionSystem: PredictionSystem = new PredictionSystem();
 
     constructor(width: number, height: number, tileSize: number) {
         this.width = width;
@@ -41,6 +44,14 @@ export class GridSystem {
         this.tileMods.set(entityId, mod);
         // Trigger visual update
         spawnVisual(entityId, mod);
+    }
+
+    /**
+     * Preview interaction for Subconscious UI
+     */
+    public previewInteraction(world: WorldState, cycleSystem: CycleSystem, r: number, c: number): PredictionResult {
+        const entityId = this.getEntityAt(r, c);
+        return this.predictionSystem.predict(world, this, cycleSystem, entityId);
     }
 
     /**
@@ -276,7 +287,7 @@ export class GridSystem {
         // V2: "Ash tiles cannot be matched", implying cannot move.
         // Let's assume Ash is "dead weight" but movable? V2 says "Ash tiles cannot be matched (black, charred)".
         // Usually blockers are immovable. Let's make STONE immovable, ASH movable but no match.
-        // Wait, Boss 2: "Stones spread... obstacles (cannot be matched)". 
+        // Wait, Boss 2: "Stones spread... obstacles (cannot be matched)".
         // Let's block swapping for Stone. Ash is debatable, but let's allow swap for now so you can move it out of the way?
         // Actually, cleaner if modded tiles are "stuck" or special. For now, block swap if STONE.
         const id1 = this.grid[r1][c1];
@@ -333,7 +344,7 @@ export class GridSystem {
         }
     }
 
-    /** 
+    /**
      * Get random tile ID - useful for Boss skills
      */
     public getRandomTileId(): number {

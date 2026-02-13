@@ -57,7 +57,36 @@ export class NguHanhModule implements IGameModule {
     }
 
     onPlayerInput(world: WorldState, input: any): void {
-        if (!input || input.type !== 'pointerdown') return;
+        if (!input) return;
+
+        // Subconscious UI: Hover Preview
+        if (input.type === 'pointermove') {
+            const [r, c] = this.gridSystem.getGridCoordinates(input.x, input.y);
+            if (r !== -1 && c !== -1) {
+                // Call Prediction System
+                const prediction = this.gridSystem.previewInteraction(world, this.cycleSystem, r, c);
+
+                // Send visual feedback to Client Context
+                // We need to extend IGameContext to support 'setInteractionHint' or similar
+                // For MVP, if we can't change interface, we assume input has a callback or we use existing spawnVisual?
+                // Actually, IGameContext is defined in engine. Let's see if we can hack it or if we need to modify engine.
+                // Assuming we can emit an event or call a method on context.
+                // For now, let's log it to verify integration.
+                // console.log(`[SubconsciousUI] Hover [${r},${c}] -> Type: ${prediction.type}, Affected: ${prediction.affectedTiles.length}`);
+
+                if (this.context.onPreviewInteraction) {
+                    this.context.onPreviewInteraction(prediction);
+                }
+            } else {
+                // Clear prediction if outside grid
+                if (this.context.onPreviewInteraction) {
+                    this.context.onPreviewInteraction(null);
+                }
+            }
+            return;
+        }
+
+        if (input.type !== 'pointerdown') return;
 
         const [r, c] = this.gridSystem.getGridCoordinates(input.x, input.y);
 
@@ -78,9 +107,8 @@ export class NguHanhModule implements IGameModule {
                 console.log("[NguHanh] Deselected tile");
                 // Reset Visuals
                 const idPrev = this.gridSystem.getEntityAt(r1, c1);
-                const idCurr = this.gridSystem.getEntityAt(r, c);
+                // const idCurr = this.gridSystem.getEntityAt(r, c); // Same tile
                 if (idPrev !== -1) this.context.setVisualState(idPrev, 0); // IDLE
-                if (idCurr !== -1) this.context.setVisualState(idCurr, 0); // IDLE
                 return;
             }
 
@@ -95,6 +123,8 @@ export class NguHanhModule implements IGameModule {
 
             if (success) {
                 console.log("[NguHanh] Swap Successful!");
+                // Boss Interaction: Every move counts
+                this.bossSystem.onPlayerMove(world, this.gridSystem, this.context.spawnVisual);
             } else {
                 console.log("[NguHanh] Swap Failed (No Match)");
             }

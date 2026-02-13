@@ -103,6 +103,53 @@ export class GameHost implements IGameContext {
         // TODO: Implement Sync System here or in GameCanvas loop
     }
 
+    onPreviewInteraction(data: any): void {
+        // Reset all previous previews (simple approach: iterate all visuals)
+        // Optimization: track previewed entities separately?
+        // For MVP, just iterate active visuals if count is low. 64 tiles is fine.
+        /* 
+           Data structure from PredictionSystem:
+           {
+               type: InteractionType (0=NONE, 1=DESTRUCTION, 2=GENERATION, 3=NEUTRAL, 4=BLOCKED),
+               affectedTiles: number[]
+           }
+        */
+
+        // Reset visual state for all entities (brute force for MVP reliability)
+        this.entityVisuals.forEach((visual) => {
+            visual.tint = 0xFFFFFF; // Reset tint
+            visual.alpha = 1.0;
+        });
+
+        if (!data || data.type === 0 || !data.affectedTiles) return;
+
+        const affected = data.affectedTiles as number[];
+        const type = data.type as number;
+
+        affected.forEach((id) => {
+            const visual = this.entityVisuals.get(id);
+            if (visual) {
+                // Visual Feedback based on Interaction Type
+                switch (type) {
+                    case 1: // DESTRUCTION (Red Tint + Shake?)
+                        visual.tint = 0xFF0000;
+                        visual.alpha = 0.8;
+                        break;
+                    case 2: // GENERATION (Green Tint + Glow?)
+                        visual.tint = 0x00FF00;
+                        visual.alpha = 1.0;
+                        break;
+                    case 4: // BLOCKED (Grey)
+                        visual.tint = 0x808080;
+                        break;
+                    default:
+                        visual.tint = 0xFFFF00; // Neutral/Other
+                        break;
+                }
+            }
+        });
+    }
+
     cleanup(): void {
         this.entityVisuals.forEach(v => v.destroy());
         this.entityVisuals.clear();
