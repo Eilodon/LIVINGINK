@@ -2,6 +2,7 @@
 import { WorldState, EntityManager, StatsAccess, EntityFlags, StateAccess } from '@cjr/engine';
 import { GridSystem } from './GridSystem.js';
 import { TileMod, ElementType } from '../types.js';
+import { SeededRNG } from '../utils/SeededRNG.js';
 
 export enum BossType {
     FIRE_PHOENIX = 0,
@@ -17,25 +18,33 @@ export class BossSystem {
     private movesCounter: number = 0;
     private movesPerAction: number = 3;
 
-    initialize(world: WorldState, entityManager: EntityManager, level: number = 1): void {
-        this.bossId = entityManager.createEntity();
+    private availableSkills: string[] = [];
+    private rng!: SeededRNG;
 
-        // Determine Boss Type based on Level (simple logic for now)
-        if (level < 25) this.bossType = BossType.FIRE_PHOENIX;
-        else if (level < 50) this.bossType = BossType.EARTH_GOLEM;
-        else this.bossType = BossType.METAL_DRAGON;
+    initialize(world: WorldState, entityManager: EntityManager, config: { hp: number, damageMultiplier: number, skills: string[] }, seed: number): void {
+        this.bossId = entityManager.createEntity();
+        this.availableSkills = config.skills;
+        this.rng = new SeededRNG(seed);
+
+        // Determine Boss Type visually (simplified)
+        // In real impl, config would have 'visualType' or 'name'
+        // For now, assume based on skills? Or just random?
+        // Let's use first skill to determine type for now
+        if (config.skills.includes('ASH_SPREAD')) this.bossType = BossType.FIRE_PHOENIX;
+        else if (config.skills.includes('STONE_WALL')) this.bossType = BossType.EARTH_GOLEM;
+        else if (config.skills.includes('LOCK_TILE')) this.bossType = BossType.METAL_DRAGON;
+        else this.bossType = BossType.FIRE_PHOENIX; // Default
 
         // Activate
         StateAccess.activate(world, this.bossId);
         StateAccess.setFlag(world, this.bossId, EntityFlags.BOSS);
 
         // Stats
-        const maxHp = 1000 * level;
-        StatsAccess.setHp(world, this.bossId, maxHp);
-        StatsAccess.setMaxHp(world, this.bossId, maxHp);
-        StatsAccess.setDefense(world, this.bossId, 5 * level);
+        StatsAccess.setHp(world, this.bossId, config.hp);
+        StatsAccess.setMaxHp(world, this.bossId, config.hp);
+        StatsAccess.setDefense(world, this.bossId, 10 * config.damageMultiplier); // Defense scaling
 
-        console.log(`[BossSystem] Boss Spawned! ID: ${this.bossId}, Type: ${BossType[this.bossType]}, HP: ${maxHp}`);
+        console.log(`[BossSystem] Boss Spawned! ID: ${this.bossId}, HP: ${config.hp}, Skills: ${config.skills.join(', ')}`);
     }
 
     onMatch(world: WorldState, count: number, multiplier: number): void {
@@ -59,62 +68,79 @@ export class BossSystem {
     /**
      * Called every player move
      */
-    onPlayerMove(world: WorldState, gridSystem: GridSystem, spawnVisual: (id: number, mod: TileMod) => void): void {
+    onPlayerMove(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
         if (this.bossId === -1 || (StateAccess.getFlags(world, this.bossId) & EntityFlags.DEAD)) return;
 
         this.movesCounter++;
         console.log(`[BossSystem] Move ${this.movesCounter}/${this.movesPerAction}`);
 
         if (this.movesCounter >= this.movesPerAction) {
-            this.executeSkill(world, gridSystem, spawnVisual);
+            this.executeSkill(world, gridSystem, setVisualState);
             this.movesCounter = 0;
         }
     }
 
-    private executeSkill(world: WorldState, gridSystem: GridSystem, spawnVisual: (id: number, mod: TileMod) => void): void {
-        console.log(`[BossSystem] EXECUTING SKILL for ${BossType[this.bossType]}!`);
+    private executeSkill(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
+        if (this.availableSkills.length === 0) return;
 
-        switch (this.bossType) {
-            case BossType.FIRE_PHOENIX:
-                this.skillAshSpread(world, gridSystem, spawnVisual);
+        // Pick random available skill
+        const skill = this.rng.nextElement(this.availableSkills);
+        if (!skill) return;
+        console.log(`[BossSystem] EXECUTING SKILL: ${skill}`);
+
+        switch (skill) {
+            case 'ASH_SPREAD':
+                this.skillAshSpread(world, gridSystem, setVisualState);
                 break;
-            case BossType.EARTH_GOLEM:
-                this.skillStoneWall(world, gridSystem, spawnVisual);
+            case 'STONE_WALL':
+                this.skillStoneWall(world, gridSystem, setVisualState);
                 break;
-            case BossType.METAL_DRAGON:
-                this.skillMetalLock(world, gridSystem, spawnVisual);
+            case 'LOCK_TILE':
+                this.skillMetalLock(world, gridSystem, setVisualState);
+                break;
+            default:
+                console.warn(`[BossSystem] Unknown skill: ${skill}`);
                 break;
         }
     }
 
     // Skill 1: Ash Spread - Converts 3 random tiles to Ash
-    private skillAshSpread(world: WorldState, gridSystem: GridSystem, spawnVisual: (id: number, mod: TileMod) => void): void {
-        for (let i = 0; i < 3; i++) {
-            const tileId = gridSystem.getRandomTileId();
-            if (tileId !== -1 && gridSystem.getMod(tileId) === TileMod.NONE) {
-                gridSystem.setMod(world, tileId, TileMod.ASH, spawnVisual);
-                console.log(`[BossSystem] Tile ${tileId} turned to ASH!`);
-            }
-        }
+    private skillAshSpread(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
+        // Use Rust efficient spawn
+        // Ash = Element 11, Flag 2. Count 3. Exclude 'Stone' (10) or 'Ash' (11).
+        const count = 3;
+        gridSystem.spawnSpecial(count, 11, 2, 10);
+        console.log(`[BossSystem] Spreading ASH on ${count} tiles!`);
     }
 
     // Skill 2: Stone Wall - Spawns 2 Stone Blocks
-    private skillStoneWall(world: WorldState, gridSystem: GridSystem, spawnVisual: (id: number, mod: TileMod) => void): void {
-        for (let i = 0; i < 2; i++) {
-            const tileId = gridSystem.getRandomTileId();
-            if (tileId !== -1 && gridSystem.getMod(tileId) === TileMod.NONE) {
-                gridSystem.setMod(world, tileId, TileMod.STONE, spawnVisual);
-                console.log(`[BossSystem] Tile ${tileId} turned to STONE!`);
-            }
-        }
+    private skillStoneWall(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
+        const count = 2;
+        // Stone = Element 10, Flag 0. Exclude 'Stone' (10).
+        gridSystem.spawnSpecial(count, 10, 0, 10);
+        console.log(`[BossSystem] Spawning STONE WALL (${count} blocks)!`);
     }
 
     // Skill 3: Metal Lock - Locks 1 random tile
-    private skillMetalLock(world: WorldState, gridSystem: GridSystem, spawnVisual: (id: number, mod: TileMod) => void): void {
-        const tileId = gridSystem.getRandomTileId();
-        if (tileId !== -1 && gridSystem.getMod(tileId) === TileMod.NONE) {
-            gridSystem.setMod(world, tileId, TileMod.LOCKED, spawnVisual);
-            console.log(`[BossSystem] Tile ${tileId} LOCKED!`);
+    private skillMetalLock(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
+        // Locking requires finding a valid tile that acts as "Metal" or just any tile?
+        // Typically Metal Boss locks Metal tiles or random tiles.
+        // Let's use manual loop for "Lock" because we want to Preserve Element.
+        // spawnSpecial replaces element.
+
+        let attempts = 0;
+        while (attempts < 10) {
+            const tileId = gridSystem.getRandomTileId();
+            if (tileId !== -1) {
+                const currentMod = gridSystem.getMod(tileId);
+                if (currentMod === TileMod.NONE) {
+                    // Apply Lock (Flag 4)
+                    gridSystem.setFlag(tileId, 4);
+                    console.log(`[BossSystem] Tile ${tileId} LOCKED!`);
+                    break;
+                }
+            }
+            attempts++;
         }
     }
 

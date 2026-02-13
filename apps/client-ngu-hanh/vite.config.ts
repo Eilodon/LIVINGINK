@@ -36,6 +36,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@cjr/engine': path.resolve(__dirname, '../../packages/engine/src/index.ts'),
+      'ngu-hanh': path.resolve(__dirname, '../../packages/games/ngu-hanh'),
     }
   },
   optimizeDeps: {

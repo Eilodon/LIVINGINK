@@ -51,28 +51,36 @@ export class ParticleManager {
         app.ticker.add(this.update, this);
     }
 
-    // Trigger an effect at position (x, y) with a specific type/color
-    spawnEffect(x: number, y: number, color: string): void {
-        const texture = Texture.WHITE; // Use a simple dot for now
+    // --- Elemental Effects ---
 
-        // Deep copy config and modify color
-        const config = JSON.parse(JSON.stringify(burstConfig));
-        // Find color behavior
-        const colorBehavior = config.behaviors.find((b: any) => b.type === 'color');
-        if (colorBehavior) {
-            colorBehavior.config.color.list[0].value = color.replace('#', '');
-            colorBehavior.config.color.list[1].value = color.replace('#', ''); // Fade to same color
-        }
+    spawnSparks(x: number, y: number): void {
+        // Metal: Silver/White sparks, fast, short life
+        this.spawnEffect(x, y, "E0E0E0", 0.3, 300);
+    }
 
-        const emitter = new Emitter(this.container as any, upgradeConfig(config, [texture]));
-        emitter.updateOwnerPos(x, y);
-        emitter.playOnceAndDestroy(() => {
-            // Cleanup callback
-            this.emitters = this.emitters.filter(e => e !== emitter);
-        });
+    spawnLeaves(x: number, y: number): void {
+        // Wood: Green, floaty, slower
+        this.spawnEffect(x, y, "4CAF50", 0.6, 150);
+    }
 
-        // Add to tracking
-        this.emitters.push(emitter);
+    spawnDroplets(x: number, y: number): void {
+        // Water: Blue, fountain-like
+        this.spawnEffect(x, y, "2196F3", 0.5, 200);
+    }
+
+    spawnEmbers(x: number, y: number): void {
+        // Fire: Red/Orange, rising
+        this.spawnEffect(x, y, "FF5722", 0.4, 250);
+    }
+
+    spawnDust(x: number, y: number): void {
+        // Earth: Brown, heavy, spread low
+        this.spawnEffect(x, y, "795548", 0.5, 100);
+    }
+
+    spawnText(x: number, y: number, text: string, color: string): void {
+        // TODO: Floating Text implementation
+        console.log(`Float Text: ${text} at ${x},${y}`);
     }
 
     update(): void {
@@ -84,6 +92,42 @@ export class ParticleManager {
         for (const emitter of this.emitters) {
             emitter.update(dt);
         }
+    }
+
+    // Update spawnEffect to allow speed adjustment
+    spawnEffect(x: number, y: number, color: string, scale: number = 0.5, speed: number = 200): void {
+        const texture = Texture.WHITE; // Use a simple dot for now
+
+        // Deep copy config and modify color
+        const config = JSON.parse(JSON.stringify(burstConfig));
+
+        // Find behaviors
+        const colorBehavior = config.behaviors.find((b: any) => b.type === 'color');
+        if (colorBehavior) {
+            colorBehavior.config.color.list[0].value = color.replace('#', '');
+            colorBehavior.config.color.list[1].value = color.replace('#', '');
+        }
+
+        const scaleBehavior = config.behaviors.find((b: any) => b.type === 'scale');
+        if (scaleBehavior) {
+            scaleBehavior.config.scale.list[0].value = scale;
+            scaleBehavior.config.scale.list[1].value = scale * 0.2;
+        }
+
+        const speedBehavior = config.behaviors.find((b: any) => b.type === 'moveSpeed');
+        if (speedBehavior) {
+            speedBehavior.config.speed.list[0].value = speed;
+        }
+
+        const emitter = new Emitter(this.container as any, upgradeConfig(config, [texture]));
+        emitter.updateOwnerPos(x, y);
+        emitter.playOnceAndDestroy(() => {
+            // Cleanup callback
+            this.emitters = this.emitters.filter(e => e !== emitter);
+        });
+
+        // Add to tracking
+        this.emitters.push(emitter);
     }
 
     // Cleanup

@@ -33,3 +33,15 @@ server/dist/
 .env.production
 .env.test
 .env.local
+
+# Rust & WASM artifacts
+target/
+pkg/
+pkg-node/
+*.wasm
+.cargo/
+Cargo.lock.lock
+
+# OS Junk
+.DS_Store
+Thumbs.db

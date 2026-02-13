@@ -12,8 +12,9 @@ export enum InteractionType {
 }
 
 export interface PredictionResult {
-    type: InteractionType;
-    affectedTiles: number[]; // IDs of tiles that will visually react
+    destructions: number[];
+    generations: number[];
+    blocked: number[];
 }
 
 export class PredictionSystem {
@@ -28,33 +29,20 @@ export class PredictionSystem {
      * This implies showing relationships (Sinh/Khac) relative to the touched tile.
      */
     predict(world: WorldState, gridSystem: GridSystem, cycleSystem: CycleSystem, selectedTileId: number): PredictionResult {
-        if (selectedTileId === -1) return { type: InteractionType.NONE, affectedTiles: [] };
+        const result: PredictionResult = { destructions: [], generations: [], blocked: [] };
+
+        if (selectedTileId === -1) return result;
 
         const selectedType = SkillAccess.getShapeId(world, selectedTileId) as ElementType;
         const selectedMod = gridSystem.getMod(selectedTileId);
 
         if (selectedMod === TileMod.ASH || selectedMod === TileMod.STONE) {
-            return { type: InteractionType.BLOCKED, affectedTiles: [selectedTileId] };
+            result.blocked.push(selectedTileId);
+            return result;
         }
 
         const width = gridSystem.getWidth();
         const height = gridSystem.getHeight();
-        const affected: number[] = [];
-        let interactionType = InteractionType.NEUTRAL;
-
-        // V2 Design Logic: 
-        // "Show Tương Khắc (Destruction) targets" -> Who does THIS tile destroy?
-        // "Show Tương Sinh (Generation) targets" -> Who does THIS tile generate?
-
-        // Check all tiles on board to highlight relationships
-        // Cycle: Water -> Wood -> Fire -> Earth -> Metal -> Water
-        // Destruction: Water -X-> Fire -X-> Metal -X-> Wood -X-> Earth -X-> Water
-        // Wait, standard Wu Xing Destruction:
-        // Water puts out Fire
-        // Fire melts Metal
-        // Metal chops Wood
-        // Wood parts Earth
-        // Earth absorbs Water
 
         const targetDestruction = this.getDestructionTarget(selectedType);
         const targetGeneration = this.getGenerationTarget(selectedType);
@@ -71,26 +59,14 @@ export class PredictionSystem {
                 const type = SkillAccess.getShapeId(world, id) as ElementType;
 
                 if (type === targetDestruction) {
-                    affected.push(id);
-                    interactionType = InteractionType.DESTRUCTION; // Priority?
+                    result.destructions.push(id);
                 } else if (type === targetGeneration) {
-                    affected.push(id);
-                    // If we haven't set destruction yet, set generation. 
-                    // Usually we might want to show BOTH, but return type is single.
-                    // Let's assume Destruction takes precedence for "Danger" feel, or Generation for "Combo".
-                    // V2 Design says: "On touch... All Wood tiles crack... All Water tiles shimmer".
-                    // It implies showing BOTH.
-                    if (interactionType === InteractionType.NEUTRAL) {
-                        interactionType = InteractionType.GENERATION;
-                    }
+                    result.generations.push(id);
                 }
             }
         }
 
-        return {
-            type: interactionType,
-            affectedTiles: affected
-        };
+        return result;
     }
 
     private getDestructionTarget(type: ElementType): ElementType {

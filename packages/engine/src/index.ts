@@ -60,6 +60,7 @@ export * from './config';
 
 // Client Module (Fluid, Rendering)
 export * from './client';
+export * from './renderer/FluidRenderer';
 
 // Factories Module
 export * from './factories';

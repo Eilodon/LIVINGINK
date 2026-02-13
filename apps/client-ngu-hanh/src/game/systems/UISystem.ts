@@ -12,6 +12,7 @@ export interface GameUIState {
     score: number;
     movesLeft: number;
     currentScreen: 'LEVEL_SELECT' | 'GAME';
+    selectedLevelId: number;
 }
 
 export class UISystem extends EventEmitter {
@@ -26,7 +27,8 @@ export class UISystem extends EventEmitter {
         levelStatus: 'PLAYING',
         score: 0,
         movesLeft: 20,
-        currentScreen: 'LEVEL_SELECT' // Start at Level Select 
+        currentScreen: 'LEVEL_SELECT', // Start at Level Select 
+        selectedLevelId: 1
     };
 
     private constructor() {
@@ -73,6 +75,10 @@ export class UISystem extends EventEmitter {
                 this.state.movesLeft = levelData.movesLeft;
                 changed = true;
             }
+            if (levelData.status && this.state.levelStatus !== levelData.status) {
+                this.state.levelStatus = levelData.status;
+                changed = true;
+            }
         }
 
         if (changed) {
@@ -90,5 +96,11 @@ export class UISystem extends EventEmitter {
     public switchScreen(screen: 'LEVEL_SELECT' | 'GAME') {
         this.state.currentScreen = screen;
         this.emit('update', this.state);
+    }
+
+    public selectLevel(levelId: number) {
+        this.state.selectedLevelId = levelId;
+        this.emit('update', this.state);
+        this.emit('start_level', levelId); // Helper event
     }
 }

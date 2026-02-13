@@ -3,6 +3,14 @@ import advectionShader from './shaders/advection';
 import divergenceShader from './shaders/divergence';
 import pressureShader from './shaders/pressure';
 import gradientSubtractShader from './shaders/gradientSubtract';
+import injectionShader from './shaders/injection';
+
+export interface FluidEvent {
+    x: number;
+    y: number;
+    element: number;
+    intensity: number;
+}
 
 export class FluidRenderer {
     public view: Container;
@@ -15,6 +23,7 @@ export class FluidRenderer {
     private divergencePipeline: GPUComputePipeline | null = null;
     private pressurePipeline: GPUComputePipeline | null = null;
     private gradientSubtractPipeline: GPUComputePipeline | null = null;
+    private injectionPipeline: GPUComputePipeline | null = null;
 
     // Textures (Ping-Pong)
     // Velocity: RG = xy velocity
@@ -26,8 +35,12 @@ export class FluidRenderer {
     // Divergence: R = divergence
     private divergence: GPUTexture | null = null;
 
+
     // Uniform Buffer
     private uniformBuffer: GPUBuffer | null = null;
+    // Event Buffer
+    private eventBuffer: GPUBuffer | null = null;
+    private maxEvents: number = 64;
 
     private width: number;
     private height: number;
@@ -79,6 +92,16 @@ export class FluidRenderer {
         this.divergencePipeline = this.createPipeline(divergenceShader);
         this.pressurePipeline = this.createPipeline(pressureShader);
         this.gradientSubtractPipeline = this.createPipeline(gradientSubtractShader);
+        this.injectionPipeline = this.createPipeline(injectionShader);
+
+        // Event Buffer (Storage)
+        // Size: 4 + 12 + (maxEvents * 16)
+        // 4 bytes count, 12 bytes padding (align 16), Events array
+        const bufferSize = 16 + (this.maxEvents * 16);
+        this.eventBuffer = this.device.createBuffer({
+            size: bufferSize,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
 
         console.log("FluidRenderer: WebGPU Pipelines Created");
     }
@@ -106,6 +129,69 @@ export class FluidRenderer {
                 entryPoint: 'main'
             }
         });
+    }
+
+    public injectGameplayInfluence(events: FluidEvent[]) {
+        if (!this.device || !this.injectionPipeline || events.length === 0) return;
+
+        // limited by maxEvents
+        const count = Math.min(events.length, this.maxEvents);
+
+        // Serialize Events
+        // Layout: [count (u32), pad, pad, pad, Event1(16b), Event2(16b)...]
+        // But Alignment: vec4<f32/u32> is 16 bytes.
+        // Struct EventBuffer { count: u32, events: array<FluidEvent> }
+        // Default storage buffer layout:
+        // count (offset 0)
+        // events (offset 16 - array element alignment)? Or offset 4?
+        // Array stride is 16 bytes.
+        // Let's assume offset 0 = count.
+        // offset 4..16 = padding? usually runtime-sized array starts strictly aligned.
+        // Let's rely on standard WGSL std430 layout usually used in WebGPU storage buffers?
+        // Actually, let's write count at 0, and events starting at 16 (safe).
+
+        const data = new ArrayBuffer(16 + (count * 16));
+        const view = new DataView(data);
+
+        view.setUint32(0, count, true); // Little endian
+
+        for (let i = 0; i < count; i++) {
+            const evt = events[i];
+            const offset = 16 + (i * 16);
+            view.setFloat32(offset + 0, evt.x, true);
+            view.setFloat32(offset + 4, evt.y, true);
+            view.setUint32(offset + 8, evt.element, true);
+            view.setFloat32(offset + 12, evt.intensity, true);
+        }
+
+        this.device.queue.writeBuffer(this.eventBuffer!, 0, data);
+
+        // Dispatch Injection
+        const encoder = this.device.createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        pass.setPipeline(this.injectionPipeline);
+
+        const bindGroup = this.device.createBindGroup({
+            layout: this.injectionPipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: this.uniformBuffer! } },
+                { binding: 1, resource: this.velocity!.read.createView() },
+                { binding: 2, resource: this.density!.read.createView() },
+                { binding: 3, resource: this.velocity!.write.createView() },
+                { binding: 4, resource: this.density!.write.createView() },
+                { binding: 5, resource: { buffer: this.eventBuffer! } }
+            ]
+        });
+
+        pass.setBindGroup(0, bindGroup);
+        pass.dispatchWorkgroups(Math.ceil(this.width / 8), Math.ceil(this.height / 8));
+        pass.end();
+
+        this.device.queue.submit([encoder.finish()]);
+
+        // Swap textures as we wrote to 'write'
+        this.swap(this.velocity!);
+        this.swap(this.density!);
     }
 
     public update(dt: number) {

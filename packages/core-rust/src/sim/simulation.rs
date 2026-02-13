@@ -1,6 +1,7 @@
 use crate::ecs::world::World;
 use crate::ecs::components::{Position, Velocity, Player};
 use crate::sim::systems::MovementSystem;
+use crate::sim::grid::GridState;
 use wasm_bindgen::prelude::*;
 use serde::Serialize;
 
@@ -20,6 +21,7 @@ struct GameState {
 #[wasm_bindgen]
 pub struct Simulation {
     world: World,
+    grid: GridState,
     accumulator: f64,
     game_time: f64,
     frame_count: u64,
@@ -28,9 +30,10 @@ pub struct Simulation {
 #[wasm_bindgen]
 impl Simulation {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    pub fn new(width: usize, height: usize, seed: u64) -> Self {
         console_error_panic_hook::set_once();
         
+        // Init Physics World
         let mut world = World::new();
         
         // Register Components
@@ -44,8 +47,12 @@ impl Simulation {
         world.add_component(e, Velocity { x: 10.0, y: 5.0 });
         world.add_component(e, Player { id: 1 });
         
+        // Init Grid
+        let grid = GridState::new(width, height, seed);
+
         Self {
             world,
+            grid,
             accumulator: 0.0,
             game_time: 0.0,
             frame_count: 0,
@@ -78,6 +85,8 @@ impl Simulation {
 
     fn tick(&mut self, dt: f64) {
         MovementSystem::update(&mut self.world, dt);
+        // Step grid logic
+        self.grid.tick();
     }
     
     // Helper to get raw pointer to world for other WASM modules (if needed)
@@ -111,4 +120,95 @@ impl Simulation {
         
         serde_wasm_bindgen::to_value(&state).unwrap()
     }
+    pub fn get_grid(&mut self) -> *mut GridState {
+        &mut self.grid
+    }
+    
+    // Delegate to GridState
+    pub fn get_cells_ptr(&self) -> *const crate::sim::grid::Cell {
+        self.grid.get_cells_ptr()
+    }
+    
+    pub fn get_cells_len(&self) -> usize {
+        self.grid.get_cells_len()
+    }
+
+    pub fn check_matches(&mut self) -> Vec<usize> {
+        // Not exposed in new GridState
+        Vec::new()
+    }
+
+    pub fn swap(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) -> bool {
+         let w = self.grid.get_width();
+         let idx1 = y1 * w + x1;
+         let idx2 = y2 * w + x2;
+         self.grid.try_swap(idx1, idx2)
+    }
+
+    pub fn tick_grid(&mut self) {
+        self.grid.tick();
+    }
+    
+    // Updated Event API
+    pub fn get_events_ptr(&self) -> *const u32 {
+        self.grid.get_events_ptr()
+    }
+
+    pub fn get_events_len(&self) -> usize {
+        self.grid.get_events_len()
+    }
+
+    pub fn clear_events(&mut self) {
+        self.grid.clear_events();
+    }
+
+    pub fn get_score(&self) -> u32 {
+        self.grid.get_score()
+    }
+
+    pub fn get_cycle_target(&self) -> u8 {
+        self.grid.get_cycle_target()
+    }
+
+    pub fn get_cycle_chain(&self) -> u32 {
+        self.grid.get_cycle_chain()
+    }
+
+    pub fn get_cycle_multiplier(&self) -> u32 {
+        self.grid.get_cycle_multiplier()
+    }
+
+    pub fn get_match_queue_ptr(&self) -> *const u8 {
+        self.grid.get_match_queue_ptr()
+    }
+
+    pub fn get_match_queue_len(&self) -> usize {
+        self.grid.get_match_queue_len()
+    }
+
+    pub fn clear_match_queue(&mut self) {
+        self.grid.clear_match_queue();
+    }
+    
+    // PREVIEW API
+    // Returns flat array: [index, type, index, type...]
+    pub fn get_swap_preview(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) -> Vec<u32> {
+         let w = self.grid.get_width();
+         let idx1 = y1 * w + x1;
+         let idx2 = y2 * w + x2;
+         self.grid.preview_swap(idx1, idx2)
+    }
+
+    // Deprecated methods from old GridState
+    pub fn get_fluid_events(&self) -> JsValue {
+        JsValue::UNDEFINED
+    }
+    
+    pub fn clear_fluid_events(&mut self) {
+        self.grid.clear_events();
+    }
+    
+    // Setters - removed as they are not in new GridState public API
+    pub fn set_cell(&mut self, _x: usize, _y: usize, _val: u8) {}
+    pub fn set_cell_flags(&mut self, _x: usize, _y: usize, _val: u8, _flags: u8) {}
 }

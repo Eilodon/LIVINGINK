@@ -29,101 +29,121 @@ export class AssetManager {
         };
 
         const size = 64; // Base size for tiles
+        const cx = size / 2;
+        const cy = size / 2;
 
         // 1. Elements
-        // METAL (Silver Circle)
+        // METAL (Diamond - Sharp, Silver)
         createTexture('element_metal', (g) => {
-            g.beginFill(0xC0C0C0); // Silver
-            g.lineStyle(2, 0xFFFFFF);
-            g.drawCircle(size / 2, size / 2, size / 2 - 4);
-            g.endFill();
-            // Shine
-            g.beginFill(0xFFFFFF, 0.5);
-            g.drawCircle(size / 2 - 10, size / 2 - 10, 8);
-            g.endFill();
-        });
-
-        // WOOD (Green Rounded Rect / Leafy)
-        createTexture('element_wood', (g) => {
-            g.beginFill(0x228B22); // Forest Green
-            g.lineStyle(2, 0x90EE90);
-            g.drawRoundedRect(4, 4, size - 8, size - 8, 16);
-            g.endFill();
-            // Leaf vein detail (simple line)
-            g.lineStyle(2, 0x006400, 0.5);
-            g.moveTo(size / 2, 10);
-            g.lineTo(size / 2, size - 10);
-        });
-
-        // WATER (Blue Fluid Step)
-        createTexture('element_water', (g) => {
-            g.beginFill(0x1E90FF); // Dodger Blue
-            g.lineStyle(2, 0x87CEFA);
-            g.drawCircle(size / 2, size / 2, size / 2 - 4);
-            g.endFill();
-            // Bubble detail
-            g.beginFill(0xFFFFFF, 0.3);
-            g.drawCircle(size / 2 + 10, size / 2 - 10, 6);
-            g.endFill();
-        });
-
-        // FIRE (Red Triangle)
-        createTexture('element_fire', (g) => {
-            g.beginFill(0xFF4500); // Orange Red
-            g.lineStyle(2, 0xFFD700); // Gold outline
-            g.moveTo(size / 2, 4);
-            g.lineTo(size - 4, size - 4);
-            g.lineTo(4, size - 4);
+            g.beginFill(0xE0E0E0); // Platinum Silver
+            g.lineStyle(2, 0xFFFFFF); // Sharp highlight
+            // Diamond shape
+            g.moveTo(cx, 4);
+            g.lineTo(size - 4, cy);
+            g.lineTo(cx, size - 4);
+            g.lineTo(4, cy);
             g.closePath();
             g.endFill();
-            // Inner flame
-            g.beginFill(0xFFFF00, 0.5);
-            g.drawCircle(size / 2, size - 20, 10);
+
+            // Inner faceted shine
+            g.beginFill(0xFFFFFF, 0.4);
+            g.moveTo(cx, 10);
+            g.lineTo(size - 10, cy);
+            g.lineTo(cx, cy);
+            g.closePath();
             g.endFill();
         });
 
-        // EARTH (Brown Square)
-        createTexture('element_earth', (g) => {
-            g.beginFill(0x8B4513); // Saddle Brown
-            g.lineStyle(2, 0xD2691E);
-            g.drawRect(8, 8, size - 16, size - 16);
+        // WOOD (Circle - Organic, Jade Green)
+        createTexture('element_wood', (g) => {
+            g.beginFill(0x2E7D32); // Jade Green
+            g.lineStyle(3, 0x81C784); // Light green border
+            g.drawCircle(cx, cy, size / 2 - 4);
             g.endFill();
-            // Cracks
-            g.lineStyle(2, 0x3E2723, 0.6);
-            g.moveTo(10, 10);
-            g.lineTo(25, 25);
-            g.lineTo(15, 35);
+
+            // Wood grain / Leaf pattern
+            g.lineStyle(2, 0x1B5E20, 0.3);
+            g.arc(cx, cy, size / 2 - 10, 0, Math.PI, false);
+            g.moveTo(cx, 10);
+            g.lineTo(cx, size - 10);
+        });
+
+        // WATER (Fluid - Deep Blue, Wave motif)
+        createTexture('element_water', (g) => {
+            g.beginFill(0x0277BD); // Deep Blue
+            g.lineStyle(2, 0x4FC3F7); // Light hue
+            // Rounded shape container
+            g.drawRoundedRect(4, 4, size - 8, size - 8, 20);
+            g.endFill();
+
+            // Wave detail
+            g.lineStyle(3, 0xFFFFFF, 0.5);
+            g.moveTo(15, cy);
+            g.quadraticCurveTo(cx, cy - 10, size - 15, cy);
+            g.moveTo(15, cy + 10);
+            g.quadraticCurveTo(cx, cy, size - 15, cy + 10);
+        });
+
+        // FIRE (Triangle - Orange Red, Energetic)
+        createTexture('element_fire', (g) => {
+            g.beginFill(0xD84315); // Deep Orange Red
+            g.lineStyle(2, 0xFFAB91); // Glowy edge
+
+            // Triangle pointing up
+            g.moveTo(cx, 4);
+            g.lineTo(size - 4, size - 8);
+            g.lineTo(4, size - 8);
+            g.closePath();
+            g.endFill();
+
+            // Inner flame core
+            g.beginFill(0xFFD600, 0.6); // Yellow center
+            g.drawCircle(cx, size - 20, 8);
+            g.endFill();
+        });
+
+        // EARTH (Square - Amber Brown, Solid)
+        createTexture('element_earth', (g) => {
+            g.beginFill(0x6D4C41); // Brown
+            g.lineStyle(3, 0xA1887F); // Light brown edge
+            g.drawRect(6, 6, size - 12, size - 12);
+            g.endFill();
+
+            // Cracks / Texture
+            g.lineStyle(2, 0x3E2723, 0.4);
+            g.moveTo(15, 15);
+            g.lineTo(30, 30);
+            g.lineTo(20, 45);
         });
 
         // 2. Modifiers
         // ASH (Dark Grey Charred)
         createTexture('mod_ash', (g) => {
-            g.beginFill(0x2F4F4F); // Dark Slate Grey
+            g.beginFill(0x212121); // Dark Grey
             g.drawRect(4, 4, size - 8, size - 8);
             g.endFill();
             // Embers
-            g.beginFill(0xFF4500, 0.8);
-            g.drawCircle(20, 20, 2);
-            g.drawCircle(40, 50, 3);
-            g.drawCircle(50, 20, 2);
+            g.beginFill(0xFF5722, 0.8);
+            g.drawCircle(20, 40, 2);
+            g.drawCircle(45, 20, 3);
             g.endFill();
         });
 
         // STONE (Light Grey Rock)
         createTexture('mod_stone', (g) => {
-            g.beginFill(0x808080); // Grey
-            g.lineStyle(2, 0x505050);
+            g.beginFill(0x9E9E9E); // Grey
+            g.lineStyle(2, 0x616161);
             g.drawRoundedRect(4, 4, size - 8, size - 8, 4);
             g.endFill();
             // Rock texture
-            g.lineStyle(1, 0x333333, 0.3);
-            g.moveTo(10, 40);
-            g.lineTo(30, 20);
+            g.lineStyle(2, 0x424242, 0.3);
+            g.moveTo(15, 45);
+            g.lineTo(45, 15);
         });
 
         // LOCK (Cage Overlay)
         createTexture('mod_lock', (g) => {
-            g.lineStyle(4, 0xFFFFFF); // White bars
+            g.lineStyle(4, 0xB0BEC5); // Steel bars
             g.drawRect(4, 4, size - 8, size - 8);
             g.moveTo(20, 4);
             g.lineTo(20, size - 4);
@@ -135,6 +155,9 @@ export class AssetManager {
         createTexture('status_selected', (g) => {
             g.lineStyle(4, 0xFFD700); // Gold
             g.drawRect(0, 0, size, size); // Full size border
+            // Inner glow
+            g.lineStyle(2, 0xFFAB00, 0.5);
+            g.drawRect(4, 4, size - 8, size - 8);
         });
     }
 

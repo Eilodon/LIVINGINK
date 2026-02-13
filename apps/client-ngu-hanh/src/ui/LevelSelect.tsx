@@ -15,9 +15,8 @@ export const LevelSelect: React.FC = () => {
     }, []);
 
     const selectLevel = (level: number) => {
-        // For MVP, just switch screen and reload/reset game 
-        // Real impl would pass level config to NguHanhModule
         console.log(`Selected Level ${level}`);
+        UISystem.getInstance().selectLevel(level);
         UISystem.getInstance().switchScreen('GAME');
     };
 
@@ -48,12 +47,13 @@ export const LevelSelect: React.FC = () => {
     const levelButtonStyle = (level: number): React.CSSProperties => ({
         padding: '20px',
         fontSize: '1.5em',
-        background: level === 1 ? '#4ade80' : '#333',
+        background: '#333',
+        color: 'white',
         border: '2px solid #555',
         borderRadius: '8px',
-        cursor: level === 1 ? 'pointer' : 'not-allowed',
-        opacity: level === 1 ? 1 : 0.5,
+        cursor: 'pointer',
         textAlign: 'center',
+        transition: 'all 0.2s',
     });
 
     if (state.currentScreen !== 'LEVEL_SELECT') return null;
@@ -66,7 +66,7 @@ export const LevelSelect: React.FC = () => {
                     <div
                         key={level}
                         style={levelButtonStyle(level)}
-                        onClick={() => level === 1 && selectLevel(level)}
+                        onClick={() => selectLevel(level)}
                     >
                         {level}
                     </div>

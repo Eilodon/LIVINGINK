@@ -3,6 +3,8 @@ import { Application, Container, Sprite, Graphics } from 'pixi.js';
 import { AssetManager } from './systems/AssetManager';
 import { ParticleManager } from './systems/ParticleManager';
 import { UISystem } from './systems/UISystem';
+import { AudioSystem } from './systems/AudioSystem';
+import { FluidRenderer, FluidEvent } from '@cjr/engine';
 
 export class GameHost implements IGameContext {
     entityManager: EntityManager;
@@ -11,6 +13,8 @@ export class GameHost implements IGameContext {
     private entityVisuals: Map<number, Container>;
     private assetManager: AssetManager;
     private particleManager: ParticleManager;
+    private audioSystem: AudioSystem;
+    private fluidRenderer: FluidRenderer;
 
     // Shake properties
     private shakeIntensity: number = 0;
@@ -26,6 +30,13 @@ export class GameHost implements IGameContext {
         // Initialize systems
         this.assetManager.loadAssets();
         this.particleManager = new ParticleManager(app, worldContainer);
+        this.audioSystem = new AudioSystem();
+
+        // Initialize Fluid Renderer
+        // Width/Height from app.screen or hardcoded?
+        this.fluidRenderer = new FluidRenderer(app.screen.width, app.screen.height);
+        // Add to stage at bottom (index 0)
+        app.stage.addChildAt(this.fluidRenderer.view, 0);
 
         // Add update loop for shake
         this.app.ticker.add(this.update, this);
@@ -36,7 +47,11 @@ export class GameHost implements IGameContext {
         this.shakeIntensity = intensity;
     }
 
-    update(): void {
+    update(ticker: any): void {
+        const dt = ticker.deltaTime / 60.0; // Normalizing? FluidRenderer expects seconds usually
+        // Actually simple advection works best with small float.
+        this.fluidRenderer.update(0.016); // Fixed dt for safety or use ticker.deltaMS / 1000
+
         if (this.shakeIntensity > 0) {
             const rx = (Math.random() - 0.5) * this.shakeIntensity;
             const ry = (Math.random() - 0.5) * this.shakeIntensity;
@@ -48,6 +63,10 @@ export class GameHost implements IGameContext {
                 this.worldContainer.position.set(0, 0); // Reset
             }
         }
+    }
+
+    public injectFluidEvents(events: FluidEvent[]): void {
+        this.fluidRenderer.injectGameplayInfluence(events);
     }
 
     spawnVisual(entityId: number, color: number, shape: number): void {
@@ -123,54 +142,82 @@ export class GameHost implements IGameContext {
         }
 
         // If state represents TileMod (ASH/STONE/LOCK)... 
-        // We need a way to distinguish "Selection State" from "Tile Modifier".
-        // Engine's setVisualState usually implies transient state.
-        // However, GridSystem might be calling spawnVisual for Mods?
-        // Let's defer Mod visual logic until we verify how GridSystem calls it.
+        // 10 = NONE, 11 = ASH, 12 = STONE, 14 = LOCKED
+        if (state >= 10) {
+            const mod = state - 10;
+            const sprite = container.children[0] as Sprite;
+
+            switch (mod) {
+                case 0: // NONE
+                    sprite.tint = 0xFFFFFF;
+                    container.alpha = 1.0;
+                    break;
+                case 1: // ASH
+                    sprite.tint = 0x333333; // Burnt
+                    container.alpha = 0.8;
+                    this.particleManager.spawnEffect(container.x, container.y, "333333");
+                    break;
+                case 2: // STONE
+                    sprite.tint = 0x888888; // Grey stone
+                    this.particleManager.spawnEffect(container.x, container.y, "888888");
+                    break;
+                case 4: // LOCKED
+                    sprite.tint = 0xFFD700; // Gold
+                    this.particleManager.spawnEffect(container.x, container.y, "FFD700");
+                    break;
+                default:
+                    sprite.tint = 0xFFFFFF;
+                    break;
+            }
+        }
     }
 
     onPreviewInteraction(data: any): void {
-        // Reset all previous previews (simple approach: iterate all visuals)
+        // Reset all previous previews
         this.entityVisuals.forEach((container) => {
-            const sprite = container.children[0] as Sprite; // Assume first child is base sprite
+            const sprite = container.children[0] as Sprite;
             if (sprite) {
                 sprite.tint = 0xFFFFFF; // Reset tint
                 container.alpha = 1.0;
+                container.scale.set(1.0);
+                container.position.set(0, 0); // Reset local offset if any
             }
         });
 
-        if (!data || data.type === 0 || !data.affectedTiles) return;
+        if (!data) return;
 
-        const affected = data.affectedTiles as number[];
-        const type = data.type as number;
-
-        affected.forEach((id) => {
-            const container = this.entityVisuals.get(id);
-            if (container) {
-                const sprite = container.children[0] as Sprite;
-                if (!sprite) return;
-
-                // Visual Feedback based on Interaction Type
-                switch (type) {
-                    case 1: // DESTRUCTION (Red Tint + Shake?)
-                        sprite.tint = 0xFF0000;
-                        container.alpha = 0.8;
-                        // Maybe slight shake preview here?
-                        container.x += (Math.random() - 0.5) * 2;
-                        break;
-                    case 2: // GENERATION (Green Tint + Glow?)
-                        sprite.tint = 0x00FF00;
-                        container.alpha = 1.0;
-                        break;
-                    case 4: // BLOCKED (Grey)
-                        sprite.tint = 0x505050; // Dark grey
-                        break;
-                    default:
-                        sprite.tint = 0xFFFF00; // Neutral/Other
-                        break;
+        // Helper to apply effect
+        const applyEffect = (ids: number[] | undefined, type: string) => {
+            if (!ids) return;
+            ids.forEach(id => {
+                const container = this.entityVisuals.get(id);
+                if (container) {
+                    const sprite = container.children[0] as Sprite;
+                    if (sprite) {
+                        switch (type) {
+                            case 'DESTRUCTION':
+                                sprite.tint = 0xFF4444; // Red
+                                container.scale.set(0.9); // Shrink/Tense
+                                // Static jitter for now (re-randomized on each hover event)
+                                container.x += (Math.random() - 0.5) * 4;
+                                container.y += (Math.random() - 0.5) * 4;
+                                break;
+                            case 'GENERATION':
+                                sprite.tint = 0x44FF44; // Green
+                                container.scale.set(1.15); // Grow/Breath
+                                break;
+                            case 'BLOCKED':
+                                sprite.tint = 0x555555; // Grey
+                                break;
+                        }
+                    }
                 }
-            }
-        });
+            });
+        };
+
+        applyEffect(data.destructions, 'DESTRUCTION');
+        applyEffect(data.generations, 'GENERATION');
+        applyEffect(data.blocked, 'BLOCKED');
     }
 
     getVisual(entityId: number): Container | undefined {
@@ -181,6 +228,10 @@ export class GameHost implements IGameContext {
         // Forward data to UISystem
         // data structure: { boss: { hp, maxHP, state }, level: { score, movesLeft } }
         UISystem.getInstance().update(null as any, data.boss, data.level);
+    }
+
+    playSound(name: string, volume?: number): void {
+        this.audioSystem.playSound(name, volume);
     }
 
     updateVisuals(world: WorldState): void {

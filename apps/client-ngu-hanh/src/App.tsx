@@ -4,6 +4,7 @@ import { NguHanhModule } from '@cjr/game-ngu-hanh';
 import { WasmAdapter } from '@cjr/engine';
 import { BossUI } from './ui/BossUI';
 import { MetagameUI } from './ui/MetagameUI';
+import { BattlePassUI } from './components/BattlePassUI'; // Import
 import { LevelSelect } from './ui/LevelSelect';
 import { UISystem, GameUIState } from './game/systems/UISystem';
 import './App.css';
@@ -45,6 +46,7 @@ function App() {
           <GameCanvas />
           <BossUI />
           <MetagameUI />
+          <BattlePassUI /> {/* Render */}
           <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', pointerEvents: 'none' }}>
             <h1>Ngũ Hành Match-3 (Client Prototype)</h1>
             <p>PixiJS + React + ECS</p>

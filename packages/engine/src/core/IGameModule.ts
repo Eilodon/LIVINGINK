@@ -14,6 +14,7 @@ export interface IGameContext {
     setVisualState(entityId: number, state: number): void;
     onPreviewInteraction?(data: any): void; // Subconscious UI feedback
     onSyncUI?(data: any): void; // UI State Sync
+    playSound?(name: string, volume?: number): void; // Audio Trigger
     entityManager: EntityManager;
 }
 

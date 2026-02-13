@@ -13,3 +13,9 @@ export enum TileMod {
     FROZEN = 3,// Created by Water/Ice, requires breaking
     LOCKED = 4 // Metal cage
 }
+
+export interface InteractionPreview {
+    type: 'destruction' | 'generation' | 'none';
+    affectedTiles: { row: number, col: number }[];
+    cycleProgress: number;
+}
