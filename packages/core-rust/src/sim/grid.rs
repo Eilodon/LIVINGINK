@@ -1,7 +1,8 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+// use rand::{Rng, SeedableRng}; // Removed
+// use rand_chacha::ChaCha8Rng; // Removed
+use crate::sim::rng::Pcg32;
 
 // --- ĐỊNH NGHĨA VẬT CHẤT ---
 
@@ -66,7 +67,7 @@ pub struct GridState {
     pub auto_refill: bool,
     
     // RNG Deterministic
-    rng: ChaCha8Rng,
+    rng: Pcg32,
     
     // Cycle System
     cycle: CycleState,
@@ -85,7 +86,7 @@ impl GridState {
             match_queue: Vec::with_capacity(64),
             is_stable: true,
             auto_refill: true,
-            rng: ChaCha8Rng::seed_from_u64(seed),
+            rng: Pcg32::seed_from_u64(seed),
             cycle: CycleState::new(),
         };
         grid.randomize(); // Khởi tạo ngẫu nhiên ban đầu
@@ -102,7 +103,7 @@ impl GridState {
             match_queue: Vec::with_capacity(64),
             is_stable: true,
             auto_refill: true,
-            rng: ChaCha8Rng::seed_from_u64(seed),
+            rng: Pcg32::seed_from_u64(seed),
             cycle: CycleState::new(),
         }
     }
@@ -193,7 +194,8 @@ impl GridState {
         let mut spawned = 0;
 
         while spawned < count && attempts < max_attempts {
-            attempts += 1;            let idx = self.rng.gen_range(0..self.cells.len());
+            attempts += 1;
+            let idx = self.rng.gen_range(0..self.cells.len());
             
             if idx >= self.cells.len() { continue; }
             
@@ -413,7 +415,8 @@ impl GridState {
 
     fn randomize(&mut self) {
         for i in 0..self.cells.len() {
-            let val = self.rng.gen_range(1..=5);
+            // rng.gen_range takes Range<usize>. 1..=5 is inclusive, so 1..6
+            let val = self.rng.gen_range(1..6) as u8;
             self.cells[i] = Cell { element: val, flags: 0 };
         }
         // Remove matches

@@ -3,6 +3,8 @@ import { WorldState, EntityManager, StatsAccess, EntityFlags, StateAccess } from
 import { GridSystem } from './GridSystem.js';
 import { TileMod, ElementType } from '../types.js';
 import { SeededRNG } from '../utils/SeededRNG.js';
+import { AudioManager } from '../audio/AudioManager.js';
+import { HapticManager } from '../audio/HapticManager.js';
 
 export enum BossType {
     FIRE_PHOENIX = 0,
@@ -60,6 +62,10 @@ export class BossSystem {
 
         console.log(`[BossSystem] Boss take ${damage} dmg! HP: ${newHp}/${StatsAccess.getMaxHp(world, this.bossId)}`);
 
+        // Audio/Haptic
+        AudioManager.getInstance().playSound('boss_damage');
+        HapticManager.getInstance().trigger('boss_damage');
+
         if (newHp <= 0) {
             this.onBossDeath(world);
         }
@@ -105,12 +111,31 @@ export class BossSystem {
     }
 
     // Skill 1: Ash Spread - Converts 3 random tiles to Ash
+    // Skill 1: Ash Spread - Converts neighbors of existing Ash to Ash (Infection)
     private skillAshSpread(world: WorldState, gridSystem: GridSystem, setVisualState: (id: number, state: number) => void): void {
-        // Use Rust efficient spawn
-        // Ash = Element 11, Flag 2. Count 3. Exclude 'Stone' (10) or 'Ash' (11).
-        const count = 3;
-        gridSystem.spawnSpecial(count, 11, 2, 10);
-        console.log(`[BossSystem] Spreading ASH on ${count} tiles!`);
+        const ashTiles = gridSystem.getTilesByElementAndFlag(11, 2); // Ash Element & Flag
+
+        if (ashTiles.length === 0) {
+            // Initial Infection: Spawn 3 random Ash tiles
+            const count = 3;
+            gridSystem.spawnSpecial(count, 11, 2, 10);
+            console.log(`[BossSystem] Initial Ash Infection on ${count} tiles!`);
+            return;
+        }
+
+        let spreadCount = 0;
+        ashTiles.forEach(tileIdx => {
+            const neighbors = gridSystem.getNeighborIndices(tileIdx);
+            neighbors.forEach(neighborIdx => {
+                // 30% chance to infect clean tiles
+                if (this.rng.chance(0.3) && gridSystem.getMod(neighborIdx) === TileMod.NONE) {
+                    gridSystem.setMod(world, neighborIdx, TileMod.ASH, setVisualState);
+                    spreadCount++;
+                }
+            });
+        });
+
+        console.log(`[BossSystem] Ash infection spread to ${spreadCount} new tiles.`);
     }
 
     // Skill 2: Stone Wall - Spawns 2 Stone Blocks

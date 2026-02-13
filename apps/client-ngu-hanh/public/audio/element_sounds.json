@@ -1,0 +1,16 @@
+{
+    "metal_clang": "audio/metal_clang.wav",
+    "metal_shatter": "audio/metal_shatter.wav",
+    "wood_crack": "audio/wood_crack.wav",
+    "wood_break": "audio/wood_break.wav",
+    "water_drop": "audio/water_drop.wav",
+    "water_splash": "audio/water_splash.wav",
+    "fire_whoosh": "audio/fire_whoosh.wav",
+    "fire_burst": "audio/fire_burst.wav",
+    "earth_rumble": "audio/earth_rumble.wav",
+    "earth_crumble": "audio/earth_crumble.wav",
+    "victory_fanfare": "audio/victory_fanfare.wav",
+    "avatar_state": "audio/avatar_state.wav",
+    "match": "audio/match.wav",
+    "boss_damage": "audio/boss_damage.wav"
+}

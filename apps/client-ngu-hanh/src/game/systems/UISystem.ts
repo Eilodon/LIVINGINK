@@ -13,6 +13,8 @@ export interface GameUIState {
     movesLeft: number;
     currentScreen: 'LEVEL_SELECT' | 'GAME';
     selectedLevelId: number;
+    ashPercentage: number;
+    stoneCount: number;
 }
 
 export class UISystem extends EventEmitter {
@@ -28,7 +30,9 @@ export class UISystem extends EventEmitter {
         score: 0,
         movesLeft: 20,
         currentScreen: 'LEVEL_SELECT', // Start at Level Select 
-        selectedLevelId: 1
+        selectedLevelId: 1,
+        ashPercentage: 0,
+        stoneCount: 0
     };
 
     private constructor() {
@@ -43,7 +47,7 @@ export class UISystem extends EventEmitter {
     }
 
     // Called by Game Loop (e.g. NguHanhModule or GameHost)
-    public update(world: WorldState, bossData: any, levelData: any) {
+    public update(world: WorldState, bossData: any, levelData: any, boardStats: any) {
         let changed = false;
 
         // Sync Boss Data
@@ -77,6 +81,18 @@ export class UISystem extends EventEmitter {
             }
             if (levelData.status && this.state.levelStatus !== levelData.status) {
                 this.state.levelStatus = levelData.status;
+                changed = true;
+            }
+        }
+
+        // Sync Board Stats (Ash/Stone)
+        if (boardStats) {
+            if (this.state.ashPercentage !== boardStats.ashPercentage) {
+                this.state.ashPercentage = boardStats.ashPercentage;
+                changed = true;
+            }
+            if (this.state.stoneCount !== boardStats.stoneCount) {
+                this.state.stoneCount = boardStats.stoneCount;
                 changed = true;
             }
         }

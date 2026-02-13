@@ -8,19 +8,19 @@ mod tests {
         x: f32,
         y: f32,
     }
-    impl Component for Position {}
+    // impl Component for Position {} // Removed: hecs has blanket impl
 
     #[derive(Debug, PartialEq)]
     struct Velocity {
         x: f32,
         y: f32,
     }
-    impl Component for Velocity {}
+    // impl Component for Velocity {} // Removed: hecs has blanket impl
 
     #[test]
     fn test_world_entity_creation() {
         let mut world = World::new();
-        let entity = world.create_entity().unwrap();
+        let entity = world.create_entity(); // No unwrap
         assert!(world.destroy_entity(entity));
         assert!(!world.destroy_entity(entity)); // Should return false (already destroyed)
     }
@@ -31,7 +31,7 @@ mod tests {
         world.register_component::<Position>();
         world.register_component::<Velocity>();
 
-        let entity = world.create_entity().unwrap();
+        let entity = world.create_entity(); // No unwrap
 
         world.add_component(entity, Position { x: 10.0, y: 20.0 });
         world.add_component(entity, Velocity { x: 1.0, y: 1.0 });

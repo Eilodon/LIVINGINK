@@ -4,6 +4,8 @@ import { CycleSystem } from './systems/CycleSystem.js';
 import { BossSystem } from './systems/BossSystem.js';
 import { CycleStats } from './CycleStats.js';
 import { LEVELS, LevelConfig } from './config/LevelData.js';
+import { AudioManager } from './audio/AudioManager.js';
+import { HapticManager } from './audio/HapticManager.js';
 
 export class NguHanhModule implements IGameModule {
     readonly id = 'ngu-hanh';
@@ -12,6 +14,8 @@ export class NguHanhModule implements IGameModule {
     private gridSystem: GridSystem;
     private cycleSystem: CycleSystem;
     private bossSystem: BossSystem;
+    private audioManager: AudioManager;
+    private hapticManager: HapticManager;
     private context!: IGameContext;
     private world!: WorldState;
     private lastStatus: string = 'PLAYING';
@@ -23,6 +27,33 @@ export class NguHanhModule implements IGameModule {
         this.gridSystem = new GridSystem(8, 8, 100);
         this.cycleSystem = new CycleSystem();
         this.bossSystem = new BossSystem();
+        this.audioManager = AudioManager.getInstance();
+        this.hapticManager = HapticManager.getInstance();
+
+        // Load Sounds
+        // We use relative paths assuming serving from public/
+        const sounds = {
+            "metal_clang": "audio/metal_clang.wav",
+            "metal_shatter": "audio/metal_shatter.wav",
+            "wood_crack": "audio/wood_crack.wav",
+            "wood_break": "audio/wood_break.wav",
+            "water_drop": "audio/water_drop.wav",
+            "water_splash": "audio/water_splash.wav",
+            "fire_whoosh": "audio/fire_whoosh.wav",
+            "fire_burst": "audio/fire_burst.wav",
+            "earth_rumble": "audio/earth_rumble.wav",
+            "earth_crumble": "audio/earth_crumble.wav",
+            "victory_fanfare": "audio/victory_fanfare.wav",
+            "avatar_state": "audio/avatar_state.wav",
+            "match": "audio/match.wav",
+            "boss_damage": "audio/boss_damage.wav"
+        };
+
+        if (typeof window !== 'undefined') {
+            Object.entries(sounds).forEach(([key, url]) => {
+                this.audioManager.loadSound(key, url);
+            });
+        }
     }
 
     async onMount(world: WorldState, context: IGameContext): Promise<void> {
@@ -129,6 +160,24 @@ export class NguHanhModule implements IGameModule {
         const matches = this.gridSystem.findMatches(world);
         if (matches.size > 0) {
             console.log(`[NguHanh] Matched ${matches.size} tiles!`);
+
+            // Add ink stains for visual feedback
+            matches.forEach(idx => {
+                const row = Math.floor(idx / this.gridSystem.getWidth());
+                const col = idx % this.gridSystem.getWidth();
+                const x = col * 50 + 25; // Grid position
+                const y = row * 50 + 25;
+
+                // Get element from grid
+                const cells = this.gridSystem.getCells();
+                const element = cells[idx * 2];
+
+                // Spawn ink stain
+                if ((this.context as any).particleManager) {
+                    (this.context as any).particleManager.spawnInkStain(x, y, element);
+                }
+            });
+
             // Pass cycleSystem to resolveMatches
             const cycleResult = this.gridSystem.resolveMatches(world, this.context.entityManager, matches, this.cycleSystem);
 
@@ -149,8 +198,28 @@ export class NguHanhModule implements IGameModule {
                 this.bossSystem.onMatch(world, matches.size, 1);
             }
 
-            // Audio Feedback
-            this.context.playSound?.('match');
+            // Audio & Haptic Feedback
+            // 1. Element Sounds
+            matches.forEach(idx => {
+                const cells = this.gridSystem.getCells();
+                const element = cells[idx * 2]; // 0=None, 1=Metal, 2=Wood...
+                if (element > 0) {
+                    this.audioManager.playElementSound(element, 'match');
+                    this.hapticManager.elementHaptic(element);
+                }
+            });
+
+            // 2. Avatar State
+            if (cycleResult.isAvatarState) {
+                this.audioManager.playSound('avatar_state');
+                this.hapticManager.trigger('cycle_complete');
+            } else {
+                // Generic match sound if no specific element (fallback) or layer it
+                // this.context.playSound?.('match'); // Legacy
+                this.audioManager.playSound('match', 0.5);
+            }
+
+            // 3. Victory/Defeat handled in UI Sync
         }
         // EIDOLON-V: UI Sync & Game End Check
         if (this.context.onSyncUI) {
@@ -166,12 +235,20 @@ export class NguHanhModule implements IGameModule {
                 status = 'DEFEAT';
             }
 
+            const totalTiles = this.gridSystem.getWidth() * this.gridSystem.getHeight();
+            const ashCount = this.gridSystem.getTilesByElementAndFlag(11, 2).length;
+            const stoneCount = this.gridSystem.getTilesByElementAndFlag(10, 0).length;
+
             this.context.onSyncUI({
                 boss: bossStatus,
                 level: {
                     score: 0, // Todo: Sync Score
                     movesLeft: this.movesLeft,
                     status: status
+                },
+                boardStats: {
+                    ashPercentage: Math.floor((ashCount / totalTiles) * 100),
+                    stoneCount: stoneCount
                 }
             });
 

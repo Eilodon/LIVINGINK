@@ -1,4 +1,4 @@
-import { Application, Container, Texture } from 'pixi.js';
+import { Application, Container, Texture, Sprite } from 'pixi.js';
 import { Emitter, upgradeConfig } from '@pixi/particle-emitter';
 
 // Simple particle config for a "Burst" effect
@@ -54,33 +54,41 @@ export class ParticleManager {
     // --- Elemental Effects ---
 
     spawnSparks(x: number, y: number): void {
-        // Metal: Silver/White sparks, fast, short life
         this.spawnEffect(x, y, "E0E0E0", 0.3, 300);
     }
 
     spawnLeaves(x: number, y: number): void {
-        // Wood: Green, floaty, slower
         this.spawnEffect(x, y, "4CAF50", 0.6, 150);
     }
 
     spawnDroplets(x: number, y: number): void {
-        // Water: Blue, fountain-like
         this.spawnEffect(x, y, "2196F3", 0.5, 200);
     }
 
     spawnEmbers(x: number, y: number): void {
-        // Fire: Red/Orange, rising
         this.spawnEffect(x, y, "FF5722", 0.4, 250);
     }
 
     spawnDust(x: number, y: number): void {
-        // Earth: Brown, heavy, spread low
         this.spawnEffect(x, y, "795548", 0.5, 100);
     }
 
     spawnText(x: number, y: number, text: string, color: string): void {
-        // TODO: Floating Text implementation
         console.log(`Float Text: ${text} at ${x},${y}`);
+    }
+
+    // Add ink stain on match
+    spawnInkStain(x: number, y: number, element: number): void {
+        // No-op
+    }
+
+    // Apply ink effects to grid sprites
+    applyInkToSprites(sprites: Sprite[]): void {
+        // No-op
+    }
+
+    getInkTexture() {
+        return Texture.EMPTY;
     }
 
     update(): void {

@@ -1,26 +1,63 @@
 export class SeededRNG {
-    private seed: number;
+    private state: bigint;
+    private inc: bigint;
 
     constructor(seed: number) {
-        this.seed = seed;
+        this.state = 0n;
+        this.inc = (BigInt(0xda3e39cb) << 32n) | BigInt(0x94b95bdb); // Stream ID
+        this.inc = (this.inc << 1n) | 1n;
+
+        // Initialize state
+        this.nextU32();
+        this.state = this.state + BigInt(seed);
+        this.nextU32();
     }
 
-    /**
-     * Mulberry32 algorithm
-     * Returns a random number between 0 and 1
-     */
-    public next(): number {
-        let t = this.seed += 0x6D2B79F5;
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    private nextU32(): number {
+        const oldState = this.state;
+        // self.state = oldstate.wrapping_mul(6364136223846793005).wrapping_add(self.inc);
+        this.state = (oldState * 6364136223846793005n + this.inc) & 0xFFFFFFFFFFFFFFFFn;
+
+        // Calculate output function (XSH-RR)
+        // let xorshifted = (((oldstate >> 18) ^ oldstate) >> 27) as u32;
+        const xorshifted = Number(((oldState >> 18n) ^ oldState) >> 27n) >>> 0;
+
+        // let rot = (oldstate >> 59) as u32;
+        const rot = Number(oldState >> 59n) >>> 0;
+
+        // xorshifted.rotate_right(rot)
+        return ((xorshifted >>> rot) | (xorshifted << (32 - rot))) >>> 0;
     }
 
     /**
      * Returns a random integer between min (inclusive) and max (exclusive)
+     * Exact match for Rust `gen_range`
      */
     public nextInt(min: number, max: number): number {
-        return Math.floor(this.next() * (max - min)) + min;
+        if (min >= max) return min;
+
+        const range = max - min;
+        const threshold = ((0 - range) >>> 0) % range;
+
+        while (true) {
+            const r = this.nextU32();
+            if (r >= threshold) {
+                return min + (r % range);
+            }
+        }
+    }
+
+    /**
+     * Returns a random float between 0.0 (inclusive) and 1.0 (exclusive)
+     */
+    public next(): number {
+        // (self.next_u32() >> 8) as f32 * (1.0 / 16777216.0)
+        return (this.nextU32() >>> 8) * (1.0 / 16777216.0);
+    }
+
+    // Alias for legacy support if needed
+    public nextFloat(): number {
+        return this.next();
     }
 
     /**

@@ -7,7 +7,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 struct EntityState {
-    id: u32,
+    id: u64,
     pos: Option<Position>,
     vel: Option<Velocity>,
 }
@@ -36,13 +36,13 @@ impl Simulation {
         // Init Physics World
         let mut world = World::new();
         
-        // Register Components
+        // Registered Components (noop in hecs wrapper)
         world.register_component::<Position>();
         world.register_component::<Velocity>();
         world.register_component::<Player>();
         
         // Init Test State directly here for now
-        let e = world.create_entity().unwrap();
+        let e = world.create_entity();
         world.add_component(e, Position { x: 100.0, y: 100.0 });
         world.add_component(e, Velocity { x: 10.0, y: 5.0 });
         world.add_component(e, Player { id: 1 });
@@ -98,19 +98,13 @@ impl Simulation {
         let mut entities = Vec::new();
         
         // Naive iteration for state sync
-        // In real ECS we would query "Changed" or "All"
-        for i in 0..100u32 {
-            let e = crate::ecs::entity::Entity::from_index(i);
-            
-            // Check if active (hack: check if has Position)
-            if let Some(pos) = self.world.get_component::<Position>(e) {
-                let vel = self.world.get_component::<Velocity>(e).copied();
-                entities.push(EntityState {
-                    id: e.index(),
-                    pos: Some(*pos),
-                    vel,
-                });
-            }
+        // Hecs query
+        for (e, (pos, vel)) in self.world.inner().query::<(&Position, Option<&Velocity>)>().iter() {
+            entities.push(EntityState {
+                id: e.to_bits().into(),
+                pos: Some(*pos),
+                vel: vel.copied(),
+            });
         }
         
         let state = GameState {

@@ -11,7 +11,8 @@ export enum TileMod {
     ASH = 1,   // Burnt by Fire Phoenix, cannot match
     STONE = 2, // Created by Earth Golem, blocks gravity
     FROZEN = 3,// Created by Water/Ice, requires breaking
-    LOCKED = 4 // Metal cage
+    LOCKED = 4, // Metal cage
+    WET = 5     // High fluid density
 }
 
 export interface InteractionPreview {

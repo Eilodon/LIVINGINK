@@ -7,17 +7,17 @@ pub struct Position {
     pub x: f32,
     pub y: f32,
 }
-impl Component for Position {}
+// impl Component for Position {}
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct Velocity {
     pub x: f32,
     pub y: f32,
 }
-impl Component for Velocity {}
+// impl Component for Velocity {}
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct Player {
     pub id: u32,
 }
-impl Component for Player {}
+// impl Component for Player {}

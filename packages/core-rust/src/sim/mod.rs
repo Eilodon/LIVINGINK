@@ -3,3 +3,4 @@ pub mod systems;
 pub mod grid;
 #[cfg(test)]
 mod grid_test;
+pub mod rng;

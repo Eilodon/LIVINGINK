@@ -5,6 +5,7 @@ import { CycleSystem } from '../../../../packages/games/ngu-hanh/systems/CycleSy
 import { ElementType } from '../../../../packages/games/ngu-hanh/types';
 import { AssetManager } from '../game/systems/AssetManager';
 import { ParticleManager } from '../game/systems/ParticleManager';
+import { FluidRenderer } from '../../../../packages/engine/src/renderer/FluidRenderer';
 
 export const GameCanvas = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +32,7 @@ export const GameCanvas = () => {
     const appRef = useRef<Application | null>(null);
     const assetManagerRef = useRef<AssetManager | null>(null);
     const particleManagerRef = useRef<ParticleManager | null>(null);
+    const fluidRendererRef = useRef<FluidRenderer | null>(null);
     const spritesRef = useRef<Sprite[]>([]); // Pool of sprites
     const traumaRef = useRef(0); // Screen shake trauma
 
@@ -83,6 +85,20 @@ export const GameCanvas = () => {
             const particleManager = new ParticleManager(app, vfxContainer);
             particleManagerRef.current = particleManager;
 
+            // Living Ink Overlay
+            const inkOverlay = new Sprite(particleManager.getInkTexture());
+            inkOverlay.alpha = 0.3;
+            gameContainer.addChild(inkOverlay);
+
+            // 5a. Initialize FluidRenderer (WebGPU)
+            const fluidRenderer = new FluidRenderer(800, 800);
+            fluidRendererRef.current = fluidRenderer;
+            // Add to container (Overlay on top of Pixi Ink for now, or replace?)
+            // Let's add it with additive blending or similar if possible.
+            // For now just addChild.
+            fluidRenderer.view.alpha = 0.5;
+            gameContainer.addChild(fluidRenderer.view);
+
             // 5. Create Sprite Pool (8x8)
             const width = systemRef.current.getWidth();
             const height = systemRef.current.getHeight();
@@ -97,6 +113,9 @@ export const GameCanvas = () => {
                 gridContainer.addChild(sprite);
                 spritesRef.current.push(sprite);
             }
+
+            // Apply Ink Filter to all sprites
+            particleManager.applyInkToSprites(spritesRef.current);
 
             // 6. Start Loop
             // PixiJS 8 uses app.ticker
@@ -147,6 +166,10 @@ export const GameCanvas = () => {
                 appRef.current = null;
             }
             spritesRef.current = [];
+            if (fluidRendererRef.current) {
+                fluidRendererRef.current.destroy();
+                fluidRendererRef.current = null;
+            }
         };
     }, []);
 
@@ -165,20 +188,47 @@ export const GameCanvas = () => {
         // 1. Update Physics
         gridSystem.update(16.0);
 
-        // 2. Process Game Events (Matches, Cycle)
-        const matchEvents = gridSystem.getMatchEvents();
-        if (matchEvents.length > 0) {
-            // Logic is now handled in Rust Tick
-            gridSystem.clearMatchEvents();
-            setScore(gridSystem.getScore());
+        // Update Fluid
+        if (fluidRendererRef.current) {
+            // Convert seconds to ms or just use dt? 
+            // FluidRenderer usually expects seconds or consistent time unit. 
+            // dt from Pixi ticker is in ticks? 
+            // app.ticker.deltaTime is scalar (1 = 1 frame at 60fps). 
+            // FluidRenderer.update(dt) -> time += dt.
+            // If shader expects seconds, we might need dt / 60.
+            // But let's pass dt for now.
+            fluidRendererRef.current.update(dt * 0.016, app.renderer); // Approx seconds, pass renderer
 
-            // Sync Cycle Status from Rust Core
-            setCycleStats({
-                target: gridSystem.getCycleTarget(),
-                multiplier: gridSystem.getCycleMultiplier(),
-                chainLength: gridSystem.getCycleChain(),
-                avatarState: (gridSystem as any).isAvatarStateActive ? (gridSystem as any).isAvatarStateActive() : false
+            // Async feedback
+            gridSystem.updateFromFluid(fluidRendererRef.current).catch(e => {
+                // console.warn("Fluid Sync Error", e); // Suppress spam
             });
+        }
+
+        // 2. Process Game Events (Matches, Cycle)
+        // 2. Process Game Events (Matches, Cycle)
+        // Use GridSystem helper to convert Rust events to Set of indices
+        const matches = gridSystem.findMatches(null);
+
+        if (matches.size > 0) {
+            // Process Logic via TypeScript System (Hybrid approach)
+            const cycleResult = gridSystem.resolveMatches(null, { removeEntity: () => { } }, matches, cycleSystem);
+
+            // Sync Cycle Status from TypeScript System
+            setCycleStats({
+                target: cycleSystem.getCurrentTarget(),
+                multiplier: cycleSystem.getStats().multiplier,
+                chainLength: cycleSystem.getChainLength(),
+                avatarState: cycleSystem.isAvatarStateActive()
+            });
+
+            // Trigger Visual Effects based on result
+            if (cycleResult.isAvatarState) {
+                // Flash effect or log
+                console.log("Avatar State Visual Triggered");
+                // TODO: Add screen shake or flash trigger here
+                traumaRef.current += 0.8;
+            }
         }
 
         // 3. Process Visual Events (Particles, Shake)
@@ -288,7 +338,11 @@ export const GameCanvas = () => {
 
         if (col >= 0 && col < systemRef.current.getWidth() && row >= 0 && row < systemRef.current.getHeight()) {
             if (col < systemRef.current.getWidth() - 1) {
-                systemRef.current.trySwap(col, row, col + 1, row);
+                if (col < systemRef.current.getWidth() - 1) {
+                    // Client-side optimistic swap (visual only, logic handled by Rust/Server eventually)
+                    // Passing null for world/entityManager as this is pure client-side prediction/input
+                    systemRef.current.trySwap(null, null, col, row, col + 1, row);
+                }
             }
         }
     };

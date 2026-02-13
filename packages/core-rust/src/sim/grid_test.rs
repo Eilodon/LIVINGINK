@@ -5,7 +5,7 @@ mod tests {
 
     // Helper to create a specific grid for testing
     fn create_test_grid(width: usize, height: usize) -> GridState {
-        let mut grid = GridState::new_empty(width, height);
+        let mut grid = GridState::new_empty(width, height, 0);
         // No need to clear, it's already empty
         grid.auto_refill = false;
         grid
@@ -106,8 +106,8 @@ mod tests {
         
         grid.tick();
         
-        // Wood Cleared
-        assert_eq!(grid.get_cell_element(30), 0);
+        // Wood turns to Fire (Generation effect)
+        assert_eq!(grid.get_cell_element(30), 4);
         
         // Fire interaction spawns fire events, doesn't clear neighbor
         assert_eq!(grid.get_cell_element(25), 4);

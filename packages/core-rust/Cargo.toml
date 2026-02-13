@@ -15,4 +15,5 @@ js-sys = "0.3"
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = "0.3"
 getrandom = { version = "0.2", features = ["js"] }
+hecs = "0.10"
 

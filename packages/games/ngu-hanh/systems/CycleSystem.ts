@@ -1,4 +1,4 @@
-import { ElementType } from '../types';
+import { ElementType } from '../types.js';
 
 export class CycleSystem {
     // Current element required in the cycle to continue the chain

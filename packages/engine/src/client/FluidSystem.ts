@@ -1,6 +1,4 @@
 import { Container } from 'pixi.js';
-import { WorldState } from '../generated';
-import { IGameModule } from '../core/IGameModule';
 import { FluidRenderer } from '../renderer/FluidRenderer';
 
 export class FluidSystem {
@@ -15,8 +13,6 @@ export class FluidSystem {
 
     public async init() {
         // Renderer init is handled in constructor but is async. 
-        // We might want to wait for it or just let it happen.
-        // For now, no-op or explicit init if we refactor renderer.
     }
 
     public update(dt: number) {

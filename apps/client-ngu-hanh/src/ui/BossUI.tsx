@@ -58,6 +58,15 @@ export const BossUI: React.FC = () => {
             <div style={{ fontSize: '0.8em', marginTop: '2px' }}>
                 {state.bossHP} / {state.bossMaxHP} HP
             </div>
+
+            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-around', fontSize: '0.8em' }}>
+                <div style={{ color: state.ashPercentage > 30 ? '#ef4444' : '#ccc' }}>
+                    Ash Spread: {state.ashPercentage}% ⚠️
+                </div>
+                <div style={{ color: state.stoneCount > 5 ? '#fbbf24' : '#ccc' }}>
+                    Stones: {state.stoneCount} 🪨
+                </div>
+            </div>
         </div>
     );
 };

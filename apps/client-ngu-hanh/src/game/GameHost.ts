@@ -227,7 +227,7 @@ export class GameHost implements IGameContext {
     onSyncUI(data: any): void {
         // Forward data to UISystem
         // data structure: { boss: { hp, maxHP, state }, level: { score, movesLeft } }
-        UISystem.getInstance().update(null as any, data.boss, data.level);
+        UISystem.getInstance().update(null as any, data.boss, data.level, data.boardStats || {});
     }
 
     playSound(name: string, volume?: number): void {

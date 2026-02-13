@@ -1,69 +1,47 @@
-use super::entity::{Entity, EntityManager, MAX_ENTITIES};
-use super::component::{Component, SparseSet}; // Removed Storage import as it's not used directly
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
+use hecs::{World as HecsWorld, Entity, Component, Ref, RefMut};
 
-// Note: We don't stick #[wasm_bindgen] here yet because HashMap/Box<dyn Any> 
-// is not easily exportable. We keep World internal to Rust for now.
 pub struct World {
-    entity_manager: EntityManager,
-    // Map TypeId -> Storage (SparseSet<T>)
-    components: HashMap<TypeId, Box<dyn Any>>, 
+    world: HecsWorld,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
-            entity_manager: EntityManager::new(MAX_ENTITIES),
-            components: HashMap::new(),
+            world: HecsWorld::new(),
         }
     }
 
-    pub fn create_entity(&mut self) -> Option<Entity> {
-        self.entity_manager.create()
+    pub fn create_entity(&mut self) -> Entity {
+        self.world.spawn(())
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) -> bool {
-        self.entity_manager.destroy(entity)
-        // TODO: Remove components for this entity?
-        // In a real ECS we would iterate all storages and remove. 
-        // For now, let's keep it simple.
+        self.world.despawn(entity).is_ok()
     }
 
-    pub fn register_component<T: Component + 'static>(&mut self) {
-        let type_id = TypeId::of::<T>();
-        self.components.insert(
-            type_id, 
-            Box::new(SparseSet::<T>::new(MAX_ENTITIES as usize))
-        );
+    pub fn register_component<T: Component>(&mut self) {
+        // hecs does not need explicit registration
     }
 
-    pub fn add_component<T: Component + 'static>(&mut self, entity: Entity, component: T) {
-        let type_id = TypeId::of::<T>();
-        if let Some(storage_any) = self.components.get_mut(&type_id) {
-            if let Some(storage) = storage_any.downcast_mut::<SparseSet<T>>() {
-                storage.insert(entity, component);
-            }
-        }
+    pub fn add_component<T: Component>(&mut self, entity: Entity, component: T) {
+        let _ = self.world.insert_one(entity, component);
     }
 
-    pub fn get_component<T: Component + 'static>(&self, entity: Entity) -> Option<&T> {
-        let type_id = TypeId::of::<T>();
-        if let Some(storage_any) = self.components.get(&type_id) {
-            if let Some(storage) = storage_any.downcast_ref::<SparseSet<T>>() {
-                return storage.get(entity);
-            }
-        }
-        None
+    pub fn get_component<T: Component>(&self, entity: Entity) -> Option<Ref<'_, T>> {
+        self.world.get::<&T>(entity).ok()
     }
 
-    pub fn get_component_mut<T: Component + 'static>(&mut self, entity: Entity) -> Option<&mut T> {
-        let type_id = TypeId::of::<T>();
-        if let Some(storage_any) = self.components.get_mut(&type_id) {
-            if let Some(storage) = storage_any.downcast_mut::<SparseSet<T>>() {
-                return storage.get_mut(entity);
-            }
-        }
-        None
+    pub fn get_component_mut<T: Component>(&mut self, entity: Entity) -> Option<RefMut<'_, T>> {
+        self.world.get::<&mut T>(entity).ok()
+    }
+    
+    // Expose inner world for advanced usage (iteration)
+    pub fn inner(&self) -> &HecsWorld {
+        &self.world
+    }
+    
+    pub fn inner_mut(&mut self) -> &mut HecsWorld {
+        &mut self.world
     }
 }
+
