@@ -13,9 +13,40 @@ model User {
   email     String?  @unique
   createdAt DateTime @default(now())
   
-  wallet    Wallet?
-  inventory InventoryItem[]
+  wallet     Wallet?
+  inventory  InventoryItem[]
   battlePass UserBattlePass?
+  gameLogs   GameLog[]
+  banRecords BanRecord[]
+}
+
+// --- ANTI-CHEAT ---
+
+model GameLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  seed      String
+  moves     Json     // Array of { tick, x1, y1, x2, y2 }
+  score     Int
+  checksum  Int
+  isValid   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model BanRecord {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String    // WARNING, TEMP_BAN, PERM_BAN
+  reason    String
+  evidence  Json?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Wallet {

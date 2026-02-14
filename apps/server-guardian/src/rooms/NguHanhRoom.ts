@@ -1,11 +1,14 @@
 import { Room, Client, ServerError } from "colyseus";
 import { Schema, type, MapSchema } from "@colyseus/schema";
-import { AuthSystem, UserProfile } from "../systems/AuthSystem";
-import { EconomySystem } from "../systems/EconomySystem";
-import { InventorySystem } from "../systems/InventorySystem";
-import { BattlePassSystem } from "../systems/BattlePassSystem";
-import { RateLimiter } from "../utils/RateLimiter";
-import { PayloadSchema } from "../schemas/InputSchemas";
+import { AuthSystem, UserProfile } from "../systems/AuthSystem.js";
+import { EconomySystem } from "../systems/EconomySystem.js";
+import { InventorySystem } from "../systems/InventorySystem.js";
+import { BattlePassSystem } from "../systems/BattlePassSystem.js";
+import { RateLimiter } from "../utils/RateLimiter.js";
+import { PayloadSchema, LevelCompleteSchema } from "../schemas/InputSchemas.js";
+import { GameValidator, Move } from "../systems/GameValidator.js";
+import { BanSystem } from "../systems/BanSystem.js";
+import { BehavioralAnalyzer, TimestampedMove } from "../systems/BehavioralAnalyzer.js";
 
 // Import Rust Core
 const { Simulation } = require("core-rust");
@@ -52,6 +55,13 @@ export class NguHanhRoom extends Room<NguHanhState> {
     private simulation: any; // Rust Simulation instance
     private playerLimiter = new RateLimiter(20, 10);
 
+    // Anti-Cheat
+    private validator = GameValidator.getInstance();
+    private banSystem = BanSystem.getInstance();
+    private analyzer = BehavioralAnalyzer.getInstance();
+    private moveLog: Map<string, Move[]> = new Map();
+    private timestampedMoves: Map<string, TimestampedMove[]> = new Map();
+    private tickCount: number = 0;
 
     // Systems
     private economy = EconomySystem.getInstance();
@@ -62,13 +72,14 @@ export class NguHanhRoom extends Room<NguHanhState> {
         const auth = AuthSystem.getInstance();
         const profile = await auth.authenticate(client, options.token);
 
+        // Kiểm tra ban status
+        if (await this.banSystem.isBanned(profile.id)) {
+            throw new ServerError(403, "Tài khoản bị khoá.");
+        }
+
         // Store profile in client metadata
         client.userData = profile;
         console.log(`Client ${client.sessionId} authenticated as ${profile.name} (${profile.id})`);
-
-        // Init Rate Limiter (Redis handles state, no need to store instance per client)
-        // this.rateLimiters.set(client.sessionId, new RateLimiter(20, 10));
-
 
         return true;
     }
@@ -97,13 +108,13 @@ export class NguHanhRoom extends Room<NguHanhState> {
         // Set Simulation Loop
         this.setSimulationInterval((dt) => this.update(dt), 50);
 
+        // --- INPUT HANDLER ---
         this.onMessage("input", async (client, message) => {
             // 1. Rate Limiting (Async Redis)
             if (!(await this.playerLimiter.tryConsume(client.sessionId, 1))) {
                 console.warn(`Rate limit exceeded for ${client.sessionId}`);
                 return;
             }
-
 
             // 2. Input Validation
             const validation = PayloadSchema.safeParse(message);
@@ -118,11 +129,24 @@ export class NguHanhRoom extends Room<NguHanhState> {
             try {
                 // 3. Process Input
                 if (payload.type === 'move') {
-                    // Forward to Rust simulation
-                    // this.simulation.queue_input(client.userData.id, payload.data);
+                    const { x1, y1, x2, y2 } = payload.data;
+
+                    // Forward tới Rust simulation
+                    this.simulation.swap(x1, y1, x2, y2);
+                    this.simulation.tick_grid();
+
+                    // Log move cho anti-cheat validation
+                    const sessionMoves = this.moveLog.get(client.sessionId) || [];
+                    sessionMoves.push({ tick: this.tickCount, x1, y1, x2, y2 });
+                    this.moveLog.set(client.sessionId, sessionMoves);
+
+                    // Log timestamped move cho behavioral analysis
+                    const tsMoves = this.timestampedMoves.get(client.sessionId) || [];
+                    tsMoves.push({ tick: this.tickCount, timestamp: Date.now(), x1, y1, x2, y2 });
+                    this.timestampedMoves.set(client.sessionId, tsMoves);
                 }
                 else if (payload.type === 'purchase') {
-                    const success = await this.inventory.purchaseItem(user.id, payload.data.itemId, 'gold', 100); // Hardcoded cost for MVP
+                    const success = await this.inventory.purchaseItem(user.id, payload.data.itemId, 'gold', 100);
                     if (success) {
                         this.syncPlayerState(client);
                         client.send("notification", { type: "success", message: `Purchased ${payload.data.itemId}` });
@@ -131,9 +155,7 @@ export class NguHanhRoom extends Room<NguHanhState> {
                     }
                 }
                 else if (payload.type === 'claim_reward') {
-                    // const success = await this.battlePass.claimReward(user.id, payload.data.level, payload.data.track);
-                    // Mock success for now as we don't have full tracks in DB
-                    const success = true;
+                    const success = true; // Mock — full tracks chưa có trong DB
                     if (success) {
                         this.syncPlayerState(client);
                         client.send("notification", { type: "success", message: "Reward claimed!" });
@@ -150,9 +172,69 @@ export class NguHanhRoom extends Room<NguHanhState> {
                 console.error("Action processing failed", e);
             }
         });
+
+        // --- LEVEL COMPLETE HANDLER ---
+        this.onMessage("level_complete", async (client, message) => {
+            const user = client.userData as UserProfile;
+            const validation = LevelCompleteSchema.safeParse(message);
+            if (!validation.success) {
+                console.error(`Invalid level_complete from ${client.sessionId}`);
+                return;
+            }
+
+            const { score, checksum } = validation.data;
+            const moves = this.moveLog.get(client.sessionId) || [];
+            const tsMoves = this.timestampedMoves.get(client.sessionId) || [];
+            const seed = BigInt(this.state.seed);
+
+            // 1. Deterministic Replay Validation
+            const result = this.validator.validateLevelCompletion(
+                8, 8, seed, moves, score, checksum
+            );
+            console.log(`[GameValidator] User ${user.id}: valid=${result.isValid}, ` +
+                `server=${result.serverScore} vs client=${score}, replay=${result.replayTimeMs}ms`);
+
+            // 2. Behavioral Analysis
+            const autoPlay = this.analyzer.detectAutoPlay(tsMoves);
+            if (autoPlay.isBot) {
+                console.warn(`[BehavioralAnalyzer] Bot detected: ${user.id}`, autoPlay.reasons);
+            }
+
+            // 3. Suspicion Score
+            const suspicion = this.analyzer.calculateSuspicionScore(
+                autoPlay, result.serverChecksum === checksum, result.serverScore >= score
+            );
+
+            // 4. Xử phạt nếu cần
+            if (!result.isValid || suspicion >= 0.7) {
+                const action = await this.banSystem.punish(
+                    user.id,
+                    `Suspicion=${suspicion.toFixed(2)}, anomalies=${result.anomalies.length}`,
+                    { anomalies: result.anomalies, autoPlay, suspicion }
+                );
+                client.send("notification", { type: "warning", message: action.message });
+
+                if (action.type === 'TEMP_BAN' || action.type === 'PERM_BAN') {
+                    client.leave(4000); // Kick
+                }
+            } else {
+                // Score hợp lệ → ghi điểm, thưởng XP
+                await this.battlePass.addXp(user.id, Math.floor(result.serverScore / 10));
+                this.syncPlayerState(client);
+                client.send("level_result", {
+                    valid: true,
+                    score: result.serverScore
+                });
+            }
+
+            // 5. Cleanup session data
+            this.moveLog.delete(client.sessionId);
+            this.timestampedMoves.delete(client.sessionId);
+        });
     }
 
     update(dt: number) {
+        this.tickCount++;
         if (this.simulation) {
             this.simulation.update(dt);
             const rawState = this.simulation.get_state();
@@ -194,7 +276,9 @@ export class NguHanhRoom extends Room<NguHanhState> {
 
     onLeave(client: Client, consented?: boolean) {
         console.log(client.sessionId, "left!", consented);
-        // this.rateLimiters.delete(client.sessionId); // No need to cleanup Redis stateless
+        // Cleanup anti-cheat data
+        this.moveLog.delete(client.sessionId);
+        this.timestampedMoves.delete(client.sessionId);
         this.state.players.delete(client.sessionId);
     }
 

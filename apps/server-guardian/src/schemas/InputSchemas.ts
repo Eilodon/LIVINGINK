@@ -28,3 +28,9 @@ export const PayloadSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("claim_reward"), data: ClaimRewardSchema }),
     z.object({ type: z.literal("cheat"), data: CheatSchema })
 ]);
+
+export const LevelCompleteSchema = z.object({
+    score: z.number().int().min(0),
+    checksum: z.number().int()
+});
+
