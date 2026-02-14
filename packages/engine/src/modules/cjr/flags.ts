@@ -6,7 +6,7 @@
  */
 
 // EIDOLON-V FIX: Inline constant to break circular dependency
-// Was: import { ENGINE_FLAG_OFFSET } from '../../compat';
+// Was: import { ENGINE_FLAG_OFFSET } from '../../compat.js';
 // compat.ts re-exports from this file, causing: index -> compat -> flags -> compat
 const ENGINE_FLAG_OFFSET = 8;
 

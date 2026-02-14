@@ -10,8 +10,8 @@
  * PigmentUtils.mix(world, entityId, 0.5, 0.2, 0.8, 0.3);
  */
 
-import { PigmentAccess } from '../generated/ComponentAccessors';
-import type { WorldState } from '../generated/WorldState';
+import { PigmentAccess } from '../generated/ComponentAccessors.js';
+import type { WorldState } from '../generated/WorldState.js';
 
 export class PigmentUtils {
     /**

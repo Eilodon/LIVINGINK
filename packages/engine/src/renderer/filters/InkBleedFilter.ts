@@ -1,5 +1,5 @@
 import { Filter, GlProgram, GpuProgram, Texture, Color } from 'pixi.js';
-import inkBleedShader from '../shaders/inkBleed';
+import inkBleedShader from '../shaders/inkBleed.js';
 
 export interface InkBleedFilterOptions {
     impactTexture: Texture;

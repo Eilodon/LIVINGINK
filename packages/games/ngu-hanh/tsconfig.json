@@ -12,6 +12,9 @@
         "skipLibCheck": true,
         "baseUrl": ".",
         "paths": {
+            "@cjr/engine": [
+                "../../engine/src/index.ts"
+            ],
             "@cjr/engine/*": [
                 "../../engine/src/*"
             ]

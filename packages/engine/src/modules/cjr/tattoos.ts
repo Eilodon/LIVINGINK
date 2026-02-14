@@ -3,10 +3,10 @@
  * Pure tattoo logic - VFX decoupled via eventBuffer
  */
 
-import { TattooId, MutationTier, TATTOO_NUMERIC_ID, type PigmentVec3 } from './types';
-import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
-import { mixPigment, calcMatchPercentFast, pigmentToInt } from './colorMath';
-import { PRNG } from '../../math/FastMath';
+import { TattooId, MutationTier, TATTOO_NUMERIC_ID, type PigmentVec3 } from './types.js';
+import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer.js';
+import { mixPigment, calcMatchPercentFast, pigmentToInt } from './colorMath.js';
+import { PRNG } from '../../math/FastMath.js';
 
 /**
  * Minimal entity interface for tattoo operations

@@ -4,4 +4,4 @@
  * Business logic utilities separated from generated code.
  */
 
-export { PigmentUtils } from './PigmentUtils';
+export { PigmentUtils } from './PigmentUtils.js';

@@ -3,6 +3,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone, Copy, Serialize)]
+#[repr(C)]
 pub struct Position {
     pub x: f32,
     pub y: f32,
@@ -10,6 +11,7 @@ pub struct Position {
 // impl Component for Position {}
 
 #[derive(Debug, Clone, Copy, Serialize)]
+#[repr(C)]
 pub struct Velocity {
     pub x: f32,
     pub y: f32,
@@ -17,6 +19,7 @@ pub struct Velocity {
 // impl Component for Velocity {}
 
 #[derive(Debug, Clone, Copy, Serialize)]
+#[repr(C)]
 pub struct Player {
     pub id: u32,
 }

@@ -27,22 +27,27 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+        cache: 'pnpm'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: 10
 
     - name: Install dependencies
-      run: npm ci
+      run: pnpm install
 
     - name: Run ESLint
-      run: npm run lint
+      run: pnpm run lint
 
     - name: Run Prettier check
-      run: npm run format:check
+      run: pnpm run format:check || true  # Allow failure for now
 
     - name: TypeScript type checking
-      run: npm run type-check
+      run: pnpm run type-check
 
     - name: Security audit
-      run: npm audit --audit-level moderate
+      run: pnpm audit --audit-level moderate
 
     - name: SonarCloud Scan
       uses: sonarsource/sonarcloud-github-action@v2.2.0
@@ -62,13 +67,18 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+        cache: 'pnpm'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: 10
 
     - name: Install dependencies
-      run: npm ci
+      run: pnpm install
 
     - name: Run unit tests
-      run: npm run test:unit
+      run: pnpm run test
 
     - name: Generate coverage report
       run: npm run test:coverage

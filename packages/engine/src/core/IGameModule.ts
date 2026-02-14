@@ -1,5 +1,5 @@
-import { WorldState } from '../generated/WorldState';
-import { EntityManager } from './EntityManager';
+import { WorldState } from '../generated/WorldState.js';
+import { EntityManager } from './EntityManager.js';
 
 /**
  * Interface that all Game Modules must implement.
@@ -15,6 +15,7 @@ export interface IGameContext {
     onPreviewInteraction?(data: any): void; // Subconscious UI feedback
     onSyncUI?(data: any): void; // UI State Sync
     playSound?(name: string, volume?: number): void; // Audio Trigger
+    playEffect?(name: string): void; // Visual Effect Trigger
     entityManager: EntityManager;
 }
 

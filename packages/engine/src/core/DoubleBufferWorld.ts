@@ -1,4 +1,4 @@
-import { WorldState, IWorldConfig } from '../generated/WorldState';
+import { WorldState, IWorldConfig } from '../generated/WorldState.js';
 
 /**
  * Manages two WorldState instances for lockless reading/writing.

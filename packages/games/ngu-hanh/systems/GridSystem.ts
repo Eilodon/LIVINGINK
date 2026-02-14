@@ -1,5 +1,7 @@
 import init, { Simulation } from "../../../../apps/client-ngu-hanh/public/wasm/core_rust.js";
-import { FluidRenderer } from "@cjr/engine/renderer/FluidRenderer";
+import { FluidRenderer, FluidEvent } from "@cjr/engine";
+import { PerformanceManager, PerformanceTier } from "@cjr/engine";
+import { ReplaySystem } from "./ReplaySystem.js";
 
 const FLAG_WET = 8; // Bit 3 (1, 2, 4, 8)
 
@@ -15,6 +17,10 @@ export class GridSystem {
 
     // Map grid index to ECS Entity ID
     private entityMap: number[] = [];
+
+    // Replay Logic
+    private replaySystem: ReplaySystem = ReplaySystem.getInstance();
+    private tickCount: number = 0;
 
     constructor(width: number = 8, height: number = 8, seed?: number) {
         this.width = width;
@@ -43,17 +49,27 @@ export class GridSystem {
         }
     }
 
-    async initialize(world?: any, entityManager?: any, spawnVisual?: any) {
+    async initialize(world?: any, entityManager?: any, spawnVisual?: any, seedInput?: bigint | string) {
         // 1. Init WASM
         const wasm = await init("/wasm/core_rust_bg.wasm");
         this.memory = wasm.memory;
 
         // 2. Init Simulation in Rust world with Deterministic Seed
-        const seed = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+        let seed: bigint;
+        if (seedInput) {
+            seed = typeof seedInput === 'string' ? BigInt(seedInput) : seedInput;
+        } else {
+            console.warn("Eidolon-V: No seed provided, using local random (Non-deterministic!)");
+            seed = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+        }
         console.log("Eidolon-V: Initializing Grid with Seed:", seed);
 
         // Pass seed to Rust
         this.sim = new Simulation(this.width, this.height, seed);
+
+        // Start Recording if we have a seed (Avatar State: Assume Record by default for now)
+        this.replaySystem.startRecording(seed.toString());
+        this.tickCount = 0;
 
         // 3. Get Pointer to cells array
         // fn get_cells_ptr(&self) -> *const Cell
@@ -84,6 +100,22 @@ export class GridSystem {
         // But `GridSystem` calls `this.sim.update(dt)`.
         // I'll stick to the user's code for `GridSystem.ts` as much as possible.
         // But I will add a check.
+        // Update Replay Playback
+        if (this.replaySystem.mode === 'PLAYBACK') {
+            const actions = this.replaySystem.getActions(this.tickCount);
+            actions.forEach(action => {
+                if (action.type === 'SWAP') {
+                    const [r1, c1, r2, c2] = action.params;
+                    console.log(`[Replay] Executing Swap at tick ${this.tickCount}:`, action.params);
+                    // Force swap bypasses record check usually, but we need to ensure we don't double record
+                    // We need a flag or just rely on mode check in trySwap
+                    this.executeSwap(r1, c1, r2, c2);
+                }
+            });
+        }
+
+        this.tickCount++;
+
         if ((this.sim as any).update) {
             this.sim.update(dt);
         } else if ((this.sim as any).tick) {
@@ -94,62 +126,58 @@ export class GridSystem {
     // --- FLUID INTERACTION ---
 
     async updateFromFluid(fluidRenderer: FluidRenderer) {
+        // PERF: Skip fluid readback on low-end devices
+        // This is a heavy operation (GPU -> CPU read)
+        if (PerformanceManager.getInstance().currentTier >= PerformanceTier.LOW) {
+            return;
+        }
+
         const density = await fluidRenderer.readDensityMap();
         if (!density) return;
 
         const fluidW = fluidRenderer.getWidth();
         const fluidH = fluidRenderer.getHeight();
-        const cellW = fluidW / this.width;
-        const cellH = fluidH / this.height;
 
-        // Iterate over grid cells
-        for (let r = 0; r < this.height; r++) {
-            for (let c = 0; c < this.width; c++) {
-                // Sample center of cell
-                const px = Math.floor((c + 0.5) * cellW);
-                const py = Math.floor((r + 0.5) * cellH);
-
-                // Clamp
-                const x = Math.max(0, Math.min(px, fluidW - 1));
-                const y = Math.max(0, Math.min(py, fluidH - 1));
-
-                const idx = (y * fluidW + x) * 4; // 4 channels
-                const d = density[idx]; // Red channel
-
-                const gridIdx = r * this.width + c;
-
-                // Threshold 0.5
-                if (d > 0.5) {
-                    this.setFlag(gridIdx, FLAG_WET);
-                } else {
-                    // Start wetting? Or just set?
-                    // Ideally we unset if dry?
-                    // For now, let's unset if dry to be reactive.
-                    this.unsetFlag(gridIdx, FLAG_WET);
-                }
-            }
+        // Zero-Copy-ish: Pass TypedArray to WASM
+        if (this.sim && (this.sim as any).apply_fluid_density) {
+            (this.sim as any).apply_fluid_density(density, fluidW, fluidH);
         }
     }
 
     // --- INTERACTION ---
 
-    trySwap(world: any, entityManager: any, x1: number, y1: number, x2: number, y2: number): boolean {
+    executeSwap(r1: number, c1: number, r2: number, c2: number): boolean {
         if (!this.sim) return false;
+        // Low-level swap execution (Rust)
 
         // Try 'swap' (exposed in Simulation)
         if ((this.sim as any).swap) {
-            (this.sim as any).swap(x1, y1, x2, y2);
-            // Assume success for now as Rust handles logic
+            (this.sim as any).swap(c1, r1, c2, r2); // Rust might use X,Y (Col, Row)
+            // Wait, getGridCoordinates returns [row, col] (y, x).
+            // trySwap params are (x1, y1, x2, y2)? No, user passed (c1, r1, c2, r2) in GameCanvas for trySwap?
+            // Let's check trySwap signature below.
             return true;
         } else if ((this.sim as any).grid && (this.sim as any).grid.try_swap) {
-            const idx1 = y1 * this.width + x1;
-            const idx2 = y2 * this.width + x2;
+            const idx1 = r1 * this.width + c1;
+            const idx2 = r2 * this.width + c2;
             (this.sim as any).grid.try_swap(idx1, idx2);
             return true;
-        } else {
-            console.warn("Eidolon-V: swap/try_swap not found on Simulation");
-            return false;
         }
+        return false;
+    }
+
+    trySwap(world: any, entityManager: any, r1: number, c1: number, r2: number, c2: number): boolean {
+        // If in Playback mode, ignore user input
+        if (this.replaySystem.mode === 'PLAYBACK') return false;
+
+        if (!this.sim) return false;
+
+        // Record Action
+        if (this.replaySystem.mode === 'RECORD') {
+            this.replaySystem.recordAction(this.tickCount, 'SWAP', r1, c1, r2, c2);
+        }
+
+        return this.executeSwap(r1, c1, r2, c2);
     }
     // ...
     // --- BOSS / DEBUG API ---
@@ -275,21 +303,8 @@ export class GridSystem {
     }
 
     resolveMatches(world: any, entityManager: any, matches: Set<number>, cycleSystem: any): { multiplier: number, isCycleHit: boolean, isAvatarState: boolean } {
-        // Determine the "Primary" element of the match.
-        // Usually the one that the user swapped, or the majority.
-        // For now, pick the first one from the set.
-        if (matches.size === 0) return { multiplier: 1, isCycleHit: false, isAvatarState: false };
-
-        const firstIdx = Array.from(matches)[0];
-        if (firstIdx === undefined) return { multiplier: 1, isCycleHit: false, isAvatarState: false };
-
-        const ptr = firstIdx * 2;
-        const cells = this.getCells();
-        // Element is at ptr
-        const element = cells[ptr];
-
-        // Update Cycle System
-        const result = cycleSystem.checkMatch(element);
+        // EIDOLON-V: Trust Rust State
+        // We ignore the passed cycleSystem (Legacy TS) and query WASM.
 
         // Remove Entities (Visuals)
         matches.forEach(idx => {
@@ -298,14 +313,16 @@ export class GridSystem {
                 entityManager.removeEntity(id);
                 this.setEntityAt(Math.floor(idx / this.width), idx % this.width, -1);
             }
-            // Rust side is handled by Rust's `process_matches` or we manually clear?
-            // If `findMatches` got them from Rust, Rust likely already marked them or cleared them?
-            // If Rust logic is "Queue Matches -> Wait for Client -> Apply".
-            // We'll assume we need to set them to 0 (Empty) if Rust hasn't.
-            // `this.setElement(idx, 0);`
         });
 
-        return result;
+        // Polling Rust State
+        // Note: isCycleHit is approximate here (checks if chain > 0)
+        // Ideally we check events.
+        return {
+            multiplier: this.getCycleMultiplier(),
+            isCycleHit: this.getCycleChain() > 0,
+            isAvatarState: this.isAvatarState()
+        };
     }
 
     clearBoard(world: any, entityManager: any) {
@@ -448,6 +465,11 @@ export class GridSystem {
         return (this.sim as any).get_cycle_multiplier();
     }
 
+    isAvatarState(): boolean {
+        if (!this.sim || !(this.sim as any).is_avatar_state) return false;
+        return (this.sim as any).is_avatar_state();
+    }
+
     getMatchEvents(): Uint8Array {
         if (!this.sim || !(this.sim as any).get_match_queue_ptr) return new Uint8Array(0);
 
@@ -465,9 +487,43 @@ export class GridSystem {
         }
     }
 
+    // --- ECS BRIDGING (ZERO-COPY) ---
+
+    syncEntities() {
+        if (this.sim && (this.sim as any).sync_buffers) {
+            (this.sim as any).sync_buffers();
+        }
+    }
+
+    getEntitiesCount(): number {
+        if (!this.sim || !(this.sim as any).get_entities_count) return 0;
+        return (this.sim as any).get_entities_count();
+    }
+
+    // Returns view into entity IDs (u64)
+    getEntityIds(): BigUint64Array {
+        if (!this.sim || !this.memory) return new BigUint64Array(0);
+        const sim = this.sim as any;
+        if (!sim.get_entity_ids_ptr) return new BigUint64Array(0);
+        const ptr = sim.get_entity_ids_ptr();
+        const count = sim.get_entities_count();
+        return new BigUint64Array(this.memory.buffer, ptr, count);
+    }
+
+    // Returns view into positions (f32, f32 pairs)
+    getPositions(): Float32Array {
+        if (!this.sim || !this.memory) return new Float32Array(0);
+        const sim = this.sim as any;
+        if (!sim.get_positions_ptr) return new Float32Array(0);
+        const ptr = sim.get_positions_ptr();
+        const count = sim.get_entities_count();
+        return new Float32Array(this.memory.buffer, ptr, count * 2);
+    }
+
     // --- SUBCONSCIOUS UI SYSTEM ---
 
     // Note: This calls WASM to get accurate interaction previews for all 4 neighbors.
+    // Optimized: Now uses a single batched WASM call instead of 4 separate calls.
     previewInteraction(world: any, cycleSystem: any, row: number, col: number): import("../types.js").InteractionPreview {
         const idx = row * this.width + col;
         // Check bounds
@@ -475,40 +531,28 @@ export class GridSystem {
             return { type: 'none', affectedTiles: [], cycleProgress: cycleSystem?.getChainLength ? cycleSystem.getChainLength() : 0 };
         }
 
-        if (!this.sim || !(this.sim as any).preview_swap) {
+        if (!this.sim || !(this.sim as any).preview_neighbors) {
             return { type: 'none', affectedTiles: [], cycleProgress: 0 };
         }
 
         const affectedMap = new Map<number, 'destruction' | 'generation'>();
 
-        // Check 4 cardinal neighbors (Up, Down, Left, Right)
-        const neighbors = [
-            { r: row - 1, c: col },
-            { r: row + 1, c: col },
-            { r: row, c: col - 1 },
-            { r: row, c: col + 1 }
-        ];
+        // Call Optimized WASM preview_neighbors
+        // WASM returns [idx, type, idx, type...] (u32 array) for all 4 neighbors
+        const result = (this.sim as any).preview_neighbors(col, row) as Uint32Array;
 
-        for (const n of neighbors) {
-            if (n.r >= 0 && n.r < this.height && n.c >= 0 && n.c < this.width) {
-                // Call WASM preview_swap
-                // WASM returns [idx, type, idx, type...] (u32 array)
-                const result = (this.sim as any).preview_swap(col, row, n.c, n.r) as Uint32Array;
-
-                // Parse result
-                for (let i = 0; i < result.length; i += 2) {
-                    const tIdx = result[i];
-                    const typeCode = result[i + 1];
-                    // typeCode: 1 = Destruction, 2 = Generation, 0/3 = Match
-                    if (typeCode === 1) {
-                        affectedMap.set(tIdx, 'destruction');
-                    } else if (typeCode === 2) {
-                        // Destruction takes priority in visualization usually, 
-                        // but if it's already destruction, keep destruction.
-                        if (affectedMap.get(tIdx) !== 'destruction') {
-                            affectedMap.set(tIdx, 'generation');
-                        }
-                    }
+        // Parse result
+        for (let i = 0; i < result.length; i += 2) {
+            const tIdx = result[i];
+            const typeCode = result[i + 1];
+            // typeCode: 1 = Destruction, 2 = Generation, 0/3 = Match
+            if (typeCode === 1) {
+                affectedMap.set(tIdx, 'destruction');
+            } else if (typeCode === 2) {
+                // Destruction takes priority in visualization usually, 
+                // but if it's already destruction, keep destruction.
+                if (affectedMap.get(tIdx) !== 'destruction') {
+                    affectedMap.set(tIdx, 'generation');
                 }
             }
         }
@@ -540,10 +584,13 @@ export class GridSystem {
 
     // --- VISUAL EVENTS ACCESS (FLUID SIMULATION EVENTS) ---
 
-    getFluidEvents(): Uint32Array {
+    // --- VISUAL EVENTS ACCESS (ZERO-COPY) ---
+
+    // Returns raw Uint32Array of packed events
+    // Format per u32: [Type (8), GX (8), GY (8), Intensity (8)]
+    getFluidEventBuffer(): Uint32Array {
         if (!this.sim || !this.memory) return new Uint32Array(0);
 
-        // pointers might be undefined in type def if not updated, so cast to any
         const sim = this.sim as any;
         if (!sim.get_events_ptr || !sim.get_events_len) return new Uint32Array(0);
 
@@ -552,11 +599,11 @@ export class GridSystem {
 
         if (len === 0) return new Uint32Array(0);
 
-        // Uint32Array view into WASM memory
-        // Ptr is in bytes? No, WASM pointers are byte offsets.
-        // Uint32Array constructor takes byte offset.
-        // Rust vec pointer is byte offset.
-        // Length is number of u32 elements.
+        // Zero-Copy view into WASM memory
+        // Slice it to avoid issues if memory grows/moves, or just return view if safe?
+        // Returning view is unsafe if memory grows. Assuming it doesn't grow mid-frame.
+        // But to be safe and match usage pattern, let's return a slice or view.
+        // A new Uint32Array(buffer, ptr, len) IS a view.
         return new Uint32Array(this.memory.buffer, ptr, len);
     }
 

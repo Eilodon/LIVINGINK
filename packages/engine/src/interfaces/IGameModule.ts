@@ -8,8 +8,8 @@
  * Examples: CJR (Color Jelly Rush), MOBA, RPG, etc.
  */
 
-import type { IComponentSchema } from './IComponent';
-import type { ISystem, SystemFactory } from './ISystem';
+import type { IComponentSchema } from './IComponent.js';
+import type { ISystem, SystemFactory } from './ISystem.js';
 
 /**
  * Network schema for module-specific packet encoding.

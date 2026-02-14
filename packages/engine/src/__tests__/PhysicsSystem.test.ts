@@ -5,14 +5,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PhysicsSystem } from '../systems/PhysicsSystem';
-import { WorldState } from '../generated/WorldState';
+import { PhysicsSystem } from '../systems/PhysicsSystem.js';
+import { WorldState } from '../generated/WorldState.js';
 import {
     TransformAccess,
     PhysicsAccess,
     StateAccess,
     EntityFlags
-} from '../generated/ComponentAccessors';
+} from '../generated/ComponentAccessors.js';
 
 describe('PhysicsSystem', () => {
     let world: WorldState;

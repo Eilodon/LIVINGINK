@@ -5,11 +5,14 @@
     "main": "index.ts",
     "types": "index.ts",
     "dependencies": {
-        "@cjr/engine": "file:../../engine",
-        "@cjr/shared": "file:../../shared",
-        "core-rust": "file:../../core-rust/pkg"
+        "@cjr/engine": "workspace:*",
+        "@cjr/shared": "workspace:*",
+        "core-rust": "workspace:*",
+        "pixi.js": "^8.16.0"
     },
     "devDependencies": {
+        "happy-dom": "^20.6.1",
+        "typescript": "5.9.3",
         "vitest": "^1.0.0"
     }
 }

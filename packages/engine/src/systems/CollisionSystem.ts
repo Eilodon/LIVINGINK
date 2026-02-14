@@ -4,7 +4,7 @@
  * Uses Spatial Hash Grid for O(N) performance with thousands of entities.
  */
 
-import { WorldState } from '../generated/WorldState';
+import { WorldState } from '../generated/WorldState.js';
 import {
     EntityFlags,
     TransformAccess,
@@ -14,9 +14,9 @@ import {
     PigmentAccess,
     ConfigAccess,
     ProjectileAccess,
-} from '../generated/ComponentAccessors';
-import { FastMath } from '../math/FastMath';
-import { calcMatchPercentFast } from '../modules/cjr/colorMath';
+} from '../generated/ComponentAccessors.js';
+import { FastMath } from '../math/FastMath.js';
+import { calcMatchPercentFast } from '../modules/cjr/colorMath.js';
 
 // ============================================
 // SPATIAL HASH GRID

@@ -15,10 +15,10 @@ import type {
     IInspectorSchema,
     IModuleConfig,
     IModuleGameState,
-} from '../../interfaces/IGameModule';
-import type { IComponentSchema } from '../../interfaces/IComponent';
-import type { SystemFactory } from '../../interfaces/ISystem';
-import { TattooId, MutationTier, type PigmentVec3 } from './types';
+} from '../../interfaces/IGameModule.js';
+import type { IComponentSchema } from '../../interfaces/IComponent.js';
+import type { SystemFactory } from '../../interfaces/ISystem.js';
+import { TattooId, MutationTier, type PigmentVec3 } from './types.js';
 
 /**
  * CJR Module Version

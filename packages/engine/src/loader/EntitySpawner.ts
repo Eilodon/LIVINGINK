@@ -5,7 +5,7 @@
  * Bridges high-level entity concepts to low-level DOD storage.
  */
 
-import { MAX_ENTITIES, STRIDES } from '../generated/WorldState';
+import { MAX_ENTITIES, STRIDES } from '../generated/WorldState.js';
 import {
     TransformAccess,
     PhysicsAccess,
@@ -14,10 +14,10 @@ import {
     SkillAccess,
     InputAccess,
     EntityFlags,
-} from '../generated/ComponentAccessors';
-import type { WorldState } from '../generated/WorldState';
-import { PLAYER_START_RADIUS } from '../config/constants';
-import type { EntityTemplate } from './BlueprintLoader';
+} from '../generated/ComponentAccessors.js';
+import type { WorldState } from '../generated/WorldState.js';
+import { PLAYER_START_RADIUS } from '../config/constants.js';
+import type { EntityTemplate } from './BlueprintLoader.js';
 
 /**
  * Context for spawning entities

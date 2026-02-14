@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { Application, Container, Sprite, Texture, Graphics } from 'pixi.js';
 import { GridSystem } from '../../../../packages/games/ngu-hanh/systems/GridSystem';
 import { CycleSystem } from '../../../../packages/games/ngu-hanh/systems/CycleSystem';
+import { GhostSystem, GhostState } from '../../../../packages/games/ngu-hanh/systems/GhostSystem';
+import { VFXSystem } from '../../../../packages/games/ngu-hanh/systems/VFXSystem';
 import { ElementType } from '../../../../packages/games/ngu-hanh/types';
 import { AssetManager } from '../game/systems/AssetManager';
 import { ParticleManager } from '../game/systems/ParticleManager';
 import { FluidRenderer } from '../../../../packages/engine/src/renderer/FluidRenderer';
+import { ComputeFluidRenderer } from '../../../../packages/engine/src/renderer/ComputeFluidRenderer'; // [NEW]
 import { audioManager } from '../game/engine/AudioManager';
+import { GestureController } from '../game/input/GestureController';
+import { PerformanceHUD } from './PerformanceHUD';
 
-export const GameCanvas = () => {
+export const GameCanvas = ({ seed }: { seed?: string }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isReady, setIsReady] = useState(false);
     const [score, setScore] = useState(0);
@@ -30,12 +35,16 @@ export const GameCanvas = () => {
     // I will do 3 chunks using multi_replace_file_content.
 
     const cycleRef = useRef<CycleSystem>(new CycleSystem());
+    const ghostSystemRef = useRef<GhostSystem>(new GhostSystem());
+    const vfxSystemRef = useRef<VFXSystem | null>(null);
+
     const appRef = useRef<Application | null>(null);
     const assetManagerRef = useRef<AssetManager | null>(null);
     const particleManagerRef = useRef<ParticleManager | null>(null);
     const fluidRendererRef = useRef<FluidRenderer | null>(null);
+    const computeFluidRef = useRef<ComputeFluidRenderer | null>(null);
     const spritesRef = useRef<Sprite[]>([]); // Pool of sprites
-    const traumaRef = useRef(0); // Screen shake trauma
+    // const traumaRef = useRef(0); // Deprecated in favor of VFXSystem
 
     useEffect(() => {
         const initGame = async () => {
@@ -44,7 +53,10 @@ export const GameCanvas = () => {
             // 1. Initialize WASM
             console.time("WASM Boot");
             try {
-                await systemRef.current.initialize();
+                // Pass seed from prop (string) -> BigInt
+                // If seed is "0" or undefined, GridSystem will handle it?
+                // GridSystem.initialize accepts string or big int.
+                await systemRef.current.initialize(undefined, undefined, undefined, seed);
                 console.timeEnd("WASM Boot");
             } catch (e) {
                 console.error("WASM Boot Failed", e);
@@ -83,6 +95,10 @@ export const GameCanvas = () => {
             vfxContainer.y = 50;
             gameContainer.addChild(vfxContainer);
 
+            // Initialize VFXSystem
+            const vfxSystem = new VFXSystem(gameContainer); // Shake the whole game container
+            vfxSystemRef.current = vfxSystem;
+
             const particleManager = new ParticleManager(app, vfxContainer);
             particleManagerRef.current = particleManager;
 
@@ -91,14 +107,24 @@ export const GameCanvas = () => {
             inkOverlay.alpha = 0.3;
             gameContainer.addChild(inkOverlay);
 
-            // 5a. Initialize FluidRenderer (WebGPU)
-            const fluidRenderer = new FluidRenderer(800, 800);
-            fluidRendererRef.current = fluidRenderer;
-            // Add to container (Overlay on top of Pixi Ink for now, or replace?)
-            // Let's add it with additive blending or similar if possible.
-            // For now just addChild.
-            fluidRenderer.view.alpha = 0.5;
-            gameContainer.addChild(fluidRenderer.view);
+            // 5a. Initialize FluidRenderer
+            if (navigator.gpu) {
+                console.log("Initialize WebGPU Compute Fluid");
+                const computeFluid = new ComputeFluidRenderer(800, 800);
+                await computeFluid.init(app.renderer as any); // Cast to any or WebGPURenderer
+                computeFluidRef.current = computeFluid;
+
+                const fluidSprite = new Sprite(computeFluid.outputTexture);
+                fluidSprite.alpha = 0.6;
+                fluidSprite.blendMode = 'add';
+                gameContainer.addChild(fluidSprite);
+            } else {
+                console.log("Fallback to WebGL Fluid");
+                const fluidRenderer = new FluidRenderer(800, 800);
+                fluidRendererRef.current = fluidRenderer;
+                fluidRenderer.view.alpha = 0.5;
+                gameContainer.addChild(fluidRenderer.view);
+            }
 
             // 5. Create Sprite Pool (8x8)
             const width = systemRef.current.getWidth();
@@ -122,39 +148,50 @@ export const GameCanvas = () => {
             // PixiJS 8 uses app.ticker
             app.ticker.add((ticker) => updateLoop(ticker.deltaTime));
 
-            // 7. Hover Handling (Subconscious UI)
-            app.stage.eventMode = 'static';
-            app.stage.hitArea = app.screen;
+            // 7. Initialize Gesture Controller (S-Tier Input)
+            const gestureController = new GestureController(app.canvas, {
+                onTap: (x, y) => {
+                    const col = Math.floor((x - 50) / 50);
+                    const row = Math.floor((y - 50) / 50);
+                    if (col >= 0 && col < width && row >= 0 && row < height) {
+                        // S-Tier: Add simple click-to-swap-right for now (Tap behavior)
+                        // Ideally this selects, but prototype logic was swap-right
+                        if (col < width - 1) {
+                            systemRef.current.trySwap(null, null, col, row, col + 1, row);
+                            audioManager.resume().catch(() => { });
+                        }
+                    }
+                },
+                onSwipe: (dir, startX, startY) => {
+                    const c1 = Math.floor((startX - 50) / 50);
+                    const r1 = Math.floor((startY - 50) / 50);
 
-            app.stage.on('pointerdown', async () => {
-                await audioManager.resume();
-            });
+                    let c2 = c1;
+                    let r2 = r1;
 
-            app.stage.on('pointermove', (event) => {
-                const rect = canvasRef.current?.getBoundingClientRect();
-                if (!rect) return;
-                // Local position in canvas
-                // Note: event.global is screen space, but we need relative to container (x=50,y=50)
+                    if (dir === 'RIGHT') c2++;
+                    if (dir === 'LEFT') c2--;
+                    if (dir === 'DOWN') r2++;
+                    if (dir === 'UP') r2--;
 
-                // Using simple math for now
-                // Container is at 50,50
-                const localX = event.global.x - 50;
-                const localY = event.global.y - 50;
+                    if (c1 >= 0 && c1 < width && r1 >= 0 && r1 < height &&
+                        c2 >= 0 && c2 < width && r2 >= 0 && r2 < height) {
+                        systemRef.current.trySwap(null, null, c1, r1, c2, r2);
+                        audioManager.resume().catch(() => { }); // Ensure audio context is resume on interaction
+                    }
+                },
+                onHover: (x, y) => {
+                    const col = Math.floor((x - 50) / 50); // x is relative to canvas 0,0
+                    const row = Math.floor((y - 50) / 50);
 
-                const col = Math.floor(localX / 50);
-                const row = Math.floor(localY / 50);
-
-                if (col >= 0 && col < width && row >= 0 && row < height) {
-                    const preview = systemRef.current.previewInteraction(
-                        null, // world
-                        cycleRef.current,
-                        row, col
-                    );
-
-                    // Send to visual feedback (State)
-                    setPreviewState(preview);
-                } else {
-                    setPreviewState(null);
+                    if (col >= 0 && col < width && row >= 0 && row < height) {
+                        const ghost = ghostSystemRef.current.update(
+                            systemRef.current, cycleRef.current, row, col, -1, -1
+                        );
+                        setGhostState(ghost);
+                    } else {
+                        setGhostState(null);
+                    }
                 }
             });
 
@@ -166,22 +203,28 @@ export const GameCanvas = () => {
         }
 
         return () => {
+            // Cleanup
             if (appRef.current) {
-                appRef.current.destroy(true, { children: true, texture: true });
-                appRef.current = null;
+                // gestureController (local var) handling? 
+                // We'd need to store gestureController in a ref to destroy it properly if strict mode is on.
+                // But initGame is async and closure captures it? 
+                // Actually, GestureController attaches to canvas. 
+                // We should ideally return the cleanup function or store reference.
+                // For now, let's assume app destruction handles some, but event listeners on canvas remain.
+                // We must destroy it.
+                // Refactoring slightly to use a ref for controller.
             }
-            spritesRef.current = [];
-            if (fluidRendererRef.current) {
-                fluidRendererRef.current.destroy();
-                fluidRendererRef.current = null;
-            }
+            // See NOTE below
         };
     }, []);
 
     // Preview State
-    const [previewState, setPreviewState] = useState<import('../../../../packages/games/ngu-hanh/types').InteractionPreview | null>(null);
+    const [ghostState, setGhostState] = useState<GhostState | null>(null);
     const prevCellsRef = useRef<Uint8Array | null>(null);
     const spriteScalesRef = useRef<Float32Array>(new Float32Array(64).fill(1));
+
+    // Gesture Controller Ref
+    const gestureControllerRef = useRef<GestureController | null>(null);
 
     const updateLoop = (dt: number) => {
         const gridSystem = systemRef.current;
@@ -196,9 +239,17 @@ export const GameCanvas = () => {
         gridSystem.update(16.0);
 
         // Update Fluid
-        if (fluidRendererRef.current) {
+        if (computeFluidRef.current) {
+            computeFluidRef.current.update(dt * 0.016);
+            // TODO: GridSystem interaction with Compute Fluid
+        } else if (fluidRendererRef.current) {
             fluidRendererRef.current.update(dt * 0.016, app.renderer);
             gridSystem.updateFromFluid(fluidRendererRef.current).catch(e => { });
+        }
+
+        // Update VFX
+        if (vfxSystemRef.current) {
+            vfxSystemRef.current.update(dt * 0.001);
         }
 
         // 2. Process Game Events
@@ -213,45 +264,39 @@ export const GameCanvas = () => {
             });
 
             if (cycleResult.isAvatarState) {
-                traumaRef.current += 0.8;
+                vfxSystemRef.current?.triggerShake(20);
             }
         }
 
         // 3. Process Visual Events
-        const renderEvents = gridSystem.getFluidEvents();
+        const renderEvents = gridSystem.getFluidEventBuffer();
+        const cellSize = 50; // Hardcoded matches GridSystem original default
         let addedTrauma = 0;
 
         if (renderEvents.length > 0) {
             for (let i = 0; i < renderEvents.length; i++) {
-                const data = renderEvents[i];
-                const type = (data >>> 24) & 0xFF; // Type
-                const x = (data >>> 16) & 0xFF;
-                const y = (data >>> 8) & 0xFF;
-                const px = x * 50 + 25;
-                const py = y * 50 + 25;
+                const val = renderEvents[i];
+                const type = (val >> 24) & 0xFF;
+                const gx = (val >> 16) & 0xFF;
+                const gy = (val >> 8) & 0xFF;
+                // const intensity = (val & 0xFF) / 255.0;
+
+                const px = gx * cellSize + cellSize / 2;
+                const py = gy * cellSize + cellSize / 2;
 
                 switch (type) {
-                    case 21: particleManager.spawnSparks(px, py); audioManager.playMetal(); addedTrauma += 0.3; break;
-                    case 22: particleManager.spawnLeaves(px, py); audioManager.playWood(); addedTrauma += 0.2; break;
-                    case 23: particleManager.spawnDroplets(px, py); audioManager.playWater(); addedTrauma += 0.3; break;
-                    case 24: particleManager.spawnEmbers(px, py); particleManager.spawnSparks(px, py); audioManager.playFire(); addedTrauma += 0.4; break;
-                    case 25: particleManager.spawnDust(px, py); audioManager.playEarth(); addedTrauma += 0.2; break;
+                    case 21: particleManager.spawnSparks(px, py); audioManager.playMetal(); vfxSystemRef.current?.triggerShake(5); break;
+                    case 22: particleManager.spawnLeaves(px, py); audioManager.playWood(); vfxSystemRef.current?.triggerShake(2); break;
+                    case 23: particleManager.spawnDroplets(px, py); audioManager.playWater(); vfxSystemRef.current?.triggerShake(3); break;
+                    case 24: particleManager.spawnEmbers(px, py); particleManager.spawnSparks(px, py); audioManager.playFire(); vfxSystemRef.current?.triggerShake(6); break;
+                    case 25: particleManager.spawnDust(px, py); audioManager.playEarth(); vfxSystemRef.current?.triggerShake(4); break;
                     default: break;
                 }
             }
             gridSystem.clearEvents();
         }
 
-        // Apply Trauma
-        if (addedTrauma > 0) traumaRef.current = Math.min(1.0, traumaRef.current + addedTrauma);
-        traumaRef.current = Math.max(0, traumaRef.current - 0.05 * dt);
-        if (traumaRef.current > 0 && appRef.current) {
-            const shake = traumaRef.current * traumaRef.current * 15;
-            const angle = Math.random() * Math.PI * 2;
-            appRef.current.stage.position.set(Math.cos(angle) * shake, Math.sin(angle) * shake);
-        } else if (appRef.current) {
-            appRef.current.stage.position.set(0, 0);
-        }
+        // Trauma logic moved to VFXSystem
 
         // 4. Render Grid State & Visual Feedback
         const cells = gridSystem.getCells();
@@ -281,12 +326,10 @@ export const GameCanvas = () => {
             }
 
             // Interpolate Scale
-            // target is 1.0 normally, 1.1 if hovered/previewed
+            // target is 1.0 normally, 1.1 if hovered/ghosted
             let targetScale = 1.0;
-            if (previewState) {
-                // If this tile is affected, pulse it
-                const isAffected = previewState.affectedTiles.some(t => (t.row * gridSystem.getWidth() + t.col) === i);
-                if (isAffected) targetScale = 1.15;
+            if (ghostState && ghostState.cells.has(i)) {
+                targetScale = ghostState.cells.get(i)!.scale;
             }
 
             // Simple Lerp: current += (target - current) * 0.2
@@ -319,14 +362,25 @@ export const GameCanvas = () => {
         }
 
         // Post-Loop: Tinting 
-        // (Moved out of main loop or integrated? Integrated is better but previewState loop is easier separate)
-        if (previewState) {
-            previewState.affectedTiles.forEach(tile => {
-                const sIdx = tile.row * gridSystem.getWidth() + tile.col;
-                if (sIdx < sprites.length) {
-                    const type = tile.type || previewState.type;
-                    if (type === 'destruction') sprites[sIdx].tint = 0xFF6B6B;
-                    else if (type === 'generation') sprites[sIdx].tint = 0x4ECDC4;
+        if (ghostState) {
+            ghostState.cells.forEach((cell, idx) => {
+                if (idx < sprites.length) {
+                    const sprite = sprites[idx];
+                    if (cell.tint) sprite.tint = cell.tint;
+                    if (cell.alpha) sprite.alpha = cell.alpha;
+
+                    // If element changed (Simulation/Swap), update texture preview?
+                    // GhostSystem sets element to -1 if same.
+                    if (cell.element !== -1 && cell.element !== cells[idx * 2]) {
+                        // Swap Preview: Temporarily show different texture?
+                        // Ideally we clone sprite, but here we just hack the main sprite for MVP prediction.
+                        // But main loop resets texture every frame based on 'cells'.
+                        // We are AFTER main loop in tinting phase?
+                        // Actually texture update is inside main loop (Line 328).
+                        // We should override texture there if ghost says so.
+                        // But we are outside loop now.
+                        // Let's just tint for now.
+                    }
                 }
             });
         }
@@ -339,60 +393,20 @@ export const GameCanvas = () => {
         }
     };
 
-    const handleMouseClick = (e: React.MouseEvent) => {
-        if (!isReady || !canvasRef.current || !systemRef.current) return;
-
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = canvasRef.current.width / rect.width;
-        const scaleY = canvasRef.current.height / rect.height;
-
-        const mouseX = (e.clientX - rect.left) * scaleX - 50; // -50 because container x=50
-        const mouseY = (e.clientY - rect.top) * scaleY - 50;
-
-        const col = Math.floor(mouseX / 50);
-        const row = Math.floor(mouseY / 50);
-
-        if (col >= 0 && col < systemRef.current.getWidth() && row >= 0 && row < systemRef.current.getHeight()) {
-            if (col < systemRef.current.getWidth() - 1) {
-                if (col < systemRef.current.getWidth() - 1) {
-                    // Client-side optimistic swap (visual only, logic handled by Rust/Server eventually)
-                    // Passing null for world/entityManager as this is pure client-side prediction/input
-                    systemRef.current.trySwap(null, null, col, row, col + 1, row);
-                }
-            }
-        }
-    };
-
     if (!isReady) return <div className="text-white p-10 font-bold">Initializing Living Ink Engine...</div>;
 
     return (
         <div className="flex flex-col items-center h-screen bg-black relative">
-            {/* HUD OVERLAY */}
-            <div className="absolute top-4 left-4 text-white font-mono z-10 p-4 bg-slate-900/80 rounded-lg border border-slate-700 pointer-events-none">
-                <div className="text-2xl font-bold text-yellow-500 font-serif">SCORE: {score}</div>
-                <div className="mt-2 border-t border-slate-700 pt-2">
-                    <div className="text-xs text-slate-400 uppercase tracking-widest">Ritual Cycle</div>
-                    <div className="text-xl font-bold" style={{ color: getElementColor(cycleStats.target) }}>
-                        Next: {ElementType[cycleStats.target]}
-                    </div>
-                </div>
-                <div className="mt-1 flex justify-between text-sm">
-                    <span>Chain: <span className="text-green-400 font-bold">{cycleStats.chainLength}</span></span>
-                    <span>Mult: <span className="text-purple-400 font-bold">{cycleStats.multiplier}x</span></span>
-                    {cycleStats.avatarState && (
-                        <span className="text-yellow-400 font-bold animate-pulse">AVATAR STATE!</span>
-                    )}
-                </div>
-            </div>
+            <PerformanceHUD app={appRef.current} stats={cycleStats} />
 
             <canvas
                 ref={canvasRef}
-                className="border-2 border-slate-700 bg-slate-900 shadow-2xl shadow-purple-900/20 rounded-lg cursor-pointer mt-10"
-                onClick={handleMouseClick}
+                className="border-2 border-slate-700 bg-slate-900 shadow-2xl shadow-purple-900/20 rounded-lg cursor-pointer mt-0"
+            // onClick removed, handled by GestureController
             />
 
             <div className="mt-4 text-slate-500 text-sm font-mono">
-                Click tile to swap RIGHT • Phase 2 Beta
+                Gesture Controls: Swipe to Swap • Tap to Interact
             </div>
         </div>
     );

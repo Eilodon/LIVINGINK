@@ -9,10 +9,10 @@ import {
     COMPONENT_IDS,
     NetworkSerializer,
     WorldState,
-} from '../generated';
+} from '../generated/index.js';
 
-import { DirtyTracker } from './DirtyTracker';
-import { SchemaPacketType } from './ProtocolSchema';
+import { DirtyTracker } from './DirtyTracker.js';
+import { SchemaPacketType } from './ProtocolSchema.js';
 
 // EIDOLON-V OPTIMIZATION: Pre-encoded component IDs to eliminate TextEncoder allocation in hot loop
 const ID_STATS = new TextEncoder().encode('STATS');

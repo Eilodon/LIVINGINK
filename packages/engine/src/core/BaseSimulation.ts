@@ -12,12 +12,12 @@
  * EIDOLON-V REFACTOR: Now uses generated WorldState from schema.
  */
 
-import { PhysicsSystem, MovementSystem } from '../systems';
-import { SkillSystem } from '../systems/SkillSystem';
-import { eventBuffer } from '../events';
-import { WorldState, MAX_ENTITIES } from '../generated/WorldState';
-import { EntityFlags, StateAccess } from '../generated/ComponentAccessors';
-import { DirtyTracker, DirtyMask } from '../networking/DirtyTracker';
+import { PhysicsSystem, MovementSystem } from '../systems/index.js';
+import { SkillSystem } from '../systems/SkillSystem.js';
+import { eventBuffer } from '../events/index.js';
+import { WorldState, MAX_ENTITIES } from '../generated/index.js';
+import { EntityFlags, StateAccess } from '../generated/ComponentAccessors.js';
+import { DirtyTracker, DirtyMask } from '../networking/DirtyTracker.js';
 
 export interface ISimulationConfig {
     tickRate: number;

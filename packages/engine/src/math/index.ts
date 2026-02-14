@@ -38,4 +38,4 @@ export {
     // Types
     type Vector2,
     type Vector3,
-} from './FastMath';
+} from './FastMath.js';

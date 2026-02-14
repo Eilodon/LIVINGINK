@@ -3,6 +3,23 @@
 import { WorldState } from '@cjr/engine';
 import { EventEmitter } from 'eventemitter3';
 
+interface BossData {
+    hp: number;
+    maxHP: number;
+    state: number;
+}
+
+interface LevelData {
+    score: number;
+    movesLeft: number;
+    status?: 'PLAYING' | 'VICTORY' | 'DEFEAT';
+}
+
+interface BoardStats {
+    ashPercentage: number;
+    stoneCount: number;
+}
+
 export interface GameUIState {
     bossHP: number;
     bossMaxHP: number;
@@ -11,10 +28,12 @@ export interface GameUIState {
     levelStatus: 'PLAYING' | 'VICTORY' | 'DEFEAT';
     score: number;
     movesLeft: number;
-    currentScreen: 'LEVEL_SELECT' | 'GAME';
+    currentScreen: 'MAIN_MENU' | 'LEVEL_SELECT' | 'GAME' | 'SHOP' | 'PROFILE' | 'SETTINGS' | 'DAILY_REWARDS';
     selectedLevelId: number;
+    unlockedLevelMax: number;
     ashPercentage: number;
     stoneCount: number;
+    playerCoins: number;
 }
 
 export class UISystem extends EventEmitter {
@@ -29,10 +48,12 @@ export class UISystem extends EventEmitter {
         levelStatus: 'PLAYING',
         score: 0,
         movesLeft: 20,
-        currentScreen: 'LEVEL_SELECT', // Start at Level Select 
+        currentScreen: 'MAIN_MENU', // Start at Main Menu
         selectedLevelId: 1,
+        unlockedLevelMax: 1,
         ashPercentage: 0,
-        stoneCount: 0
+        stoneCount: 0,
+        playerCoins: 2500 // Moved from ShopScreen
     };
 
     private constructor() {
@@ -47,7 +68,7 @@ export class UISystem extends EventEmitter {
     }
 
     // Called by Game Loop (e.g. NguHanhModule or GameHost)
-    public update(world: WorldState, bossData: any, levelData: any, boardStats: any) {
+    public update(world: WorldState, bossData: BossData | undefined, levelData: LevelData | undefined, boardStats: BoardStats | undefined) {
         let changed = false;
 
         // Sync Boss Data
@@ -64,7 +85,7 @@ export class UISystem extends EventEmitter {
             const stateMap = ['IDLE', 'WARNING', 'ATTACK', 'COOLDOWN'];
             const stateStr = stateMap[bossData.state] || 'IDLE';
             if (this.state.bossState !== stateStr) {
-                this.state.bossState = stateStr as any;
+                this.state.bossState = stateStr as 'IDLE' | 'WARNING' | 'ATTACK' | 'COOLDOWN';
                 changed = true;
             }
         }
@@ -109,7 +130,7 @@ export class UISystem extends EventEmitter {
         }
     }
 
-    public switchScreen(screen: 'LEVEL_SELECT' | 'GAME') {
+    public switchScreen(screen: 'MAIN_MENU' | 'LEVEL_SELECT' | 'GAME' | 'SHOP' | 'PROFILE' | 'SETTINGS' | 'DAILY_REWARDS') {
         this.state.currentScreen = screen;
         this.emit('update', this.state);
     }
@@ -118,5 +139,23 @@ export class UISystem extends EventEmitter {
         this.state.selectedLevelId = levelId;
         this.emit('update', this.state);
         this.emit('start_level', levelId); // Helper event
+    }
+
+    public addCoins(amount: number) {
+        this.state.playerCoins += amount;
+        this.emit('update', this.state);
+    }
+
+    public spendCoins(amount: number): boolean {
+        if (this.state.playerCoins >= amount) {
+            this.state.playerCoins -= amount;
+            this.emit('update', this.state);
+            return true;
+        }
+        return false;
+    }
+
+    public dispose() {
+        this.removeAllListeners();
     }
 }

@@ -7,8 +7,8 @@
  * This is part of the Phase 3 & 4 Unification - Memory Convergence.
  */
 
-import type { IComponentSchema } from '../interfaces/IComponent';
-import { getComponentRegistry, type ComponentRegistry } from './ComponentRegistry';
+import type { IComponentSchema } from '../interfaces/IComponent.js';
+import { getComponentRegistry, type ComponentRegistry } from './ComponentRegistry.js';
 
 // =============================================================================
 // Core Component Schemas

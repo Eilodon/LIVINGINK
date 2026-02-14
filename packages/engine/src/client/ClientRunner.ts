@@ -21,9 +21,9 @@
  * EIDOLON-V: Uses generated WorldState for zero-allocation render loop
  */
 
-import { BaseSimulation, type ISimulationConfig } from '../core/BaseSimulation';
-import { STRIDES } from '../generated/WorldState';
-import { TransformAccess, EntityFlags, StateAccess } from '../generated/ComponentAccessors';
+import { BaseSimulation, type ISimulationConfig } from '../core/BaseSimulation.js';
+import { STRIDES } from '../generated/WorldState.js';
+import { TransformAccess, EntityFlags, StateAccess } from '../generated/ComponentAccessors.js';
 
 /**
  * Entity lookup for render sync

@@ -1,4 +1,4 @@
-import { PigmentVec3 } from './types';
+import { PigmentVec3 } from './types.js';
 
 // World Settings (Core Engine Constants)
 export const WORLD_WIDTH = 3400;

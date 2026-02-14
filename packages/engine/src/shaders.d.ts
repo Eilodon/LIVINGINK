@@ -1,9 +1,9 @@
-declare module '*.wgsl?raw' {
-    const value: string;
-    export default value;
+declare module '*.wgsl' {
+    const shader: string;
+    export default shader;
 }
 
-declare module '*.wgsl' {
-    const value: string;
-    export default value;
+declare module '*.wgsl?raw' {
+    const shader: string;
+    export default shader;
 }

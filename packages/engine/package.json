@@ -5,8 +5,8 @@
     "main": "./src/index.ts",
     "types": "./src/index.ts",
     "dependencies": {
-        "@cjr/shared": "file:../shared",
-        "core-rust": "file:../core-rust/pkg",
+        "@cjr/shared": "workspace:*",
+        "core-rust": "workspace:*",
         "pixi.js": "^8.16.0"
     },
     "exports": {
@@ -21,7 +21,9 @@
         "./interfaces": "./src/interfaces/index.ts",
         "./modules": "./src/modules/index.ts",
         "./modules/cjr": "./src/modules/cjr/index.ts",
-        "./cjr": "./src/modules/cjr/index.ts"
+        "./cjr": "./src/modules/cjr/index.ts",
+        "./renderer/FluidRenderer": "./src/renderer/FluidRenderer.ts",
+        "./renderer/ComputeFluidRenderer": "./src/renderer/ComputeFluidRenderer.ts"
     },
     "scripts": {
         "gen": "node scripts/generate.js",

@@ -11,8 +11,8 @@ import {
     FIELD_TYPE_SIZE,
     FIELD_TYPE_ARRAY,
     validateComponentSchema,
-} from '../interfaces/IComponent';
-import { MAX_ENTITIES } from '../generated/WorldState';
+} from '../interfaces/IComponent.js';
+import { MAX_ENTITIES } from '../generated/WorldState.js';
 
 /**
  * Typed array union for component stores.

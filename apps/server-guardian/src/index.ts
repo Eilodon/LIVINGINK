@@ -6,6 +6,7 @@ import { NguHanhRoom } from "./rooms/NguHanhRoom";
 import { monitor } from "@colyseus/monitor";
 
 const port = Number(process.env.PORT || 2567);
+const host = process.env.HOST || 'localhost';
 const app = express();
 
 app.use(cors());
@@ -21,6 +22,6 @@ const gameServer = new Server({
 gameServer.define("ngu_hanh", NguHanhRoom);
 
 gameServer.listen(port).then(() => {
-    console.log(`Listening on ws://localhost:${port}`);
-    console.log(`Monitor available at http://localhost:${port}/colyseus`);
+    console.log(`Listening on ws://${host}:${port}`);
+    console.log(`Monitor available at http://${host}:${port}/colyseus`);
 });

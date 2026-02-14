@@ -6,11 +6,11 @@
  */
 
 // CJR Module Class (IGameModule implementation)
-export { CJRModule, cjrModule, createCJRModule } from './CJRModule';
+export { CJRModule, cjrModule, createCJRModule } from './CJRModule.js';
 
 // Module Registration Helper
-import { getComponentRegistry } from '../../core/ComponentRegistry';
-import { cjrModule } from './CJRModule';
+import { getComponentRegistry } from '../../core/ComponentRegistry.js';
+import { cjrModule } from './CJRModule.js';
 
 /**
  * Register CJR-specific components into the ComponentRegistry.
@@ -32,16 +32,16 @@ export function registerCJRComponents(): void {
 }
 
 // Types
-export * from './types';
+export * from './types.js';
 
 // CJR-specific Flags
-export * from './flags';
+export * from './flags.js';
 
 // CJR State Interfaces (extends base engine interfaces)
-export * from './state';
+export * from './state.js';
 
 // CJR Constants
-export * from './constants';
+export * from './constants.js';
 
 // Color Math
 export {
@@ -55,7 +55,7 @@ export {
     intToHex,
     intToRgbString,
     getSnapAlpha,
-} from './colorMath';
+} from './colorMath.js';
 
 // Ring System
 export {
@@ -65,7 +65,7 @@ export {
     checkRingTransition,
     checkRingTransitionDOD,  // EIDOLON-V Finding 6: DOD-native ring check
     type IRingEntity,
-} from './ringSystem';
+} from './ringSystem.js';
 
 // Tattoos System
 export {
@@ -83,7 +83,7 @@ export {
     type TattooChoice,
     type ITattooEntity,
     type ITattooFood,
-} from './tattoos';
+} from './tattoos.js';
 
 // Tattoo Entity Adapter (Zero-Allocation DOD Bridge)
 export {
@@ -91,7 +91,7 @@ export {
     tattooEntityAdapter,
     TattooEntityPool,
     tattooEntityPool,
-} from './TattooEntityAdapter';
+} from './TattooEntityAdapter.js';
 
 // Win Condition
 export {
@@ -100,7 +100,7 @@ export {
     type IWinEntity,
     type IWinState,
     type ILevelConfig,
-} from './winCondition';
+} from './winCondition.js';
 
 // Boss Logic
 export {
@@ -112,7 +112,7 @@ export {
     type IBossEntity,
     type IPlayerEntity,
     type IBossState,
-} from './bossCjr';
+} from './bossCjr.js';
 
 // Wave Spawner
 export {
@@ -124,4 +124,4 @@ export {
     type IFood,
     type IWaveState,
     type ISpawnResult,
-} from './waveSpawner';
+} from './waveSpawner.js';

@@ -25,6 +25,11 @@ pub struct Simulation {
     accumulator: f64,
     game_time: f64,
     frame_count: u64,
+
+    // Zero-Copy Buffers
+    entity_ids: Vec<u64>,
+    positions: Vec<Position>,
+    velocities: Vec<Velocity>,
 }
 
 #[wasm_bindgen]
@@ -56,6 +61,9 @@ impl Simulation {
             accumulator: 0.0,
             game_time: 0.0,
             frame_count: 0,
+            entity_ids: Vec::with_capacity(1024),
+            positions: Vec::with_capacity(1024),
+            velocities: Vec::with_capacity(1024),
         }
     }
 
@@ -88,22 +96,39 @@ impl Simulation {
         // Step grid logic
         self.grid.tick();
     }
+
+    /// Synchronize ECS state to continuous buffers for Zero-Copy access
+    pub fn sync_buffers(&mut self) {
+        self.entity_ids.clear();
+        self.positions.clear();
+        self.velocities.clear();
+
+        for (e, (pos, vel)) in self.world.inner().query::<(&Position, Option<&Velocity>)>().iter() {
+            self.entity_ids.push(e.to_bits().get());
+            self.positions.push(*pos);
+            self.velocities.push(vel.copied().unwrap_or(Velocity { x: 0.0, y: 0.0 }));
+        }
+    }
+
+    pub fn get_entity_ids_ptr(&self) -> *const u64 { self.entity_ids.as_ptr() }
+    pub fn get_positions_ptr(&self) -> *const Position { self.positions.as_ptr() }
+    pub fn get_velocities_ptr(&self) -> *const Velocity { self.velocities.as_ptr() }
+    pub fn get_entities_count(&self) -> usize { self.entity_ids.len() }
     
     // Helper to get raw pointer to world for other WASM modules (if needed)
     pub fn world_ptr(&self) -> *const World {
         &self.world
     }
     
-    pub fn get_state(&self) -> JsValue {
+    pub fn get_state(&self) -> Result<JsValue, JsValue> {
+        // Optimized legacy bridge: uses synced buffers if they match current state, 
+        // or just re-runs query. For SOTA we avoid this, but keeping for compatibility.
         let mut entities = Vec::new();
-        
-        // Naive iteration for state sync
-        // Hecs query
-        for (e, (pos, vel)) in self.world.inner().query::<(&Position, Option<&Velocity>)>().iter() {
+        for i in 0..self.entity_ids.len() {
             entities.push(EntityState {
-                id: e.to_bits().into(),
-                pos: Some(*pos),
-                vel: vel.copied(),
+                id: self.entity_ids[i],
+                pos: Some(self.positions[i]),
+                vel: Some(self.velocities[i]),
             });
         }
         
@@ -112,8 +137,9 @@ impl Simulation {
             time: self.game_time,
         };
         
-        serde_wasm_bindgen::to_value(&state).unwrap()
+        serde_wasm_bindgen::to_value(&state).map_err(|e| e.into())
     }
+
     pub fn get_grid(&mut self) -> *mut GridState {
         &mut self.grid
     }
@@ -193,12 +219,27 @@ impl Simulation {
          let idx2 = y2 * w + x2;
          self.grid.preview_swap(idx1, idx2)
     }
+
+    pub fn preview_neighbors(&mut self, x: usize, y: usize) -> Vec<u32> {
+        self.grid.preview_neighbors(x, y)
+    }
+
     pub fn get_fluid_events(&self) -> JsValue {
         JsValue::UNDEFINED
     }
     
     pub fn clear_fluid_events(&mut self) {
         self.grid.clear_events();
+    }
+    
+    // FLUID BRIDGE
+    pub fn apply_fluid_density(&mut self, density: &[u8], fluid_w: usize, fluid_h: usize) {
+        self.grid.apply_fluid_density(density, fluid_w, fluid_h);
+    }
+    
+    // CYCLE BRIDGE
+    pub fn is_avatar_state(&self) -> bool {
+        self.grid.is_avatar_state()
     }
     
     // Setters
@@ -216,5 +257,9 @@ impl Simulation {
 
     pub fn spawn_special(&mut self, count: usize, element: u8, flags: u8, exclude_element: u8) -> Vec<usize> {
         self.grid.spawn_special(count, element, flags, exclude_element)
+    }
+
+    pub fn get_checksum(&self) -> u32 {
+        self.grid.get_checksum()
     }
 }

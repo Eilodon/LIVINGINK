@@ -5,7 +5,7 @@
  * Enables dynamic serialization of game-specific components.
  */
 
-import type { IComponentSchema, ComponentFieldType } from '../interfaces/IComponent';
+import type { IComponentSchema, ComponentFieldType } from '../interfaces/IComponent.js';
 
 /**
  * Packet types for different data categories

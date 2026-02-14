@@ -4,7 +4,7 @@
  * Generated: 2026-02-08T15:29:30.437Z
  */
 
-import type { WorldState } from './WorldState';
+import type { WorldState } from './WorldState.js';
 
 export const COMPONENT_IDS = {
     TRANSFORM: 1,

@@ -8,7 +8,7 @@ import {
     EngineEventType,
     TEXT_IDS,
     type IEngineEvent,
-} from '../events/EventRingBuffer';
+} from '../events/EventRingBuffer.js';
 
 describe('EventRingBuffer', () => {
     let buffer: EventRingBuffer;

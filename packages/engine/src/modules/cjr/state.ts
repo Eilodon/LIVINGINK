@@ -5,8 +5,8 @@
  * These add color matching, ring progression, and tattoo mechanics.
  */
 
-import type { IEnginePlayer, IEngineBot, IColorVec3 } from '../../interfaces/IGameState';
-import type { PigmentVec3 } from './types';
+import type { IEnginePlayer, IEngineBot, IColorVec3 } from '../../interfaces/IGameState.js';
+import type { PigmentVec3 } from './types.js';
 
 /**
  * CJR Player - extends base with color matching mechanics

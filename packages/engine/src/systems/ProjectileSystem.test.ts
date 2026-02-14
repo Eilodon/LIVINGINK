@@ -3,11 +3,11 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { WorldState } from '../generated/WorldState';
-import { EntityFlags, ProjectileAccess, StateAccess, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
-import { ProjectileSystem } from './ProjectileSystem';
-import { PhysicsSystem } from './PhysicsSystem';
-import { DirtyTracker } from '../networking/DirtyTracker';
+import { WorldState } from '../generated/WorldState.js';
+import { EntityFlags, ProjectileAccess, StateAccess, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors.js';
+import { ProjectileSystem } from './ProjectileSystem.js';
+import { PhysicsSystem } from './PhysicsSystem.js';
+import { DirtyTracker } from '../networking/DirtyTracker.js';
 
 describe('ProjectileSystem', () => {
     let world: WorldState;

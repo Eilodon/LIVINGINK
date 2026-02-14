@@ -5,10 +5,10 @@
  */
 
 // NOTE: Code uses direct buffer access (world.transform, world.physics), not Store methods
-import { WorldState } from '../../generated/WorldState';
-import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants';
-import { fastMath } from '../../math/FastMath';
-import type { RingId } from './types';
+import { WorldState } from '../../generated/WorldState.js';
+import { RING_RADII, RING_RADII_SQ, THRESHOLDS, COMMIT_BUFFS } from './constants.js';
+import { fastMath } from '../../math/FastMath.js';
+import type { RingId } from './types.js';
 
 /**
  * Entity interface for ring system operations

@@ -3,9 +3,9 @@
  * Pure spawning logic - no state.engine dependency
  */
 
-import { WAVE_CONFIG, RING_RADII } from './constants';
-import { randomRange, PRNG } from '../../math/FastMath';
-import type { PigmentVec3, PickupKind } from './types';
+import { WAVE_CONFIG, RING_RADII } from './constants.js';
+import { randomRange, PRNG } from '../../math/FastMath.js';
+import type { PigmentVec3, PickupKind } from './types.js';
 
 export interface IFood {
     id: string;

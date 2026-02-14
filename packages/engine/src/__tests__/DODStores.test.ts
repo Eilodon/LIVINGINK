@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { WorldState, MAX_ENTITIES } from '../generated/WorldState';
+import { WorldState, MAX_ENTITIES } from '../generated/WorldState.js';
 import {
   TransformAccess,
   PhysicsAccess,
@@ -17,7 +17,7 @@ import {
   SkillAccess,
   ProjectileAccess,
   EntityFlags,
-} from '../generated/ComponentAccessors';
+} from '../generated/ComponentAccessors.js';
 
 describe('DOD Component Accessors', () => {
   let world: WorldState;

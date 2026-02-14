@@ -6,13 +6,13 @@
  */
 
 // Component System
-export * from './IComponent';
+export * from './IComponent.js';
 
 // System (ECS)
-export * from './ISystem';
+export * from './ISystem.js';
 
 // Game Module (Plugin/Cartridge)
-// export * from './IGameModule';
+export * from './IGameModule.js';
 
 // Legacy Game State (IMPERATOR)
-export * from './IGameState';
+export * from './IGameState.js';

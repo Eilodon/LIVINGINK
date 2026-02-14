@@ -4,7 +4,7 @@
  * Source: packages/engine/scripts/schema.config.js
  */
 
-import { EntityFlags } from './ComponentAccessors';
+import { EntityFlags } from './ComponentAccessors.js';
 
 export const MAX_ENTITIES = 10000;
 

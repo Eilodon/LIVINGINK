@@ -11,17 +11,17 @@ export {
     type LoaderConfig,
     getBlueprintLoader,
     resetBlueprintLoader,
-} from './BlueprintLoader';
+} from './BlueprintLoader.js';
 
 export {
     validateLevelBlueprint,
     type LevelBlueprint,
     type ValidationResult,
-} from './LevelValidator';
+} from './LevelValidator.js';
 
 export {
     EntitySpawner,
     type SpawnContext,
     type BotSpawnOptions,
     type BossSpawnOptions,
-} from './EntitySpawner';
+} from './EntitySpawner.js';

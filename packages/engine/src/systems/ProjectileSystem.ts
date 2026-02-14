@@ -5,8 +5,8 @@
  * EIDOLON-V: Pure DOD implementation.
  */
 
-import { WorldState } from '../generated/WorldState';
-import { EntityFlags, TransformAccess, PhysicsAccess, ProjectileAccess, StateAccess } from '../generated/ComponentAccessors';
+import { WorldState } from '../generated/WorldState.js';
+import { EntityFlags, TransformAccess, PhysicsAccess, ProjectileAccess, StateAccess } from '../generated/ComponentAccessors.js';
 
 export class ProjectileSystem {
     /**

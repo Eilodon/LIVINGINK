@@ -5,7 +5,7 @@
  * EIDOLON-V: Uses generated WorldState and Accessor classes from schema.
  */
 
-import { WorldState, STRIDES, MAX_ENTITIES } from '../generated/WorldState';
+import { WorldState, STRIDES, MAX_ENTITIES } from '../generated/WorldState.js';
 import {
     EntityFlags,
     StateAccess,
@@ -13,7 +13,7 @@ import {
     TransformAccess,
     InputAccess,
     ConfigAccess
-} from '../generated/ComponentAccessors';
+} from '../generated/ComponentAccessors.js';
 
 // Default values for when Config has no data
 const DEFAULT_MAX_SPEED = 150;

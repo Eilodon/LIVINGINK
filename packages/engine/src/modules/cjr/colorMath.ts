@@ -4,7 +4,7 @@
  * Zero dependencies - headless compatible
  */
 
-import type { PigmentVec3 } from './types';
+import type { PigmentVec3 } from './types.js';
 
 // ==========================================
 // COLOR MATH: OkLCH (Perceptually Uniform)

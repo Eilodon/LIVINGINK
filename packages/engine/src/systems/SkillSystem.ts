@@ -5,9 +5,9 @@
  * EIDOLON-V: Refactored to use generated WorldState and accessors
  */
 
-import { WorldState, MAX_ENTITIES } from '../generated/WorldState';
-import { EntityFlags, StateAccess, SkillAccess, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
-import { eventBuffer, EngineEventType } from '../events/EventRingBuffer';
+import { WorldState, MAX_ENTITIES } from '../generated/WorldState.js';
+import { EntityFlags, StateAccess, SkillAccess, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors.js';
+import { eventBuffer, EngineEventType } from '../events/EventRingBuffer.js';
 
 /**
  * Shape ID Enum for compile-time optimization

@@ -5,12 +5,11 @@
  * No game-specific logic allowed here.
  */
 
-export * from './ComponentRegistry';
-export * from './BaseSimulation';
-export * from './CoreRegistry';
-export * from './IEntityLookup';
-export * from './EntityManager';
-export * from './IGameModule';
-
-export * from './GlobalEntityLookup';
-export * from './WasmAdapter';
+export * from './ComponentRegistry.js';
+export * from './BaseSimulation.js';
+export * from './CoreRegistry.js';
+export * from './IEntityLookup.js';
+export * from './EntityManager.js';
+export * from './ComponentRegistry.js';
+export * from './WasmAdapter.js';
+export * from './ObjectPool.js';

@@ -12,10 +12,10 @@
  * ```
  */
 
-import type { LevelConfig } from '../config/levels';
-import { validateLevelBlueprint, type LevelBlueprint } from './LevelValidator';
-import { EntitySpawner, type SpawnContext } from './EntitySpawner';
-import { WorldState } from '../generated/WorldState';
+import type { LevelConfig } from '../config/levels.js';
+import { validateLevelBlueprint, type LevelBlueprint } from './LevelValidator.js';
+import { EntitySpawner, type SpawnContext } from './EntitySpawner.js';
+import { WorldState } from '../generated/WorldState.js';
 
 /**
  * Entity template for dynamic spawning

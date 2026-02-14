@@ -3,7 +3,7 @@
  * Generated: 2026-02-08T15:29:30.437Z
  */
 
-export { WorldState, MAX_ENTITIES, STRIDES, type IWorldConfig, type IWorldBuffers } from './WorldState';
-export * from './ComponentAccessors';
-export { NetworkSerializer, COMPONENT_IDS, COMPONENT_STRIDES } from './NetworkPacker';
-export { NetworkDeserializer } from './NetworkDeserializer';
+export { WorldState, MAX_ENTITIES, STRIDES, type IWorldConfig, type IWorldBuffers } from './WorldState.js';
+export * from './ComponentAccessors.js';
+export { NetworkSerializer, COMPONENT_IDS, COMPONENT_STRIDES } from './NetworkPacker.js';
+export { NetworkDeserializer } from './NetworkDeserializer.js';

@@ -50,5 +50,23 @@ export const GameConfig = {
          * Maximum number of food items to keep in memory before culling.
          */
         MAX_FOOD_COUNT: 200,
+    },
+
+    // Performance Manager
+    PERFORMANCE: {
+        /**
+         * Target FPS for HIGH tier.
+         */
+        TARGET_FPS: 60,
+
+        /**
+         * Number of consecutive bad frames before tier downgrade.
+         */
+        DOWNGRADE_THRESHOLD: 3,
+
+        /**
+         * Number of consecutive good frames before tier upgrade.
+         */
+        UPGRADE_THRESHOLD: 10,
     }
 } as const;

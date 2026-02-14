@@ -1,0 +1,24 @@
+{
+    "name": "living-ink-monorepo",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "build": "pnpm -r run build",
+        "dev": "pnpm -r run dev",
+        "lint": "pnpm -r run lint",
+        "test": "pnpm -r run test",
+        "test:coverage": "pnpm -r run test --coverage",
+        "test:integration": "echo 'No integration tests yet'",
+        "migrate:test": "echo 'No migration tests yet'",
+        "clean": "pnpm -r run clean",
+        "build:core": "cd packages/core-rust && wasm-pack build --target web"
+    },
+    "devDependencies": {
+        "pnpm": "^10.29.3",
+        "typescript": "^5.0.0",
+        "vite": "^5.0.0"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}

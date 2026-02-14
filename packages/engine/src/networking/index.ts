@@ -5,9 +5,9 @@
  * Runs on both client (with VFX) and server (headless).
  */
 
-export * from './types';
-export * from './ProtocolSchema';
-export * from './DirtyTracker';
-export * from './SchemaBinaryPacker';
-export * from './SchemaBinaryUnpacker';
-export * from './ISnapshotReceiver';
+export * from './types.js';
+export * from './ProtocolSchema.js';
+export * from './DirtyTracker.js';
+export * from './SchemaBinaryPacker.js';
+export * from './SchemaBinaryUnpacker.js';
+export * from './ISnapshotReceiver.js';

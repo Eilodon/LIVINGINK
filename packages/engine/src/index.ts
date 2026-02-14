@@ -30,46 +30,42 @@
 // =============================================================================
 
 // Generated Types (EIDOLON-V) - Primary source
-export * from './generated';
-
-// DOD Module (Data-Oriented Design) - Compatibility layer
-// Note: EntityFlags and other types are re-exported from generated
-// Import from './generated' for new code
-
+export * from './generated/index.js';
 
 // Core (Registry, Memory Management)
-export * from './core';
+export * from './core/index.js';
 
 // Interfaces (Contracts)
-export * from './interfaces';
+export * from './interfaces/index.js';
 
 // Events Module
-export * from './events';
+export * from './events/index.js';
 
 // Systems Module (Core systems only: Physics, Movement)
-export * from './systems';
+export * from './systems/index.js';
+export * from './systems/PerformanceManager.js';
 
 // Math Module
-export * from './math';
+export * from './math/index.js';
 
 // Networking Module
-export * from './networking';
+export * from './networking/index.js';
 
 // Config Module
-export * from './config';
+export * from './config/index.js';
 
 // Client Module (Fluid, Rendering)
-export * from './client';
-export * from './renderer/FluidRenderer';
+export * from './client/index.js';
+export * from './renderer/FluidRenderer.js';
 
 // Factories Module
-export * from './factories';
+export * from './factories/index.js';
 
 // Utils Module (Business Logic Utilities)
-export * from './utils';
+export * from './utils/index.js';
 
 // Loader Module (Blueprint loading)
-export * from './loader';
+export * from './loader/index.js';
 
 // Engine Class - REMOVED (dead code)
 
@@ -78,7 +74,7 @@ export * from './loader';
 // =============================================================================
 
 // Game Modules
-export * from './modules';
+export * from './modules/index.js';
 
 // =============================================================================
 // BACKWARD COMPATIBILITY

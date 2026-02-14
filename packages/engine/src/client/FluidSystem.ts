@@ -1,5 +1,5 @@
 import { Container } from 'pixi.js';
-import { FluidRenderer } from '../renderer/FluidRenderer';
+import { FluidRenderer } from '../renderer/FluidRenderer.js';
 
 export class FluidSystem {
     private renderer: FluidRenderer;

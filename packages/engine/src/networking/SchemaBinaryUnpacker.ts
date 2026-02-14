@@ -5,15 +5,15 @@
  * Uses generated NetworkDeserializer for component deltas.
  */
 
-import { SchemaPacketType } from './ProtocolSchema';
+import { SchemaPacketType } from './ProtocolSchema.js';
 import {
     COMPONENT_IDS,
     NetworkDeserializer,
     WorldState,
     TransformAccess,
     PhysicsAccess
-} from '../generated';
-import { ISnapshotReceiver } from './ISnapshotReceiver';
+} from '../generated/index.js';
+import { ISnapshotReceiver } from './ISnapshotReceiver.js';
 
 export class SchemaBinaryUnpacker {
 

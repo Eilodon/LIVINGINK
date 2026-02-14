@@ -1,2 +1,2 @@
-export * from './InkBleedShader';
-export * from './FluidSimulation';
+export * from './InkBleedShader.js';
+export * from './FluidSimulation.js';

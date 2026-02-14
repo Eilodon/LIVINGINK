@@ -2,16 +2,12 @@
     "name": "core-rust",
     "version": "0.1.0",
     "scripts": {
-        "build": "wasm-pack build --target web --out-dir ../../apps/client-ngu-hanh/public/wasm --no-typescript",
+        "build": "pnpm build:web && pnpm build:node",
+        "build:web": "wasm-pack build --target web --out-dir ../../apps/client-ngu-hanh/public/wasm --no-typescript",
+        "build:node": "wasm-pack build --target nodejs --out-dir pkg-node",
         "test": "cargo test"
     },
-    "dependencies": {
-        "wasm-bindgen": "0.2",
-        "getrandom": {
-            "version": "0.2",
-            "features": [
-                "js"
-            ]
-        }
+    "devDependencies": {
+        "wasm-pack": "^0.12.1"
     }
 }

@@ -10,4 +10,4 @@ export {
     TEXT_IDS,
     type IEngineEvent,
     type TextId,
-} from './EventRingBuffer';
+} from './EventRingBuffer.js';

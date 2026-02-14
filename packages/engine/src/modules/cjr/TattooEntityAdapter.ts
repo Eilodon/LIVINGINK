@@ -7,11 +7,11 @@
  * CRITICAL: Do NOT create new instances per-frame. Use the singleton.
  */
 
-import type { WorldState } from '../../generated/WorldState';
-import { TransformAccess, PigmentAccess, StatsAccess, StateAccess } from '../../generated/ComponentAccessors';
-import { TattooId, type PigmentVec3 } from './types';
-import { StatusFlag, TattooFlag, type ITattooEntity, type ITattooFood } from './tattoos';
-import { getRingAtPosition } from './ringSystem';
+import type { WorldState } from '../../generated/WorldState.js';
+import { TransformAccess, PigmentAccess, StatsAccess, StateAccess } from '../../generated/ComponentAccessors.js';
+import { TattooId, type PigmentVec3 } from './types.js';
+import { StatusFlag, TattooFlag, type ITattooEntity, type ITattooFood } from './tattoos.js';
+import { getRingAtPosition } from './ringSystem.js';
 
 /**
  * Reusable adapter that implements ITattooEntity interface.
@@ -160,7 +160,7 @@ export class TattooEntityAdapter implements ITattooEntity {
  * 
  * @example
  * ```typescript
- * import { tattooEntityAdapter } from './TattooEntityAdapter';
+ * import { tattooEntityAdapter } from './TattooEntityAdapter.js';
  * 
  * for (const id of activeEntities) {
  *     const entity = tattooEntityAdapter.bindToEntity(world, id);

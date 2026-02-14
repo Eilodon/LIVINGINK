@@ -1,5 +1,5 @@
 import { Application, RenderTexture, Sprite, Filter, Graphics, GlProgram, defaultFilterVert } from 'pixi.js';
-import { InkBleedShader } from './InkBleedShader';
+import { InkBleedShader } from './InkBleedShader.js';
 
 export class FluidSimulation {
     private app: Application;

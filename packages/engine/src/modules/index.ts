@@ -6,4 +6,4 @@
  */
 
 // CJR Module (Color Jelly Rush)
-export * from './cjr';
+export * from './cjr/index.js';

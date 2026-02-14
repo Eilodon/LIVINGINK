@@ -3,10 +3,10 @@
  * Pure boss AI and combat - VFX decoupled via eventBuffer
  */
 
-import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer';
-import { distanceSquared } from '../../math/FastMath';
-import { PhysicsAccess } from '../../generated/ComponentAccessors';
-import { WorldState } from '../../generated/WorldState';
+import { eventBuffer, EngineEventType, TEXT_IDS } from '../../events/EventRingBuffer.js';
+import { distanceSquared } from '../../math/FastMath.js';
+import { PhysicsAccess } from '../../generated/ComponentAccessors.js';
+import { WorldState } from '../../generated/WorldState.js';
 
 /**
  * Minimal entity interfaces

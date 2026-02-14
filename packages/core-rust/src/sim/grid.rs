@@ -1,8 +1,7 @@
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-// use rand::{Rng, SeedableRng}; // Removed
-// use rand_chacha::ChaCha8Rng; // Removed
-use crate::sim::rng::Pcg32;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 
 // --- ĐỊNH NGHĨA VẬT CHẤT ---
 
@@ -16,17 +15,23 @@ pub enum ElementType {
     Water = 3, // Thủy - Xanh dương
     Fire = 4,  // Hỏa - Đỏ
     Earth = 5, // Thổ - Nâu/Vàng
-    // Các loại đặc biệt (dành cho Boss mechanics sau này)
-    Stone = 10, // Đá (Không thể phá hủy thường)
-    Dark = 11,  // Hắc ám (Cần thanh tẩy)
+    // Các loại đặc biệt
+    Stone = 10, // Đá
+    Dark = 11,  // Hắc ám
 }
+
+// Flags Constants
+pub const FLAG_FROZEN: u8 = 1;
+pub const FLAG_BURNING: u8 = 2; // Ash/Burning
+pub const FLAG_LOCKED: u8 = 4;
+pub const FLAG_WET: u8 = 8;
 
 // Cấu trúc Cell siêu gọn (2 bytes)
 #[derive(Clone, Copy, Debug)]
 #[repr(C)] // Đảm bảo layout bộ nhớ tương thích C để JS đọc an toàn
 pub struct Cell {
     pub element: u8,
-    pub flags: u8,   // Bitmask: 1=Frozen, 2=Burning, 4=Locked...
+    pub flags: u8,   // Bitmask
 }
 
 // --- CORE GRID STATE ---
@@ -67,7 +72,7 @@ pub struct GridState {
     pub auto_refill: bool,
     
     // RNG Deterministic
-    rng: Pcg32,
+    rng: ChaCha8Rng,
     
     // Cycle System
     cycle: CycleState,
@@ -86,7 +91,7 @@ impl GridState {
             match_queue: Vec::with_capacity(64),
             is_stable: true,
             auto_refill: true,
-            rng: Pcg32::seed_from_u64(seed),
+            rng: ChaCha8Rng::seed_from_u64(seed),
             cycle: CycleState::new(),
         };
         grid.randomize(); // Khởi tạo ngẫu nhiên ban đầu
@@ -103,9 +108,25 @@ impl GridState {
             match_queue: Vec::with_capacity(64),
             is_stable: true,
             auto_refill: true,
-            rng: Pcg32::seed_from_u64(seed),
+            rng: ChaCha8Rng::seed_from_u64(seed),
             cycle: CycleState::new(),
         }
+    }
+
+    pub fn get_checksum(&self) -> u32 {
+        // Simple Adler-32 or CRC32-ish checksum of cells
+        let mut sum1: u32 = 1;
+        let mut sum2: u32 = 0;
+        
+        for cell in &self.cells {
+             sum1 = (sum1 + cell.element as u32) % 65521;
+             sum2 = (sum2 + sum1) % 65521;
+             
+             sum1 = (sum1 + cell.flags as u32) % 65521;
+             sum2 = (sum2 + sum1) % 65521;
+        }
+        
+        (sum2 << 16) | sum1
     }
 
     // 2. API TRUY XUẤT MEMORY (ZERO-COPY)
@@ -695,6 +716,10 @@ impl GridState {
         self.cycle.multiplier
     }
 
+    pub fn is_avatar_state(&self) -> bool {
+        self.cycle.is_avatar()
+    }
+
     // --- PREVIEW IMPLEMENTATION ---
     pub fn preview_swap(&mut self, idx1: usize, idx2: usize) -> Vec<u32> {
         if idx1 >= self.cells.len() || idx2 >= self.cells.len() { return Vec::new(); }
@@ -738,6 +763,28 @@ impl GridState {
         self.cells.swap(idx1, idx2);
 
         result
+    }
+
+    pub fn preview_neighbors(&mut self, x: usize, y: usize) -> Vec<u32> {
+        let mut results = Vec::new();
+        let width = self.width;
+        let height = self.height;
+        let idx = y * width + x;
+        if idx >= self.cells.len() { return results; }
+
+        let neighbors = [
+            if y > 0 { Some((x, y - 1)) } else { None },
+            if y < height - 1 { Some((x, y + 1)) } else { None },
+            if x > 0 { Some((x - 1, y)) } else { None },
+            if x < width - 1 { Some((x + 1, y)) } else { None },
+        ];
+
+        for n in neighbors.iter().flatten() {
+            let n_idx = n.1 * width + n.0;
+            let sub_result = self.preview_swap(idx, n_idx);
+            results.extend(sub_result);
+        }
+        results
     }
 }
 
@@ -843,7 +890,34 @@ impl GridState {
          InteractionType::None
     }
 
+    // Fluid Interaction
+    pub fn apply_fluid_density(&mut self, density: &[u8], fluid_w: usize, fluid_h: usize) {
+        if density.len() < fluid_w * fluid_h * 4 { return; }
 
+        let cell_w = fluid_w as f32 / self.width as f32;
+        let cell_h = fluid_h as f32 / self.height as f32;
+
+        for r in 0..self.height {
+            for c in 0..self.width {
+                // Sample center
+                let px = ((c as f32 + 0.5) * cell_w) as usize;
+                let py = ((r as f32 + 0.5) * cell_h) as usize;
+                
+                let x = if px >= fluid_w { fluid_w - 1 } else { px };
+                let y = if py >= fluid_h { fluid_h - 1 } else { py };
+
+                let idx = (y * fluid_w + x) * 4;
+                let d = density[idx]; // Red channel as density
+
+                let grid_idx = r * self.width + c;
+                if d > 100 { // Threshold ~0.4
+                    self.cells[grid_idx].flags |= FLAG_WET;
+                } else {
+                    self.cells[grid_idx].flags &= !FLAG_WET;
+                }
+            }
+        }
+    }
 }
 
 // --- CYCLE SYSTEM LOGIC ---
@@ -853,6 +927,7 @@ pub struct CycleState {
     pub target: u8,        // ElementType (1-5)
     pub chain_length: u32,
     pub multiplier: u32,
+    pub is_avatar_state: bool,
 }
 
 impl CycleState {
@@ -861,17 +936,31 @@ impl CycleState {
             target: 3, // Start with WATER (3)
             chain_length: 0,
             multiplier: 1,
+            is_avatar_state: false,
         }
     }
 
     // Check if match continues cycle
     // Returns: (is_success, multiplier_applied)
     pub fn process_match(&mut self, element: u8) -> (bool, u32) {
+        if self.is_avatar_state {
+             // In Avatar State, everything is a match/bonus?
+             // Or just huge multiplier?
+             // Let's keep existing logic but with boosted stats
+             self.multiplier += 1;
+             return (true, self.multiplier * 2); 
+        }
+
         if element == self.target {
             // SUCCESS
             self.chain_length += 1;
             self.multiplier += 1;
             
+            // Avatar State Check (Chain >= 5)
+            if self.chain_length >= 5 {
+                self.is_avatar_state = true;
+            }
+
             // Advance Target: Water(3) -> Wood(2) -> Fire(4) -> Earth(5) -> Metal(1) -> Water(3)
             self.target = match self.target {
                 3 => 2, // Water -> Wood
@@ -894,5 +983,14 @@ impl CycleState {
         self.chain_length = 0;
         self.multiplier = 1;
         self.target = 3; // Reset to Water
+        self.is_avatar_state = false;
+    }
+    
+    pub fn get_chain_length(&self) -> u32 {
+        self.chain_length
+    }
+    
+    pub fn is_avatar(&self) -> bool {
+        self.is_avatar_state
     }
 }

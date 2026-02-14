@@ -6,14 +6,14 @@
  * Uses Generated Accessors for Type Safety.
  */
 
-import { WorldState } from '../generated/WorldState';
-import { EntityFlags, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors';
+import { WorldState } from '../generated/WorldState.js';
+import { EntityFlags, TransformAccess, PhysicsAccess } from '../generated/ComponentAccessors.js';
 
 // EIDOLON-V P2 FIX: Document the intentional difference between physics and visual boundaries
 export const PHY_MAP_RADIUS = 2500;
 export const FRICTION_BASE = 0.92;
 
-import { GameConfig } from '../config/GameConfig';
+import { GameConfig } from '../config/GameConfig.js';
 
 // EIDOLON-V Phase 3: Anti-cheat speed limits
 const MAX_SPEED_BASE = 150;

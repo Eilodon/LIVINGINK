@@ -7,7 +7,7 @@
  * Client: wrap with singleton pattern for backward compat
  */
 
-import { MAX_ENTITIES } from '../generated/WorldState';
+import { MAX_ENTITIES } from '../generated/WorldState.js';
 
 /**
  * Generational Index Handle

@@ -3,7 +3,7 @@
  * Generated: 2026-02-08T15:29:30.437Z
  */
 
-import type { WorldState } from './WorldState';
+import type { WorldState } from './WorldState.js';
 
 // Entity State Flags
 export const enum EntityFlags {

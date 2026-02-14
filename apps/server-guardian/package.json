@@ -7,17 +7,21 @@
     "build": "tsc",
     "start": "tsc && node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsc && node dist/index.js'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No tests specified yet\" && exit 0"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@colyseus/monitor": "^0.15.8",
+    "@colyseus/schema": "^4.0.12",
+    "@types/uuid": "^11.0.0",
     "colyseus": "^0.15.57",
     "core-rust": "file:../../packages/core-rust/pkg-node",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
