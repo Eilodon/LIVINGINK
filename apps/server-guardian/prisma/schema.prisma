@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  
+  wallet    Wallet?
+  inventory InventoryItem[]
+  battlePass UserBattlePass?
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  gold      Int      @default(0) // Soft Currency
+  gems      Int      @default(0) // Hard Currency
+}
+
+model Item {
+  id        String   @id
+  type      String   // SKIN, BOOST, CURRENCY
+  rarity    String
+  name      String
+  meta      Json?    // Specifics (e.g. skin texture path)
+  
+  inventory InventoryItem[]
+}
+
+model InventoryItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id])
+  quantity  Int      @default(1)
+  acquiredAt DateTime @default(now())
+}
+
+model Season {
+  id        String   @id
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  active    Boolean  @default(false)
+  
+  tracks    BattlePassTrack[]
+}
+
+model BattlePassTrack {
+  id        String   @id @default(uuid())
+  seasonId  String
+  season    Season   @relation(fields: [seasonId], references: [id])
+  type      String   // FREE, PREMIUM
+  rewards   Json     // List of { level: 1, itemId: "skin_fire", amount: 1 }
+}
+
+model UserBattlePass {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  seasonId  String
+  level     Int      @default(1)
+  xp        Int      @default(0)
+  isPremium Boolean  @default(false)
+  claimed   Json     // List of claimed levels/track IDs
+}

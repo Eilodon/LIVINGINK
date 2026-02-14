@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-core:
+    name: Rust Core (Test & Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/core-rust
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/core-rust
+
+      - name: Check Formatting
+        run: cargo fmt -- --check
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run Tests
+        run: cargo test
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM (Web)
+        run: wasm-pack build --target web --out-dir ../../apps/client-ngu-hanh/public/wasm --no-typescript
+
+      - name: Build WASM (Node)
+        run: wasm-pack build --target nodejs --out-dir pkg-node
+
+  typescript:
+    name: TypeScript (Lint, Test, Build)
+    runs-on: ubuntu-latest
+    needs: rust-core # Wait for rust core to pass sanity checks (optional, but good for saving minutes)
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build Core Rust WASM again?
+      # Ideally we'd optimize by caching the 'pkg' from the previous job, but re-running wasm-pack is fast if cached or just repeating for simplicity in one job.
+      # Actually, the 'typescript' job needs 'core-rust/pkg-node' to exist for 'pnpm install' if it's a file dependency.
+      # But 'pnpm install' might just link.
+      # To be safe, we need WASM built before pnpm install? Or does pnpm install handle file:deps if they don't exist?
+      # It usually warns. But 'pkg-node' folder MUST exist.
+
+      - name: Install Rust (for WASM build in TS job)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build Rust Core (Pre-requisite)
+        working-directory: packages/core-rust
+        run: |
+          wasm-pack build --target web --out-dir ../../apps/client-ngu-hanh/public/wasm --no-typescript
+          wasm-pack build --target nodejs --out-dir pkg-node
+
+      - name: Build Engine
+        run: pnpm --filter engine build
+
+      - name: Build Games (Ngu Hanh)
+        run: pnpm --filter ngu-hanh build
+
+      - name: Typecheck & Build Server
+        run: pnpm --filter server-guardian build
+
+      - name: Typecheck Client
+        # Client build might take longer, just typecheck/lint for now
+        run: pnpm --filter client-ngu-hanh exec tsc --noEmit

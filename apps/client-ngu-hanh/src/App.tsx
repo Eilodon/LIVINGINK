@@ -38,7 +38,7 @@ function App() {
       });
 
     // 2. Network Init
-    const netManager = new NetworkManager();
+    const netManager = NetworkManager.getInstance();
     netManager.connect().then(seed => {
       console.log("App: Network Connected. Seed:", seed);
       setNetworkSeed(seed);

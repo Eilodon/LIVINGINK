@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ELEMENTAL_PALETTE, TYPOGRAPHY, SPACING } from '../theme/Theme';
 import { UISystem } from '../../game/systems/UISystem';
 import { ParticleBackground } from '../components/ParticleBackground';
+import { BattlePassUI } from '../../components/BattlePassUI';
 
 export const MainMenuScreen: React.FC = () => {
     // Determine which element is "active" or just cycle through them for the background
     const [activeElement, setActiveElement] = useState<Exclude<keyof typeof ELEMENTAL_PALETTE, 'UI'>>('FIRE');
+    const [showBattlePass, setShowBattlePass] = useState(false);
 
     // Simple cycle effect for the background
     useEffect(() => {
@@ -108,7 +110,25 @@ export const MainMenuScreen: React.FC = () => {
 
                 {/* Secondary Nav */}
                 <div style={{ display: 'flex', gap: SPACING.lg }}>
-                    <button 
+                    <button
+                        onClick={() => setShowBattlePass(true)}
+                        style={{
+                            padding: SPACING.sm,
+                            border: 'none',
+                            background: 'transparent',
+                            color: ELEMENTAL_PALETTE.UI.textSecondary,
+                            fontFamily: TYPOGRAPHY.fontFamily,
+                            fontSize: TYPOGRAPHY.caption,
+                            cursor: 'pointer',
+                            letterSpacing: '2px',
+                            transition: 'color 0.3s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#FFF'}
+                        onMouseLeave={e => e.currentTarget.style.color = ELEMENTAL_PALETTE.UI.textSecondary}
+                    >
+                        BATTLE PASS
+                    </button>
+                    <button
                         onClick={() => UISystem.getInstance().switchScreen('SHOP')}
                         style={{
                             padding: SPACING.sm,
@@ -126,7 +146,7 @@ export const MainMenuScreen: React.FC = () => {
                     >
                         SHOP
                     </button>
-                    <button 
+                    <button
                         onClick={() => UISystem.getInstance().switchScreen('PROFILE')}
                         style={{
                             padding: SPACING.sm,
@@ -144,7 +164,7 @@ export const MainMenuScreen: React.FC = () => {
                     >
                         PROFILE
                     </button>
-                    <button 
+                    <button
                         onClick={() => UISystem.getInstance().switchScreen('SETTINGS')}
                         style={{
                             padding: SPACING.sm,
@@ -164,6 +184,8 @@ export const MainMenuScreen: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {showBattlePass && <BattlePassUI onClose={() => setShowBattlePass(false)} />}
         </div>
     );
 };

@@ -14,9 +14,24 @@ export class NetworkManager {
     private entities = new Map<number, EntityData>();
     public onEntityAdd: ((id: number, data: EntityData) => void) | null = null;
     public onEntityRemove: ((id: number) => void) | null = null;
+    public onWalletUpdate: ((gold: number, gems: number) => void) | null = null;
 
-    constructor() {
+    // Current user state
+    public wallet = { gold: 0, gems: 0 };
+    public battlePass = { level: 1, xp: 0, isPremium: false };
+    public onBattlePassUpdate: ((level: number, xp: number, isPremium: boolean) => void) | null = null;
+
+    private static instance: NetworkManager;
+
+    private constructor() {
         this.client = new Client(CONFIG.WS_URL);
+    }
+
+    public static getInstance(): NetworkManager {
+        if (!NetworkManager.instance) {
+            NetworkManager.instance = new NetworkManager();
+        }
+        return NetworkManager.instance;
     }
 
     async connect(): Promise<string> {
@@ -53,11 +68,48 @@ export class NetworkManager {
                 if (this.onEntityRemove) this.onEntityRemove(entity.id);
             });
 
+            // Player State Sync
+            this.room.state.players.onAdd((player: any, sessionId: string) => {
+                if (sessionId === this.room.sessionId) {
+                    // This is ME
+                    this.updateWallet(player.wallet);
+
+                    player.wallet.onChange(() => {
+                        this.updateWallet(player.wallet);
+                    });
+
+                    // Initial BP
+                    this.updateBattlePass(player.battlePass);
+                    player.battlePass.onChange(() => {
+                        this.updateBattlePass(player.battlePass);
+                    });
+                }
+            });
+
             return seed || "0";
 
         } catch (e) {
             console.error("Join failed", e);
             throw e;
+        }
+    }
+
+    private updateWallet(walletState: any) {
+        this.wallet.gold = walletState.gold;
+        this.wallet.gems = walletState.gems;
+        if (this.onWalletUpdate) this.onWalletUpdate(this.wallet.gold, this.wallet.gems);
+    }
+
+    private updateBattlePass(bpState: any) {
+        this.battlePass.level = bpState.level;
+        this.battlePass.xp = bpState.xp;
+        this.battlePass.isPremium = bpState.isPremium;
+        if (this.onBattlePassUpdate) this.onBattlePassUpdate(this.battlePass.level, this.battlePass.xp, this.battlePass.isPremium);
+    }
+
+    public sendAction(type: string, data: any) {
+        if (this.room) {
+            this.room.send("input", { type, data });
         }
     }
 }

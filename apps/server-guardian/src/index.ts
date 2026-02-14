@@ -1,3 +1,8 @@
+import { startTelemetry } from "./utils/Telemetry";
+
+// Initialize Telemetry before importing other modules
+startTelemetry();
+
 import { Server } from "colyseus";
 import { createServer } from "http";
 import express from "express";

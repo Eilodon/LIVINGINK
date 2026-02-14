@@ -11,8 +11,20 @@ export const PurchaseSchema = z.object({
     itemId: z.string().min(1)
 });
 
+export const ClaimRewardSchema = z.object({
+    seasonId: z.string().optional(),
+    level: z.number().int().min(1),
+    track: z.enum(['FREE', 'PREMIUM'])
+});
+
+export const CheatSchema = z.object({
+    type: z.enum(['gold', 'gems']),
+    amount: z.number().int()
+});
+
 export const PayloadSchema = z.discriminatedUnion("type", [
     z.object({ type: z.literal("move"), data: MoveSchema }),
     z.object({ type: z.literal("purchase"), data: PurchaseSchema }),
-    // Add more action types here
+    z.object({ type: z.literal("claim_reward"), data: ClaimRewardSchema }),
+    z.object({ type: z.literal("cheat"), data: CheatSchema })
 ]);

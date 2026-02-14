@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "2567:2567"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/nguhanh?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=supersecretdevkey
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - game-net
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nguhanh
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - game-net
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - game-net
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+
+networks:
+  game-net:

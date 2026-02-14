@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ELEMENTAL_PALETTE, TYPOGRAPHY, SPACING } from '../theme/Theme';
 import { UISystem } from '../../game/systems/UISystem';
+import { useEconomy } from '../hooks/useEconomy';
 
 interface ShopItem {
     id: string;
@@ -14,16 +15,8 @@ interface ShopItem {
 }
 
 export const ShopScreen: React.FC = () => {
-    const [uiState, setUiState] = useState(UISystem.getInstance().state);
+    const { gold, gems, purchaseItem } = useEconomy();
     const [selectedTab, setSelectedTab] = useState<'powerups' | 'cosmetics' | 'boosts'>('powerups');
-    // const [playerCoins, setPlayerCoins] = useState(2500); // REPLACED by UISystem
-
-    useEffect(() => {
-        const sys = UISystem.getInstance();
-        const onUpdate = (s: any) => setUiState({ ...s });
-        sys.on('update', onUpdate);
-        return () => { sys.off('update', onUpdate); }
-    }, []);
 
     const shopItems: ShopItem[] = [
         // Power-ups
@@ -50,10 +43,9 @@ export const ShopScreen: React.FC = () => {
     });
 
     const handlePurchase = (item: ShopItem) => {
-        if (UISystem.getInstance().spendCoins(item.cost)) {
-            // Coin deduction handled in UISystem
-            console.log(`Purchased ${item.name}`);
-            // TODO: Update inventory in ECS/Backend
+        if (gold >= item.cost) {
+            purchaseItem(item.id);
+            // Optimistic UI updates or wait for server notification
         }
     };
 
@@ -93,19 +85,36 @@ export const ShopScreen: React.FC = () => {
                     ELEMENTAL SHOP
                 </h2>
 
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: SPACING.sm,
-                    padding: '8px 16px',
-                    background: 'rgba(0,0,0,0.5)',
-                    borderRadius: '20px',
-                    border: `1px solid ${ELEMENTAL_PALETTE.UI.primary}`
-                }}>
-                    <span style={{ fontSize: '20px' }}>🪙</span>
-                    <span style={{ fontFamily: TYPOGRAPHY.fontFamily, fontWeight: 'bold' }}>
-                        {uiState.playerCoins.toLocaleString()}
-                    </span>
+                <div style={{ display: 'flex', gap: SPACING.md }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: SPACING.sm,
+                        padding: '8px 16px',
+                        background: 'rgba(0,0,0,0.5)',
+                        borderRadius: '20px',
+                        border: `1px solid ${ELEMENTAL_PALETTE.UI.primary}`
+                    }}>
+                        <span style={{ fontSize: '20px' }}>🪙</span>
+                        <span style={{ fontFamily: TYPOGRAPHY.fontFamily, fontWeight: 'bold' }}>
+                            {gold.toLocaleString()}
+                        </span>
+                    </div>
+
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: SPACING.sm,
+                        padding: '8px 16px',
+                        background: 'rgba(0,0,0,0.5)',
+                        borderRadius: '20px',
+                        border: `1px solid ${ELEMENTAL_PALETTE.UI.secondary}`
+                    }}>
+                        <span style={{ fontSize: '20px' }}>💎</span>
+                        <span style={{ fontFamily: TYPOGRAPHY.fontFamily, fontWeight: 'bold' }}>
+                            {gems.toLocaleString()}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -145,7 +154,7 @@ export const ShopScreen: React.FC = () => {
             }}>
                 {filteredItems.map(item => {
                     const theme = ELEMENTAL_PALETTE[item.element];
-                    const canAfford = uiState.playerCoins >= item.cost;
+                    const canAfford = gold >= item.cost;
 
                     return (
                         <div
